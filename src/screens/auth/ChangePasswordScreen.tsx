@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import { clearCookie } from '../../services/api';
-import { COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { COLORS, FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { GlassInput } from '../../components/ui/GlassInput';
+import { AnimatedButton } from '../../components/ui/AnimatedButton';
+import { SuccessBurst } from '../../components/ui/SuccessBurst';
 
 export const ChangePasswordScreen: React.FC = () => {
   const { logout, setFirstLoginDone } = useAuth();
@@ -23,6 +26,7 @@ export const ChangePasswordScreen: React.FC = () => {
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleSubmit = async () => {
     if (!current || !next || !confirm) {
@@ -41,15 +45,18 @@ export const ChangePasswordScreen: React.FC = () => {
     setLoading(true);
     try {
       await changePassword({ currentPassword: current, newPassword: next, confirmPassword: confirm });
-      Alert.alert('Password Changed', 'Please log in with your new password.', [
-        {
-          text: 'OK',
-          onPress: async () => {
-            await clearCookie();
-            logout();
+      setShowSuccess(true);
+      setTimeout(() => {
+        Alert.alert('Password Changed', 'Please log in with your new password.', [
+          {
+            text: 'OK',
+            onPress: async () => {
+              await clearCookie();
+              logout();
+            },
           },
-        },
-      ]);
+        ]);
+      }, 900);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to change password.';
       Alert.alert('Error', message);
@@ -59,110 +66,67 @@ export const ChangePasswordScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.iconBox}>
-          <Ionicons name="shield-checkmark" size={48} color={COLORS.primary} />
-        </View>
-        <Text style={styles.title}>Set Your Password</Text>
-        <Text style={styles.subtitle}>
-          This is your first login. Please change your temporary password to continue.
-        </Text>
+    <AnimatedScreen>
+      <SuccessBurst visible={showSuccess} />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <Animated.View entering={ZoomIn.duration(400)} style={styles.iconBox}>
+            <Ionicons name="shield-checkmark" size={48} color={COLORS.primary} />
+          </Animated.View>
+          <Text style={styles.title}>Set Your Password</Text>
+          <Text style={styles.subtitle}>
+            This is your first login. Please change your temporary password to continue.
+          </Text>
 
-        <View style={styles.card}>
-          {[
-            { label: 'Current Password', value: current, onChange: setCurrent },
-            { label: 'New Password', value: next, onChange: setNext },
-            { label: 'Confirm New Password', value: confirm, onChange: setConfirm },
-          ].map(({ label, value, onChange }) => (
-            <View key={label} style={styles.field}>
-              <Text style={styles.label}>{label}</Text>
-              <View style={styles.inputRow}>
-                <Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} style={styles.icon} />
-                <TextInput
-                  style={styles.input}
+          <GlassCard glowColor={COLORS.primary}>
+            {[
+              { label: 'Current Password', value: current, onChange: setCurrent },
+              { label: 'New Password', value: next, onChange: setNext },
+              { label: 'Confirm New Password', value: confirm, onChange: setConfirm },
+            ].map(({ label, value, onChange }, i) => (
+              <Animated.View key={label} entering={FadeIn.delay(i * 80).duration(300)}>
+                <GlassInput
+                  label={label}
                   placeholder={label}
-                  placeholderTextColor={COLORS.textMuted}
                   value={value}
                   onChangeText={onChange}
                   secureTextEntry
                   autoCapitalize="none"
                   editable={!loading}
+                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} />}
                 />
-              </View>
-            </View>
-          ))}
+              </Animated.View>
+            ))}
 
-          <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.btnText}>Change Password</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={logout} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Skip for now</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <AnimatedButton
+              label="Change Password"
+              onPress={handleSubmit}
+              loading={loading}
+              style={styles.btn}
+            />
+            <AnimatedButton label="Skip for now" variant="ghost" onPress={logout} />
+          </GlassCard>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AnimatedScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  flex: { flex: 1 },
   scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.xl },
   iconBox: { alignItems: 'center', marginBottom: SPACING.md },
-  title: { color: COLORS.text, fontSize: FONT_SIZE.xxl, fontWeight: '700', textAlign: 'center' },
+  title: { ...TYPOGRAPHY.title, color: COLORS.text, textAlign: 'center' },
   subtitle: {
+    ...TYPOGRAPHY.body,
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.md,
     textAlign: 'center',
     marginTop: SPACING.sm,
     marginBottom: SPACING.xl,
     lineHeight: 22,
   },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    gap: SPACING.md,
-  },
-  field: { gap: SPACING.xs },
-  label: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '500' },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingHorizontal: SPACING.md,
-    height: 52,
-  },
-  icon: { marginRight: SPACING.sm },
-  input: { flex: 1, color: COLORS.text, fontSize: FONT_SIZE.md },
-  btn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.xs,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: COLORS.white, fontSize: FONT_SIZE.lg, fontWeight: '700' },
-  skipBtn: { alignItems: 'center', paddingVertical: SPACING.sm },
-  skipText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm },
+  btn: { marginTop: SPACING.xs },
 });

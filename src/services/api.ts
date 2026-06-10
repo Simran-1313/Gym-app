@@ -52,7 +52,13 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    const message =
+      error.response?.data?.message ??
+      error.message ??
+      'Request failed';
+    return Promise.reject(new Error(message));
+  },
 );
 
 export default api;

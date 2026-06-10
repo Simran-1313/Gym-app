@@ -5,15 +5,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { getMyBookings, cancelBooking } from '../../services/member.service';
 import { ClassBooking } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { StatBadge } from '../../components/ui/StatBadge';
+import { StaggerItem } from '../../components/ui/StaggerItem';
+import { AnimatedButton } from '../../components/ui/AnimatedButton';
+import { GlassOverlay } from '../../components/ui/GlassOverlay';
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -29,10 +36,12 @@ const statusConfig: Record<string, { color: string; icon: keyof typeof Ionicons.
 };
 
 export const BookingsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ClassBooking | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -53,123 +62,97 @@ export const BookingsScreen: React.FC = () => {
     setRefreshing(false);
   }, [load]);
 
-  const handleCancel = useCallback(
-    (booking: ClassBooking) => {
-      Alert.alert(
-        'Cancel Booking',
-        `Cancel your booking for ${booking.schedule.class.name}?`,
-        [
-          { text: 'No', style: 'cancel' },
-          {
-            text: 'Yes, Cancel',
-            style: 'destructive',
-            onPress: async () => {
-              setCancellingId(booking.id);
-              try {
-                await cancelBooking(booking.id);
-                await load();
-              } catch (err: unknown) {
-                Alert.alert('Error', err instanceof Error ? err.message : 'Cancel failed');
-              } finally {
-                setCancellingId(null);
-              }
-            },
-          },
-        ],
-      );
-    },
-    [load],
-  );
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    setCancellingId(cancelTarget.id);
+    try {
+      await cancelBooking(cancelTarget.id);
+      await load();
+      setCancelTarget(null);
+    } catch (err: unknown) {
+      setCancelTarget(null);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Cancel failed');
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-    >
-      {bookings.length === 0 ? (
-        <EmptyState
-          icon="bookmark-outline"
-          title="No bookings yet"
-          subtitle="Book a class from the Classes tab to see it here."
-        />
-      ) : (
-        bookings.map((b) => {
-          const cfg = statusConfig[b.status] ?? statusConfig.CONFIRMED;
-          const canCancel = b.status === 'CONFIRMED';
-          return (
-            <View key={b.id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.classBlock}>
-                  <Text style={styles.className}>{b.schedule.class.name}</Text>
-                  <Text style={styles.classTime}>
-                    {formatDate(b.schedule.startTime)} · {formatTime(b.schedule.startTime)} – {formatTime(b.schedule.endTime)}
-                  </Text>
-                  <Text style={styles.duration}>{b.schedule.class.durationMinutes} min</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: cfg.color + '22' }]}>
-                  <Ionicons name={cfg.icon} size={14} color={cfg.color} />
-                  <Text style={[styles.statusText, { color: cfg.color }]}>{b.status}</Text>
-                </View>
-              </View>
+    <AnimatedScreen>
+      <GlassOverlay
+        visible={!!cancelTarget}
+        title="Cancel Booking"
+        message={`Cancel your booking for ${cancelTarget?.schedule.class.name ?? 'this class'}?`}
+        confirmLabel="Yes, Cancel"
+        cancelLabel="Keep Booking"
+        destructive
+        loading={!!cancellingId}
+        onConfirm={confirmCancel}
+        onCancel={() => setCancelTarget(null)}
+      />
 
-              {canCancel && (
-                <TouchableOpacity
-                  style={[styles.cancelBtn, cancellingId === b.id && styles.cancelBtnDisabled]}
-                  onPress={() => handleCancel(b)}
-                  disabled={cancellingId === b.id}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.cancelBtnText}>
-                    {cancellingId === b.id ? 'Cancelling…' : 'Cancel Booking'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })
-      )}
-    </ScrollView>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+      >
+        {bookings.length === 0 ? (
+          <EmptyState
+            icon="bookmark-outline"
+            title="No bookings yet"
+            subtitle="Book a class from the Classes tab to see it here."
+          />
+        ) : (
+          bookings.map((b, i) => {
+            const cfg = statusConfig[b.status] ?? statusConfig.CONFIRMED;
+            const canCancel = b.status === 'CONFIRMED';
+            return (
+              <StaggerItem key={b.id} index={i}>
+                <GlassCard glowColor={cfg.color} style={styles.card}>
+                  <View style={styles.cardTop}>
+                    <View style={styles.classBlock}>
+                      <Text style={styles.className}>{b.schedule.class.name}</Text>
+                      <Text style={styles.classTime}>
+                        {formatDate(b.schedule.startTime)} · {formatTime(b.schedule.startTime)} – {formatTime(b.schedule.endTime)}
+                      </Text>
+                      <StatBadge
+                        icon="time-outline"
+                        label="Duration"
+                        value={`${b.schedule.class.durationMinutes} min`}
+                        color={COLORS.accent}
+                      />
+                    </View>
+                    <StatBadge icon={cfg.icon} label="Status" value={b.status} color={cfg.color} />
+                  </View>
+
+                  {canCancel && (
+                    <AnimatedButton
+                      label={cancellingId === b.id ? 'Cancelling…' : 'Cancel Booking'}
+                      variant="secondary"
+                      onPress={() => setCancelTarget(b)}
+                      disabled={!!cancellingId}
+                      loading={cancellingId === b.id}
+                    />
+                  )}
+                </GlassCard>
+              </StaggerItem>
+            );
+          })
+        )}
+      </ScrollView>
+    </AnimatedScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.md, gap: SPACING.md, paddingBottom: SPACING.xxl },
+  root: { flex: 1 },
+  content: { padding: SPACING.md, gap: SPACING.md },
 
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    gap: SPACING.md,
-  },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  classBlock: { flex: 1, gap: 4 },
-  className: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  card: { gap: SPACING.md },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: SPACING.sm },
+  classBlock: { flex: 1, gap: 8 },
+  className: { ...TYPOGRAPHY.heading, color: COLORS.text },
   classTime: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm },
-  duration: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs },
-
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-  },
-  statusText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
-
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: COLORS.error,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  cancelBtnDisabled: { opacity: 0.5 },
-  cancelBtnText: { color: COLORS.error, fontSize: FONT_SIZE.sm, fontWeight: '600' },
 });

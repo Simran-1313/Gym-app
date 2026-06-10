@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
-import { COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { RootStackParams } from '../../navigation/AppNavigator';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { GlassInput } from '../../components/ui/GlassInput';
+import { AnimatedButton } from '../../components/ui/AnimatedButton';
+import { GlassOverlay } from '../../components/ui/GlassOverlay';
+import { StaggerItem } from '../../components/ui/StaggerItem';
 
 const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = ({
   icon,
@@ -29,12 +37,15 @@ const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; v
 );
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
+  const insets = useSafeAreaInsets();
   const { user, logout, refreshUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -54,22 +65,14 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          setLoggingOut(true);
-          try {
-            await logout();
-          } finally {
-            setLoggingOut(false);
-          }
-        },
-      },
-    ]);
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
   const memberSince = user?.createdAt
@@ -77,164 +80,141 @@ export const ProfileScreen: React.FC = () => {
     : '—';
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarLetter}>{user?.name?.[0]?.toUpperCase() ?? 'M'}</Text>
-        </View>
-        <Text style={styles.heroName}>{user?.name ?? 'Member'}</Text>
-        <Text style={styles.heroEmail}>{user?.email ?? ''}</Text>
-        <Text style={styles.memberSince}>Member since {memberSince}</Text>
-      </View>
+    <AnimatedScreen>
+      <GlassOverlay
+        visible={showLogoutConfirm}
+        title="Logout"
+        message="Are you sure you want to log out?"
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        destructive
+        loading={loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
 
-      {user?.isFirstLogin && (
-        <View style={styles.alertBanner}>
-          <Ionicons name="warning" size={18} color={COLORS.warning} />
-          <Text style={styles.alertText}>Please change your temporary password.</Text>
-        </View>
-      )}
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 100 }]}
+      >
+        <GlassCard glowColor={COLORS.primary} style={styles.hero}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarLetter}>{user?.name?.[0]?.toUpperCase() ?? 'M'}</Text>
+          </View>
+          <Text style={styles.heroName}>{user?.name ?? 'Member'}</Text>
+          <Text style={styles.heroEmail}>{user?.email ?? ''}</Text>
+          <Text style={styles.memberSince}>Member since {memberSince}</Text>
+        </GlassCard>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Personal Info</Text>
-          {!editing && (
-            <TouchableOpacity onPress={() => setEditing(true)} style={styles.editBtn}>
-              <Ionicons name="create-outline" size={16} color={COLORS.primary} />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
+        {user?.isFirstLogin && (
+          <GlassCard glowColor={COLORS.warning}>
+            <View style={styles.alertBanner}>
+              <Ionicons name="warning" size={18} color={COLORS.warning} />
+              <Text style={styles.alertText}>Please change your temporary password.</Text>
+            </View>
+          </GlassCard>
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Personal Info</Text>
+            {!editing && (
+              <AnimatedButton label="Edit" variant="ghost" onPress={() => setEditing(true)} />
+            )}
+          </View>
+
+          {editing ? (
+            <GlassCard style={styles.editCard}>
+              <GlassInput label="Full Name" value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" editable={!saving} />
+              <GlassInput label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" editable={!saving} />
+              <View style={styles.editActions}>
+                <AnimatedButton
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => {
+                    setEditing(false);
+                    setName(user?.name ?? '');
+                    setPhone(user?.phone ?? '');
+                  }}
+                  disabled={saving}
+                  style={styles.flex1}
+                />
+                <AnimatedButton label="Save" onPress={handleSave} loading={saving} style={styles.flex1} />
+              </View>
+            </GlassCard>
+          ) : (
+            <GlassCard>
+              <InfoRow icon="person-outline" label="Name" value={user?.name ?? ''} />
+              <View style={styles.separator} />
+              <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
+              <View style={styles.separator} />
+              <InfoRow icon="call-outline" label="Phone" value={user?.phone ?? ''} />
+            </GlassCard>
           )}
         </View>
 
-        {editing ? (
-          <View style={styles.editCard}>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Your name"
-                placeholderTextColor={COLORS.textMuted}
-                autoCapitalize="words"
-                editable={!saving}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <StaggerItem index={0}>
+            <GlassCard glowColor={COLORS.accent} style={styles.menuTile}>
+              <AnimatedButton
+                label="My Diet Plan"
+                variant="secondary"
+                onPress={() => navigation.navigate('DietPlan')}
+                icon={<Ionicons name="nutrition-outline" size={20} color={COLORS.accent} />}
               />
+            </GlassCard>
+          </StaggerItem>
+          <GlassCard style={styles.menuCard}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusLeft}>
+                <Ionicons
+                  name={user?.isActive ? 'checkmark-circle' : 'close-circle'}
+                  size={20}
+                  color={user?.isActive ? COLORS.success : COLORS.error}
+                />
+                <Text style={styles.menuLabel}>Account Status</Text>
+              </View>
+              <Text style={{ color: user?.isActive ? COLORS.success : COLORS.error, fontSize: FONT_SIZE.sm, fontWeight: '600' }}>
+                {user?.isActive ? 'Active' : 'Inactive'}
+              </Text>
             </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Phone number"
-                placeholderTextColor={COLORS.textMuted}
-                keyboardType="phone-pad"
-                editable={!saving}
-              />
-            </View>
-            <View style={styles.editActions}>
-              <TouchableOpacity
-                style={styles.cancelEditBtn}
-                onPress={() => {
-                  setEditing(false);
-                  setName(user?.name ?? '');
-                  setPhone(user?.phone ?? '');
-                }}
-                disabled={saving}
-              >
-                <Text style={styles.cancelEditText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.infoCard}>
-            <InfoRow icon="person-outline" label="Name" value={user?.name ?? ''} />
-            <View style={styles.separator} />
-            <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
-            <View style={styles.separator} />
-            <InfoRow icon="call-outline" label="Phone" value={user?.phone ?? ''} />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.menuCard}>
-          <View style={[styles.statusRow]}>
-            <View style={styles.statusLeft}>
-              <Ionicons
-                name={user?.isActive ? 'checkmark-circle' : 'close-circle'}
-                size={20}
-                color={user?.isActive ? COLORS.success : COLORS.error}
-              />
-              <Text style={styles.menuLabel}>Account Status</Text>
-            </View>
-            <Text style={{ color: user?.isActive ? COLORS.success : COLORS.error, fontSize: FONT_SIZE.sm, fontWeight: '600' }}>
-              {user?.isActive ? 'Active' : 'Inactive'}
-            </Text>
-          </View>
+          </GlassCard>
         </View>
-      </View>
 
-      <TouchableOpacity
-        style={[styles.logoutBtn, loggingOut && styles.logoutBtnDisabled]}
-        onPress={handleLogout}
-        disabled={loggingOut}
-        activeOpacity={0.8}
-      >
-        {loggingOut ? (
-          <ActivityIndicator color={COLORS.error} />
-        ) : (
-          <>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-            <Text style={styles.logoutText}>Logout</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        <AnimatedButton
+          label="Logout"
+          variant="secondary"
+          onPress={() => setShowLogoutConfirm(true)}
+          loading={loggingOut}
+          icon={<Ionicons name="log-out-outline" size={20} color={COLORS.error} />}
+        />
+      </ScrollView>
+    </AnimatedScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.lg, gap: SPACING.lg, paddingBottom: SPACING.xxl },
+  root: { flex: 1 },
+  content: { padding: SPACING.lg, gap: SPACING.lg },
 
-  hero: { alignItems: 'center', paddingVertical: SPACING.lg, gap: SPACING.sm },
+  hero: { alignItems: 'center', gap: SPACING.sm },
   avatarCircle: {
     width: 88,
     height: 88,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primary + '33',
+    backgroundColor: `${COLORS.primary}33`,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: COLORS.primary,
   },
-  avatarLetter: { color: COLORS.primary, fontSize: FONT_SIZE.xxxl, fontWeight: '800' },
-  heroName: { color: COLORS.text, fontSize: FONT_SIZE.xxl, fontWeight: '700' },
-  heroEmail: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md },
+  avatarLetter: { color: COLORS.primary, fontSize: FONT_SIZE.hero, fontWeight: '800' },
+  heroName: { ...TYPOGRAPHY.title, color: COLORS.text },
+  heroEmail: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
   memberSince: { color: COLORS.textMuted, fontSize: FONT_SIZE.sm },
 
-  alertBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.warning + '22',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.warning + '44',
-  },
+  alertBanner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   alertText: { color: COLORS.warning, fontSize: FONT_SIZE.sm, flex: 1 },
 
   section: { gap: SPACING.sm },
@@ -246,86 +226,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  editBtnText: { color: COLORS.primary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
 
-  infoCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm },
   infoText: { flex: 1 },
   infoLabel: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginBottom: 2 },
   infoValue: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '500' },
-  separator: { height: 1, backgroundColor: COLORS.cardBorder },
+  separator: { height: 1, backgroundColor: COLORS.surfaceBorder },
 
-  editCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    gap: SPACING.md,
-  },
-  field: { gap: SPACING.xs },
-  fieldLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '500' },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    paddingHorizontal: SPACING.md,
-    height: 48,
-  },
-  editActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.xs },
-  cancelEditBtn: {
-    flex: 1,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    borderRadius: RADIUS.md,
-  },
-  cancelEditText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md, fontWeight: '600' },
-  saveBtn: {
-    flex: 1,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: COLORS.white, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  editCard: { gap: SPACING.md },
+  editActions: { flexDirection: 'row', gap: SPACING.md },
+  flex1: { flex: 1 },
 
-  menuCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
+  menuTile: { marginBottom: SPACING.sm },
+  menuCard: {},
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   menuLabel: { color: COLORS.text, fontSize: FONT_SIZE.md },
-
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    borderWidth: 1.5,
-    borderColor: COLORS.error,
-    borderRadius: RADIUS.md,
-    height: 52,
-    marginTop: SPACING.sm,
-  },
-  logoutBtnDisabled: { opacity: 0.5 },
-  logoutText: { color: COLORS.error, fontSize: FONT_SIZE.lg, fontWeight: '700' },
 });

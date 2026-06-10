@@ -1,5 +1,15 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { ScreenBackground } from './ScreenBackground';
 import { COLORS } from '../../config/theme';
 
 interface Props {
@@ -8,20 +18,55 @@ interface Props {
 }
 
 export const LoadingSpinner: React.FC<Props> = ({ size = 'large', fullScreen = false }) => {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0.6);
+
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.12, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.6, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [scale, opacity]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  const iconSize = size === 'large' ? 48 : 28;
+
+  const spinner = (
+    <Animated.View style={iconStyle}>
+      <Ionicons name="barbell" size={iconSize} color={COLORS.primary} />
+    </Animated.View>
+  );
+
   if (fullScreen) {
     return (
-      <View style={styles.fullScreen}>
-        <ActivityIndicator size={size} color={COLORS.primary} />
-      </View>
+      <ScreenBackground>
+        <View style={styles.fullScreen}>{spinner}</View>
+      </ScreenBackground>
     );
   }
-  return <ActivityIndicator size={size} color={COLORS.primary} />;
+
+  return spinner;
 };
 
 const styles = StyleSheet.create({
   fullScreen: {
     flex: 1,
-    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
   },

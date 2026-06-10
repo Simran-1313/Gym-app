@@ -2,11 +2,13 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { Platform, StyleSheet } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { FloatingTabBar } from '../components/ui/FloatingTabBar';
 import { COLORS } from '../config/theme';
+import { AiPlan } from '../types';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ChangePasswordScreen } from '../screens/auth/ChangePasswordScreen';
@@ -15,6 +17,9 @@ import { ClassesScreen } from '../screens/classes/ClassesScreen';
 import { BookingsScreen } from '../screens/classes/BookingsScreen';
 import { CheckInsScreen } from '../screens/checkins/CheckInsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
+import { DietPlanScreen } from '../screens/dietplan/DietPlanScreen';
+import { WorkoutPlanScreen } from '../screens/workout/WorkoutPlanScreen';
 
 export type AuthStackParams = {
   Login: undefined;
@@ -33,15 +38,27 @@ export type TabParams = {
   Profile: undefined;
 };
 
+export type RootStackParams = {
+  MainTabs: undefined;
+  Onboarding: undefined;
+  DietPlan: { plan?: AiPlan; fromOnboarding?: boolean; generate?: boolean } | undefined;
+  WorkoutPlan: { plan?: AiPlan; generate?: boolean } | undefined;
+};
+
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
 const ClassesStack = createNativeStackNavigator<ClassesStackParams>();
+const RootStack = createNativeStackNavigator<RootStackParams>();
 const Tab = createBottomTabNavigator<TabParams>();
 
+const stackAnimation = Platform.OS === 'ios' ? 'fade_from_bottom' : 'slide_from_right';
+
 const screenOptions = {
-  headerStyle: { backgroundColor: COLORS.surface },
+  headerStyle: { backgroundColor: 'transparent' },
+  headerTransparent: true,
   headerTintColor: COLORS.text,
   headerTitleStyle: { color: COLORS.text, fontWeight: '600' as const },
-  contentStyle: { backgroundColor: COLORS.background },
+  contentStyle: { backgroundColor: 'transparent' },
+  animation: stackAnimation as 'fade_from_bottom' | 'slide_from_right',
 };
 
 const ClassesNavigator: React.FC = () => (
@@ -53,29 +70,14 @@ const ClassesNavigator: React.FC = () => (
 
 const MainTabs: React.FC = () => (
   <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerStyle: { backgroundColor: COLORS.surface },
+    tabBar={(props) => <FloatingTabBar {...props} />}
+    screenOptions={{
+      headerStyle: { backgroundColor: 'transparent' },
+      headerTransparent: true,
       headerTintColor: COLORS.text,
       headerTitleStyle: { color: COLORS.text, fontWeight: '600' as const },
-      tabBarStyle: {
-        backgroundColor: COLORS.surface,
-        borderTopColor: COLORS.cardBorder,
-        height: 60,
-        paddingBottom: 8,
-      },
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textMuted,
-      tabBarIcon: ({ focused, color, size }) => {
-        const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
-          Home: ['home', 'home-outline'],
-          Classes: ['barbell', 'barbell-outline'],
-          CheckIns: ['time', 'time-outline'],
-          Profile: ['person', 'person-outline'],
-        };
-        const [active, inactive] = icons[route.name] ?? ['help', 'help-outline'];
-        return <Ionicons name={focused ? active : inactive} size={size} color={color} />;
-      },
-    })}
+      sceneStyle: styles.tabScene,
+    }}
   >
     <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
     <Tab.Screen
@@ -93,25 +95,58 @@ export const AppNavigator: React.FC = () => {
 
   if (isLoading) return <LoadingSpinner fullScreen />;
 
-  return (
-    <NavigationContainer>
-      {user ? (
-        isFirstLogin ? (
-          <AuthStack.Navigator screenOptions={screenOptions}>
-            <AuthStack.Screen
-              name="ChangePassword"
-              component={ChangePasswordScreen}
-              options={{ title: 'Set New Password', headerLeft: () => null }}
-            />
-          </AuthStack.Navigator>
-        ) : (
-          <MainTabs />
-        )
-      ) : (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-          <AuthStack.Screen name="Login" component={LoginScreen} />
-        </AuthStack.Navigator>
-      )}
-    </NavigationContainer>
-  );
+  let content: React.ReactNode;
+
+  if (!user) {
+    content = (
+      <AuthStack.Navigator screenOptions={{ headerShown: false, animation: stackAnimation }}>
+        <AuthStack.Screen name="Login" component={LoginScreen} />
+      </AuthStack.Navigator>
+    );
+  } else if (isFirstLogin) {
+    content = (
+      <AuthStack.Navigator screenOptions={screenOptions}>
+        <AuthStack.Screen
+          name="ChangePassword"
+          component={ChangePasswordScreen}
+          options={{ title: 'Set New Password', headerLeft: () => null }}
+        />
+      </AuthStack.Navigator>
+    );
+  } else if (user.isOnboarded === false) {
+    content = (
+      <RootStack.Navigator screenOptions={screenOptions}>
+        <RootStack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ title: 'Your Fitness Profile', headerLeft: () => null }}
+        />
+        <RootStack.Screen
+          name="DietPlan"
+          component={DietPlanScreen}
+          options={{ title: 'My Diet Plan', headerBackVisible: false }}
+        />
+        <RootStack.Screen
+          name="WorkoutPlan"
+          component={WorkoutPlanScreen}
+          options={{ title: 'My Workout Plan' }}
+        />
+      </RootStack.Navigator>
+    );
+  } else {
+    content = (
+      <RootStack.Navigator screenOptions={screenOptions}>
+        <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+        <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ title: 'My Diet Plan' }} />
+        <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: 'My Workout Plan' }} />
+        <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Update Fitness Profile' }} />
+      </RootStack.Navigator>
+    );
+  }
+
+  return <NavigationContainer>{content}</NavigationContainer>;
 };
+
+const styles = StyleSheet.create({
+  tabScene: { backgroundColor: 'transparent' },
+});

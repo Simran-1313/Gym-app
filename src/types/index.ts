@@ -31,9 +31,82 @@ export interface User {
   avatarUrl: string | null;
   isActive: boolean;
   isFirstLogin: boolean;
+  isOnboarded: boolean;
   createdAt: string;
   activeSubscription?: ActiveSubscription | null;
   tenant?: Tenant;
+}
+
+// ─── Onboarding / AI plans ────────────────────────────────────────────────────
+
+export type FitnessGoal = 'WEIGHT_LOSS' | 'MUSCLE_GAIN' | 'FITNESS' | 'ENDURANCE';
+export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE';
+export type DietPreference = 'VEG' | 'NON_VEG' | 'VEGAN' | 'KETO';
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
+export interface MemberProfileInput {
+  age: number;
+  weight: number;
+  height: number;
+  gender?: Gender;
+  fitnessGoal: FitnessGoal;
+  dietPreference: DietPreference;
+  activityLevel: ActivityLevel;
+  allergies?: string;
+  daysPerWeek?: number;
+}
+
+export interface MemberProfile extends MemberProfileInput {
+  id: string;
+  memberId: string;
+  isOnboarded: boolean;
+  updatedAt: string;
+}
+
+export interface DietPlanMeal {
+  name: string;
+  items: string[];
+  calories: number;
+}
+
+export interface DietPlanDay {
+  day: string;
+  meals: DietPlanMeal[];
+}
+
+export interface DietPlanContent {
+  summary: string;
+  calories: number;
+  macros: { proteinG: number; carbsG: number; fatG: number };
+  days: DietPlanDay[];
+}
+
+export interface AiPlanMeta {
+  id: string;
+  type: 'WORKOUT' | 'DIET';
+  model: string;
+  createdAt: string;
+}
+
+export interface WorkoutExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: string;
+}
+
+export interface WorkoutDay {
+  day: string;
+  focus: string;
+  exercises: WorkoutExercise[];
+}
+
+export interface WorkoutPlanContent {
+  weeklyPlan: WorkoutDay[];
+}
+
+export interface AiPlan extends AiPlanMeta {
+  content: DietPlanContent | WorkoutPlanContent;
 }
 
 export interface ClassSchedule {

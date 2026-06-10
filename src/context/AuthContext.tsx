@@ -28,10 +28,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = useCallback(async () => {
     try {
       const user = await getMe();
-      setState((s) => ({ ...s, user }));
+      setState((s) => ({ ...s, user, isFirstLogin: user.isFirstLogin }));
     } catch {
       await clearCookie();
-      setState((s) => ({ ...s, user: null }));
+      setState((s) => ({ ...s, user: null, isFirstLogin: false }));
     }
   }, []);
 
@@ -39,12 +39,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bootstrap = async () => {
       const cookie = await getCookie();
       if (cookie) {
-        await refreshUser();
+        try {
+          const user = await getMe();
+          // Only auto-restore fully onboarded members. Everyone else must log in
+          // first so the flow is always: Login → (change password) → onboarding.
+          if (user.isOnboarded) {
+            setState((s) => ({
+              ...s,
+              user,
+              isFirstLogin: user.isFirstLogin,
+            }));
+          } else {
+            await clearCookie();
+          }
+        } catch {
+          await clearCookie();
+        }
       }
       setState((s) => ({ ...s, isLoading: false }));
     };
     bootstrap();
-  }, [refreshUser]);
+  }, []);
 
   const login = useCallback(async (payload: LoginPayload) => {
     const data = await apiLogin(payload);
