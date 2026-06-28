@@ -20,6 +20,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Home: ['home', 'home-outline'],
   Classes: ['barbell', 'barbell-outline'],
+  Products: ['bag', 'bag-outline'],
   CheckIns: ['time', 'time-outline'],
   Profile: ['person', 'person-outline'],
 };

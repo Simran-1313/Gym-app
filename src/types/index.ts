@@ -153,6 +153,31 @@ export interface CheckIn {
   method: 'MANUAL' | 'QR' | 'BIOMETRIC';
 }
 
+// ─── POS / Products ───────────────────────────────────────────────────────────
+
+export type ProductSortBy =
+  | 'name_asc'
+  | 'name_desc'
+  | 'price_asc'
+  | 'price_desc'
+  | 'stock_asc'
+  | 'stock_desc'
+  | 'newest'
+  | 'oldest'
+  | 'category';
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  stock: number;
+  category: string | null;
+  imageUrl: string | null;
+  inStock: boolean;
+  createdAt: string;
+}
+
 export interface Meta {
   page: number;
   limit: number;

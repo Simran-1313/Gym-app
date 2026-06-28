@@ -23,6 +23,8 @@ import { DietPlanScreen } from '../screens/dietplan/DietPlanScreen';
 import { WorkoutPlanScreen } from '../screens/workout/WorkoutPlanScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { ActivityScreen } from '../screens/activity/ActivityScreen';
+import { ProductsScreen } from '../screens/products/ProductsScreen';
+import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export type AuthStackParams = {
@@ -35,9 +37,15 @@ export type ClassesStackParams = {
   MyBookings: undefined;
 };
 
+export type ProductsStackParams = {
+  ProductList: undefined;
+  ProductDetail: { productId: string };
+};
+
 export type TabParams = {
   Home: undefined;
   Classes: undefined;
+  Products: undefined;
   CheckIns: undefined;
   Profile: undefined;
 };
@@ -53,6 +61,7 @@ export type RootStackParams = {
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
 const ClassesStack = createNativeStackNavigator<ClassesStackParams>();
+const ProductsStack = createNativeStackNavigator<ProductsStackParams>();
 const RootStack = createNativeStackNavigator<RootStackParams>();
 const Tab = createBottomTabNavigator<TabParams>();
 
@@ -84,6 +93,25 @@ const ClassesNavigator: React.FC = () => {
   );
 };
 
+const ProductsNavigator: React.FC = () => {
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  const dynamicScreenOptions = {
+    ...screenOptions,
+    headerTintColor: colors.text,
+    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
+  };
+
+  return (
+    <ProductsStack.Navigator screenOptions={dynamicScreenOptions}>
+      <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ title: 'Products' }} />
+      <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: 'Product Details' }} />
+    </ProductsStack.Navigator>
+  );
+};
+
 const MainTabs: React.FC = () => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
@@ -105,6 +133,11 @@ const MainTabs: React.FC = () => {
         name="Classes"
         component={ClassesNavigator}
         options={{ title: 'Classes', headerShown: false }}
+      />
+      <Tab.Screen
+        name="Products"
+        component={ProductsNavigator}
+        options={{ title: 'Products', headerShown: false }}
       />
       <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ title: 'Check-ins' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
