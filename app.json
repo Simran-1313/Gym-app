@@ -16,7 +16,9 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.fit_stack.app",
+      "googleServicesFile": "./google-services.json"
     },
     "androidStatusBar": {
       "translucent": true

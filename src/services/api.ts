@@ -33,7 +33,10 @@ const api: AxiosInstance = axios.create({
 });
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  console.log(`[API Request Interceptor] Starting request to URL: ${config.url}`);
+  console.log(`[API Request Interceptor] ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url}`);
+  if (config.data) {
+    console.log('[API Request Interceptor] body:', JSON.stringify(config.data, null, 2));
+  }
   const cookie = await getCookie();
   if (cookie) {
     console.log('[API Request Interceptor] Found cookie in SecureStore, attaching to request header...');
