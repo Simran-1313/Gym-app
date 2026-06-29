@@ -97,6 +97,34 @@ const ActionCard: React.FC<{
   );
 };
 
+const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onPress, delay = 0 }) => (
+  <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={styles.productsBannerWrap}>
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] }]}>
+      <LinearGradient
+        colors={['#5B21B6', '#7C3AED', '#9333EA']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.productsBanner}
+      >
+        <View style={styles.productsBannerGlow} />
+        <View style={styles.productsBannerContent}>
+          <View style={styles.productsBannerIcon}>
+            <Ionicons name="bag-handle" size={28} color="#fff" />
+          </View>
+          <View style={styles.productsBannerCopy}>
+            <Text style={styles.productsBannerEyebrow}>GYM STORE</Text>
+            <Text style={styles.productsBannerTitle}>Shop Products</Text>
+            <Text style={styles.productsBannerSubtitle}>Supplements, gear & essentials</Text>
+          </View>
+          <View style={styles.productsBannerArrow}>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </View>
+        </View>
+      </LinearGradient>
+    </Pressable>
+  </Animated.View>
+);
+
 export const HomeScreen: React.FC = () => {
   const { user, refreshUser, theme, toggleTheme } = useAuth();
   const nav = useNavigation<HomeNavProp>();
@@ -156,6 +184,11 @@ export const HomeScreen: React.FC = () => {
   const handleNotificationPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     nav.navigate('Notifications');
+  };
+
+  const handleProductsPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    nav.navigate('Products');
   };
 
   const waterProgress = waterLogged / 3000;
@@ -351,6 +384,8 @@ export const HomeScreen: React.FC = () => {
             <ActionCard title="Body Test" subtitle="Update profile" icon="body" onPress={() => nav.navigate('Onboarding')} accent={colors.warning} delay={260} />
             <ActionCard title="Profile Settings" subtitle="View stats" icon="person" onPress={() => nav.navigate('Profile')} accent={colors.accent} delay={280} />
           </View>
+
+          <ProductsBanner onPress={handleProductsPress} delay={300} />
         </View>
       </ScrollView>
     </AnimatedScreen>
@@ -638,6 +673,78 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     rowGap: SPACING.md,
+  },
+  productsBannerWrap: {
+    width: '100%',
+    marginTop: SPACING.sm,
     marginBottom: SPACING.md,
+  },
+  productsBanner: {
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+    minHeight: 96,
+    justifyContent: 'center',
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  productsBannerGlow: {
+    position: 'absolute',
+    top: -30,
+    right: -20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  productsBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
+    gap: SPACING.md,
+  },
+  productsBannerIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.lg,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  productsBannerCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  productsBannerEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.75)',
+  },
+  productsBannerTitle: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    lineHeight: 26,
+  },
+  productsBannerSubtitle: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  productsBannerArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
 });

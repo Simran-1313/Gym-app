@@ -25,6 +25,8 @@ import { NotificationsScreen } from '../screens/notifications/NotificationsScree
 import { ActivityScreen } from '../screens/activity/ActivityScreen';
 import { ProductsScreen } from '../screens/products/ProductsScreen';
 import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
+import { ChatListScreen } from '../screens/chat/ChatListScreen';
+import { ChatRoomScreen } from '../screens/chat/ChatRoomScreen';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export type AuthStackParams = {
@@ -42,10 +44,15 @@ export type ProductsStackParams = {
   ProductDetail: { productId: string };
 };
 
+export type ChatStackParams = {
+  ChatList: undefined;
+  ChatRoom: { roomId: string; roomName: string };
+};
+
 export type TabParams = {
   Home: undefined;
   Classes: undefined;
-  Products: undefined;
+  Chat: undefined;
   CheckIns: undefined;
   Profile: undefined;
 };
@@ -57,11 +64,13 @@ export type RootStackParams = {
   WorkoutPlan: { plan?: AiPlan; generate?: boolean } | undefined;
   Notifications: undefined;
   Activity: undefined;
+  Products: undefined;
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
 const ClassesStack = createNativeStackNavigator<ClassesStackParams>();
 const ProductsStack = createNativeStackNavigator<ProductsStackParams>();
+const ChatStack = createNativeStackNavigator<ChatStackParams>();
 const RootStack = createNativeStackNavigator<RootStackParams>();
 const Tab = createBottomTabNavigator<TabParams>();
 
@@ -72,25 +81,6 @@ const screenOptions = {
   headerTransparent: true,
   contentStyle: { backgroundColor: 'transparent' },
   animation: stackAnimation as 'fade_from_bottom' | 'slide_from_right',
-};
-
-const ClassesNavigator: React.FC = () => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
-
-  const dynamicScreenOptions = {
-    ...screenOptions,
-    headerTintColor: colors.text,
-    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
-  };
-
-  return (
-    <ClassesStack.Navigator screenOptions={dynamicScreenOptions}>
-      <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ title: 'Classes' }} />
-      <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ title: 'My Bookings' }} />
-    </ClassesStack.Navigator>
-  );
 };
 
 const ProductsNavigator: React.FC = () => {
@@ -109,6 +99,48 @@ const ProductsNavigator: React.FC = () => {
       <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ title: 'Products' }} />
       <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: 'Product Details' }} />
     </ProductsStack.Navigator>
+  );
+};
+
+const ChatNavigator: React.FC = () => {
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  const dynamicScreenOptions = {
+    ...screenOptions,
+    headerTintColor: colors.text,
+    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
+  };
+
+  return (
+    <ChatStack.Navigator screenOptions={dynamicScreenOptions}>
+      <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Messages' }} />
+      <ChatStack.Screen
+        name="ChatRoom"
+        component={ChatRoomScreen}
+        options={({ route }) => ({ title: route.params.roomName })}
+      />
+    </ChatStack.Navigator>
+  );
+};
+
+const ClassesNavigator: React.FC = () => {
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  const dynamicScreenOptions = {
+    ...screenOptions,
+    headerTintColor: colors.text,
+    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
+  };
+
+  return (
+    <ClassesStack.Navigator screenOptions={dynamicScreenOptions}>
+      <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ title: 'Classes' }} />
+      <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ title: 'My Bookings' }} />
+    </ClassesStack.Navigator>
   );
 };
 
@@ -135,9 +167,9 @@ const MainTabs: React.FC = () => {
         options={{ title: 'Classes', headerShown: false }}
       />
       <Tab.Screen
-        name="Products"
-        component={ProductsNavigator}
-        options={{ title: 'Products', headerShown: false }}
+        name="Chat"
+        component={ChatNavigator}
+        options={{ title: 'Messages', headerShown: false }}
       />
       <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ title: 'Check-ins' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
@@ -209,6 +241,7 @@ export const AppNavigator: React.FC = () => {
         <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Update Fitness Profile' }} />
         <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <RootStack.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity Dashboard' }} />
+        <RootStack.Screen name="Products" component={ProductsNavigator} options={{ headerShown: false }} />
       </RootStack.Navigator>
     );
   }

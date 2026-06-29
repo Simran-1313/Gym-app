@@ -20,7 +20,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Home: ['home', 'home-outline'],
   Classes: ['barbell', 'barbell-outline'],
-  Products: ['bag', 'bag-outline'],
+  Chat: ['chatbubbles', 'chatbubbles-outline'],
   CheckIns: ['time', 'time-outline'],
   Profile: ['person', 'person-outline'],
 };
@@ -89,6 +89,12 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
   const insets = useSafeAreaInsets();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
+
+  const focusedRoute = state.routes[state.index];
+  const nestedState = focusedRoute.state as { index?: number } | undefined;
+  if (nestedState && typeof nestedState.index === 'number' && nestedState.index > 0) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, { bottom: Math.max(insets.bottom, 12) + 4 }]}>

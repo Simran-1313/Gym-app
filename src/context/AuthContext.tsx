@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { getCookie, clearCookie } from '../services/api';
 import { getMe, login as apiLogin, logout as apiLogout, LoginPayload } from '../services/auth.service';
 import { getDeviceTokenInfo } from '../services/deviceToken';
+import { disconnectSocket } from '../services/socket';
 import { User } from '../types';
 
 interface AuthState {
@@ -88,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async () => {
+    disconnectSocket();
     await apiLogout();
     setState({ user: null, isLoading: false, isFirstLogin: false });
   }, []);
