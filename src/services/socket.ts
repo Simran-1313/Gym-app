@@ -1,6 +1,9 @@
 import { io, Socket } from 'socket.io-client';
+import { Platform } from 'react-native';
 import { getCookie } from './api';
 import { ENV } from '../config/env';
+
+const isWeb = Platform.OS === 'web';
 
 let socket: Socket | null = null;
 
@@ -12,18 +15,20 @@ let socket: Socket | null = null;
 export async function getSocket(): Promise<Socket> {
   if (socket && socket.connected) return socket;
 
-  // Extract raw JWT value from "member_token=<jwt>" string stored in SecureStore
-  const cookieStr = await getCookie();
   let token: string | null = null;
-  if (cookieStr) {
-    const match = cookieStr.match(/member_token=([^;]+)/);
-    token = match ? match[1] : null;
+  if (!isWeb) {
+    const cookieStr = await getCookie();
+    if (cookieStr) {
+      const match = cookieStr.match(/member_token=([^;]+)/);
+      token = match ? match[1] : null;
+    }
   }
 
   socket = io(ENV.API_URL, {
     path: '/socket.io',
     transports: ['websocket', 'polling'],
-    auth: { token, role: 'MEMBER' },
+    withCredentials: isWeb,
+    auth: isWeb ? { role: 'MEMBER' } : { token, role: 'MEMBER' },
     autoConnect: false,
     reconnection: true,
     reconnectionAttempts: 10,

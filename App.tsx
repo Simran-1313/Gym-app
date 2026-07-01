@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
+import { PlansProvider } from './src/context/PlansContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { COLORS } from './src/config/theme';
 
@@ -12,7 +13,9 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AuthProvider>
-          <AppNavigator />
+          <PlansProvider>
+            <AppNavigator />
+          </PlansProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

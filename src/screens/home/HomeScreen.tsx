@@ -151,18 +151,21 @@ export const HomeScreen: React.FC = () => {
     return true;
   };
 
-  const openRootScreen = (name: 'DietPlan' | 'WorkoutPlan', params: { generate: true }) => {
-    nav.dispatch(CommonActions.navigate({ name, params }));
+  // Open the plan screen in "view" mode. The screen shows the saved plan
+  // (from cache, no reload) and offers an explicit "Generate New Plan" action,
+  // so we never silently regenerate on every tap.
+  const openRootScreen = (name: 'DietPlan' | 'WorkoutPlan') => {
+    nav.dispatch(CommonActions.navigate({ name }));
   };
 
   const handleCreateDiet = () => {
     if (!requireProfile()) return;
-    openRootScreen('DietPlan', { generate: true });
+    openRootScreen('DietPlan');
   };
 
   const handleCreateWorkout = () => {
     if (!requireProfile()) return;
-    openRootScreen('WorkoutPlan', { generate: true });
+    openRootScreen('WorkoutPlan');
   };
 
   const onRefresh = useCallback(async () => {
@@ -379,7 +382,7 @@ export const HomeScreen: React.FC = () => {
           {/* Additional Quick Actions */}
           <Text style={[styles.gridSectionTitle, { color: colors.textSecondary }]}>QUICK ACTIONS</Text>
           <View style={styles.actionGrid}>
-            <ActionCard title="AI Diet Plan" subtitle="Generate meals" icon="nutrition" onPress={handleCreateDiet} accent={colors.success} delay={220} />
+            <ActionCard title="AI Diet Plan" subtitle="Meals & macros" icon="nutrition" onPress={handleCreateDiet} accent={colors.success} delay={220} />
             <ActionCard title="Classes" subtitle="Book workout" icon="calendar" onPress={() => nav.navigate('Classes')} accent={colors.info} delay={240} />
             <ActionCard title="Body Test" subtitle="Update profile" icon="body" onPress={() => nav.navigate('Onboarding')} accent={colors.warning} delay={260} />
             <ActionCard title="Profile Settings" subtitle="View stats" icon="person" onPress={() => nav.navigate('Profile')} accent={colors.accent} delay={280} />

@@ -61,8 +61,9 @@ export interface SubmitProfileResult {
 
 export const submitProfile = async (data: MemberProfileInput): Promise<SubmitProfileResult> => {
   const res = await api.post<ApiResponse<SubmitProfileResult>>('/member/profile', data, {
-    // Diet plan generation calls an LLM; give it more headroom than the default 15s.
-    timeout: 90000,
+    // Diet plan generation calls an LLM (with multi-model fallback on the
+    // backend); give it generous headroom beyond the default 15s.
+    timeout: 120000,
   });
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message ?? 'Failed to save profile');
@@ -89,7 +90,7 @@ export const getAiPlan = async (id: string): Promise<AiPlan> => {
   return res.data.data.plan;
 };
 
-const AI_TIMEOUT = 90000;
+const AI_TIMEOUT = 120000;
 
 export const generateDietPlan = async (): Promise<AiPlan> => {
   const res = await api.post<ApiResponse<{ plan: AiPlan }>>('/member/ai-plans/diet', {}, {

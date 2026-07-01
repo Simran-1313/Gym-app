@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { getCookie, clearCookie } from '../services/api';
 import { getMe, login as apiLogin, logout as apiLogout, LoginPayload } from '../services/auth.service';
 import { getDeviceTokenInfo } from '../services/deviceToken';
@@ -48,7 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const bootstrap = async () => {
       const cookie = await getCookie();
-      if (cookie) {
+      // Web sessions live in the browser cookie jar (httpOnly), not localStorage.
+      if (cookie || Platform.OS === 'web') {
         try {
           const user = await getMe();
           // Only auto-restore fully onboarded members. Everyone else must log in

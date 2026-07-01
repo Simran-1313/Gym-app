@@ -231,6 +231,29 @@ export const ChatListScreen: React.FC = () => {
   return (
     <LinearGradient colors={[...colors.backgroundGradient]} style={styles.screen}>
       <View style={[styles.container, { paddingTop: headerOffset }]}>
+        {/* AI Coach banner */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => navigation.navigate('AiCoach')}
+          style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}
+        >
+          <LinearGradient
+            colors={['#FF4F18', '#FF1744']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.aiCoachBanner}
+          >
+            <View style={styles.aiCoachIcon}>
+              <Ionicons name="fitness" size={22} color="#FF4F18" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aiCoachTitle}>FitCoach AI</Text>
+              <Text style={styles.aiCoachSub}>Your personal fitness &amp; nutrition assistant</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* Search */}
         <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           <Ionicons name="search" size={16} color={colors.textMuted} />
@@ -405,5 +428,31 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: FONT_SIZE.xs,
     textAlign: 'center',
+  },
+  aiCoachBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+  },
+  aiCoachIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  aiCoachTitle: {
+    color: '#fff',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+  },
+  aiCoachSub: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: FONT_SIZE.xs,
+    marginTop: 1,
   },
 });

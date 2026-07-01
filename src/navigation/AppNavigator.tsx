@@ -27,6 +27,7 @@ import { ProductsScreen } from '../screens/products/ProductsScreen';
 import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
 import { ChatRoomScreen } from '../screens/chat/ChatRoomScreen';
+import { AiCoachScreen } from '../screens/chat/AiCoachScreen';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export type AuthStackParams = {
@@ -47,6 +48,7 @@ export type ProductsStackParams = {
 export type ChatStackParams = {
   ChatList: undefined;
   ChatRoom: { roomId: string; roomName: string };
+  AiCoach: undefined;
 };
 
 export type TabParams = {
@@ -120,6 +122,11 @@ const ChatNavigator: React.FC = () => {
         name="ChatRoom"
         component={ChatRoomScreen}
         options={({ route }) => ({ title: route.params.roomName })}
+      />
+      <ChatStack.Screen
+        name="AiCoach"
+        component={AiCoachScreen}
+        options={{ title: 'FitCoach AI' }}
       />
     </ChatStack.Navigator>
   );

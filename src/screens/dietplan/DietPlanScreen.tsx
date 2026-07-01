@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,39 +11,42 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../context/AuthContext';
-import { generateDietPlan, getAiPlan, getAiPlans } from '../../services/member.service';
+import { usePlans } from '../../context/PlansContext';
 import { COLORS, FONT_SIZE, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { AiPlan, DietPlanDay } from '../../types';
+import { DietPlanDay } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { normalizeDietPlanContent } from '../../utils/dietPlan';
-import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenBackground } from '../../components/ui/ScreenBackground';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { StatBadge } from '../../components/ui/StatBadge';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
-const MealCard: React.FC<{ meal: DietPlanDay['meals'][0]; index: number }> = ({ meal, index }) => (
-  <Animated.View entering={FadeIn.delay(index * 60).duration(300)}>
-    <GlassCard glowColor={COLORS.accent} style={styles.mealCard}>
-      <View style={styles.mealHeader}>
-        <Text style={styles.mealName}>{meal.name}</Text>
-        <StatBadge icon="flame-outline" label="Cal" value={`${meal.calories}`} color={COLORS.warning} />
+const formatUpdated = (iso?: string): string => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const MealCard: React.FC<{ meal: DietPlanDay['meals'][0] }> = ({ meal }) => (
+  <GlassCard glowColor={COLORS.accent} style={styles.mealCard}>
+    <View style={styles.mealHeader}>
+      <Text style={styles.mealName}>{meal.name}</Text>
+      <StatBadge icon="flame-outline" label="Cal" value={`${meal.calories}`} color={COLORS.warning} />
+    </View>
+    {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
+      <View key={i} style={styles.mealItemRow}>
+        <View style={styles.bullet} />
+        <Text style={styles.mealItem}>{item}</Text>
       </View>
-      {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
-        <View key={i} style={styles.mealItemRow}>
-          <View style={styles.bullet} />
-          <Text style={styles.mealItem}>{item}</Text>
-        </View>
-      ))}
-    </GlassCard>
-  </Animated.View>
+    ))}
+  </GlassCard>
 );
 
 export const DietPlanScreen: React.FC = () => {
@@ -50,143 +54,166 @@ export const DietPlanScreen: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParams, 'DietPlan'>>();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+  const { diet, loadPlan, generatePlan, setPlan } = usePlans();
 
-  const paramPlan = route.params?.plan ?? null;
-  const shouldGenerate = !!route.params?.generate;
-
-  const [plan, setPlan] = useState<AiPlan | null>(paramPlan);
-  const [loading, setLoading] = useState(!paramPlan);
-  const [generating, setGenerating] = useState(shouldGenerate);
-  const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
+  // True while we're waiting for a background-generated plan (after onboarding).
+  const [awaitingBackground, setAwaitingBackground] = useState(false);
 
-  const generateNew = useCallback(async () => {
-    setLoading(true);
-    setGenerating(true);
-    setError(null);
-    try {
-      const newPlan = await generateDietPlan();
-      setPlan(newPlan);
-      setSelectedDay(0);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to generate diet plan.';
-      setError(message);
-      Alert.alert('Error', message);
-    } finally {
-      setLoading(false);
-      setGenerating(false);
-    }
-  }, []);
-
-  const fetchLatest = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { plans } = await getAiPlans(1, 10);
-      const latestDiet = plans.find((p) => p.type === 'DIET');
-      if (!latestDiet) {
-        setError('No diet plan found. Complete your fitness profile to generate one.');
-        setPlan(null);
-        return;
-      }
-      const full = await getAiPlan(latestDiet.id);
-      setPlan(full);
-      setSelectedDay(0);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load your diet plan.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Hydrate once on mount — never re-run on context updates (prevents flicker).
   useEffect(() => {
-    if (paramPlan) return;
-    if (shouldGenerate) {
-      generateNew();
+    const paramPlan = route.params?.plan ?? null;
+    const shouldGenerate = !!route.params?.generate;
+    const fromOnboarding = !!route.params?.fromOnboarding;
+
+    if (paramPlan) {
+      setPlan('DIET', paramPlan);
       return;
     }
-    fetchLatest();
-  }, [paramPlan, shouldGenerate, generateNew, fetchLatest]);
+    if (shouldGenerate) {
+      generatePlan('DIET');
+      return;
+    }
+    // If coming straight from onboarding without a pre-loaded plan, the AI is
+    // still generating in the background. Start polling until it appears.
+    if (fromOnboarding) setAwaitingBackground(true);
+    loadPlan('DIET');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Poll every 5 s while awaiting the background-generated plan (up to 90 s).
+  useEffect(() => {
+    if (!awaitingBackground || diet.plan || diet.generating) return;
+
+    const poll = setInterval(() => loadPlan('DIET', true), 5000);
+    const giveUp = setTimeout(() => {
+      setAwaitingBackground(false);
+      clearInterval(poll);
+    }, 90000);
+
+    // Stop polling as soon as the plan arrives.
+    if (diet.loaded && diet.plan) {
+      setAwaitingBackground(false);
+      clearInterval(poll);
+      clearTimeout(giveUp);
+    }
+
+    return () => {
+      clearInterval(poll);
+      clearTimeout(giveUp);
+    };
+  }, [awaitingBackground, diet.plan, diet.generating, diet.loaded, loadPlan]);
+
+  const plan = diet.plan;
+  const content = plan ? normalizeDietPlanContent(plan.content) : null;
   const cameFromOnboarding = !user?.isOnboarded || !!route.params?.fromOnboarding;
+  const showBlockingLoader = (diet.generating || diet.loading || awaitingBackground) && !content;
 
-  const handleRegenerate = () => {
+  const handleGenerateNew = useCallback(() => {
     Alert.alert(
-      'Regenerate Plan',
-      'This will take you back to the profile form so you can update your details and generate a fresh plan.',
+      'Generate a fresh plan?',
+      'This builds a new 7-day diet plan from your current fitness profile. It can take up to a minute.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', onPress: () => navigation.navigate('Onboarding') },
+        {
+          text: 'Generate',
+          onPress: async () => {
+            setSelectedDay(0);
+            await generatePlan('DIET');
+          },
+        },
       ],
     );
-  };
+  }, [generatePlan]);
 
   const handleDone = async () => {
     await refreshUser();
     if (navigation.canGoBack()) navigation.goBack();
   };
 
-  if (loading) {
-    return (
-      <AnimatedScreen>
-        <View style={[styles.center, { paddingTop: insets.top + 56 }]}>
-          {generating ? <AiLoadingPulse icon="nutrition-outline" size={48} /> : <LoadingSpinner />}
+  const renderBody = () => {
+    if (showBlockingLoader) {
+      return (
+        <View style={styles.center}>
+          <AiLoadingPulse icon="nutrition-outline" size={48} />
+          <Text style={styles.loadingTitle}>
+            {diet.generating
+              ? 'Crafting your diet plan'
+              : awaitingBackground
+              ? 'Preparing your plan…'
+              : 'Loading your diet plan'}
+          </Text>
           <Text style={styles.loadingText}>
-            {generating
-              ? 'Generating your personalized diet plan…\nThis may take up to a minute.'
-              : 'Loading your diet plan…'}
+            {diet.generating || awaitingBackground
+              ? 'Our AI nutritionist is balancing your meals and macros. This usually takes under a minute.'
+              : 'Fetching your saved plan…'}
           </Text>
         </View>
-      </AnimatedScreen>
-    );
-  }
+      );
+    }
 
-  if (error || !plan) {
-    return (
-      <AnimatedScreen>
-        <View style={[styles.center, { paddingTop: insets.top + 56 }]}>
-          <Ionicons name="nutrition-outline" size={48} color={COLORS.textMuted} />
-          <Text style={styles.errorText}>{error ?? 'No plan available.'}</Text>
+    if (!content) {
+      return (
+        <View style={styles.center}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="nutrition-outline" size={42} color={COLORS.accent} />
+          </View>
+          <Text style={styles.emptyTitle}>No diet plan yet</Text>
+          <Text style={styles.errorText}>
+            {diet.error ?? 'Generate a personalised 7-day diet plan from your fitness profile.'}
+          </Text>
           <AnimatedButton
-            label="Retry"
-            onPress={shouldGenerate ? generateNew : fetchLatest}
+            label={diet.generating ? 'Generating…' : 'Generate My Diet Plan'}
+            onPress={() => generatePlan('DIET')}
+            loading={diet.generating}
+            disabled={diet.generating}
+            icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
+          />
+          <AnimatedButton
+            label="Update Fitness Profile"
+            variant="secondary"
+            onPress={() => navigation.navigate('Onboarding')}
+            icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
           />
         </View>
-      </AnimatedScreen>
-    );
-  }
+      );
+    }
 
-  const content = normalizeDietPlanContent(plan.content);
+    const maxMacro = Math.max(content.macros.proteinG, content.macros.carbsG, content.macros.fatG, 1);
+    const activeDay = content.days[selectedDay] ?? content.days[0];
+    const updatedLabel = formatUpdated(plan?.createdAt);
 
-  if (!content || content.days.length === 0) {
     return (
-      <AnimatedScreen>
-        <View style={[styles.center, { paddingTop: insets.top + 56 }]}>
-          <Ionicons name="nutrition-outline" size={48} color={COLORS.textMuted} />
-          <Text style={styles.errorText}>
-            This diet plan has an unsupported format. Try regenerating from Home.
-          </Text>
-          <AnimatedButton label="Retry" onPress={fetchLatest} />
-        </View>
-      </AnimatedScreen>
-    );
-  }
-
-  const maxMacro = Math.max(content.macros.proteinG, content.macros.carbsG, content.macros.fatG, 1);
-  const activeDay = content.days[selectedDay] ?? content.days[0];
-
-  return (
-    <AnimatedScreen>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={diet.loading}
+            onRefresh={() => loadPlan('DIET', true)}
+            tintColor={COLORS.primary}
+          />
+        }
       >
+        {diet.generating && (
+          <View style={styles.banner}>
+            <AiLoadingPulse icon="sparkles" size={18} />
+            <Text style={styles.bannerText}>Generating a fresh plan…</Text>
+          </View>
+        )}
+
         <GlassCard glowColor={COLORS.primary} style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="sparkles" size={20} color={COLORS.accent} />
             <Text style={styles.summaryTitle}>Your Diet Plan</Text>
           </View>
           <Text style={styles.summaryText}>{content.summary}</Text>
+          {!!updatedLabel && (
+            <View style={styles.updatedRow}>
+              <Ionicons name="time-outline" size={13} color={COLORS.textMuted} />
+              <Text style={styles.updatedText}>Updated {updatedLabel}</Text>
+            </View>
+          )}
 
           <View style={styles.caloriesRow}>
             <Ionicons name="flame" size={22} color={COLORS.warning} />
@@ -235,28 +262,37 @@ export const DietPlanScreen: React.FC = () => {
           })}
         </ScrollView>
 
-        <Animated.View key={selectedDay} entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)}>
+        <View key={selectedDay}>
           {(activeDay.meals ?? []).map((meal, idx) => (
-            <MealCard key={`${meal.name}-${idx}`} meal={meal} index={idx} />
+            <MealCard key={`${meal.name}-${idx}`} meal={meal} />
           ))}
-        </Animated.View>
+        </View>
 
         <AnimatedButton
-          label="Regenerate Plan"
+          label={diet.generating ? 'Generating…' : 'Generate New Plan'}
           variant="secondary"
-          onPress={handleRegenerate}
-          icon={<Ionicons name="refresh" size={18} color={COLORS.primary} />}
+          onPress={handleGenerateNew}
+          loading={diet.generating}
+          disabled={diet.generating}
+          icon={<Ionicons name="sparkles" size={18} color={COLORS.primary} />}
         />
 
-        {cameFromOnboarding && (
-          <AnimatedButton label="Continue to App" onPress={handleDone} />
-        )}
+        {cameFromOnboarding && <AnimatedButton label="Continue to App" onPress={handleDone} />}
       </ScrollView>
-    </AnimatedScreen>
+    );
+  };
+
+  return (
+    <ScreenBackground>
+      <View style={[styles.shell, { paddingTop: insets.top + 56 }]}>
+        {renderBody()}
+      </View>
+    </ScreenBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  shell: { flex: 1 },
   root: { flex: 1 },
   scroll: { padding: SPACING.lg, gap: SPACING.md },
 
@@ -267,13 +303,41 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     gap: SPACING.md,
   },
+  loadingTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.lg, textAlign: 'center' },
   loadingText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
   errorText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
+
+  emptyIconWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  emptyTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.xl, textAlign: 'center' },
+
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
 
   summaryCard: { gap: SPACING.md },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   summaryTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.xl },
   summaryText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, lineHeight: 21 },
+  updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  updatedText: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs },
 
   caloriesRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xs },
   caloriesValue: { color: COLORS.text, fontSize: FONT_SIZE.hero, fontWeight: '800' },

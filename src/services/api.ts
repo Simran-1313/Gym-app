@@ -1,19 +1,22 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { ENV } from '../config/env';
+import { deleteSecureItem, getSecureItem, setSecureItem } from '../utils/secureStorage';
+
+const isWeb = Platform.OS === 'web';
 
 const COOKIE_KEY = 'member_token_cookie';
 
 export const storeCookie = async (cookieValue: string): Promise<void> => {
-  await SecureStore.setItemAsync(COOKIE_KEY, cookieValue);
+  await setSecureItem(COOKIE_KEY, cookieValue);
 };
 
 export const getCookie = async (): Promise<string | null> => {
-  return SecureStore.getItemAsync(COOKIE_KEY);
+  return getSecureItem(COOKIE_KEY);
 };
 
 export const clearCookie = async (): Promise<void> => {
-  await SecureStore.deleteItemAsync(COOKIE_KEY);
+  await deleteSecureItem(COOKIE_KEY);
 };
 
 const parseMemberCookie = (setCookieHeader: string | string[]): string | null => {
@@ -37,12 +40,16 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   if (config.data) {
     console.log('[API Request Interceptor] body:', JSON.stringify(config.data, null, 2));
   }
-  const cookie = await getCookie();
-  if (cookie) {
-    console.log('[API Request Interceptor] Found cookie in SecureStore, attaching to request header...');
-    config.headers['Cookie'] = cookie;
-  } else {
-    console.log('[API Request Interceptor] No cookie found in SecureStore.');
+  // Browsers manage httpOnly cookies via withCredentials; manual Cookie headers
+  // are forbidden on web and cross-site LAN IPs break SameSite cookies.
+  if (!isWeb) {
+    const cookie = await getCookie();
+    if (cookie) {
+      console.log('[API Request Interceptor] Found cookie in SecureStore, attaching to request header...');
+      config.headers['Cookie'] = cookie;
+    } else {
+      console.log('[API Request Interceptor] No cookie found in SecureStore.');
+    }
   }
   return config;
 });
@@ -54,22 +61,34 @@ api.interceptors.response.use(
       response.headers['set-cookie'] ??
       response.headers['Set-Cookie'];
 
-    if (setCookie) {
-      console.log('[API Response Interceptor] set-cookie header present, parsing cookie...');
-      const cookieStr = parseMemberCookie(setCookie);
-      if (cookieStr) {
-        console.log('[API Response Interceptor] Storing member cookie to SecureStore...');
-        await storeCookie(cookieStr);
+    if (!isWeb) {
+      if (setCookie) {
+        console.log('[API Response Interceptor] set-cookie header present, parsing cookie...');
+        const cookieStr = parseMemberCookie(setCookie);
+        if (cookieStr) {
+          console.log('[API Response Interceptor] Storing member cookie to SecureStore...');
+          await storeCookie(cookieStr);
+        } else {
+          console.log('[API Response Interceptor] set-cookie header could not be parsed to member_token.');
+        }
       } else {
-        console.log('[API Response Interceptor] set-cookie header could not be parsed to member_token.');
+        console.log('[API Response Interceptor] No set-cookie header found in response.');
       }
-    } else {
-      console.log('[API Response Interceptor] No set-cookie header found in response.');
     }
     return response;
   },
   (error) => {
-    console.error(`[API Response Interceptor] Request failed for URL: ${error.config?.url}. Error message:`, error.message);
+    const status = error.response?.status;
+    const url = error.config?.url ?? '';
+    const isExpectedMissingProfile = status === 404 && url.includes('/member/profile');
+
+    if (!isExpectedMissingProfile) {
+      console.error(
+        `[API Response Interceptor] Request failed for URL: ${url}. Error message:`,
+        error.message,
+      );
+    }
+
     const message =
       error.response?.data?.message ??
       error.message ??

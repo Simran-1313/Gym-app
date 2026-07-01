@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,167 +12,194 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { generateWorkoutPlan, getAiPlan, getAiPlans } from '../../services/member.service';
-import { COLORS, FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { AiPlan, WorkoutDay, WorkoutPlanContent } from '../../types';
+import { usePlans } from '../../context/PlansContext';
+import { COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { WorkoutDay, WorkoutPlanContent } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
-import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenBackground } from '../../components/ui/ScreenBackground';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { StaggerItem } from '../../components/ui/StaggerItem';
 import { StatBadge } from '../../components/ui/StatBadge';
 
-const DayCard: React.FC<{ day: WorkoutDay; index: number }> = ({ day, index }) => (
-  <StaggerItem index={index}>
-    <GlassCard glowColor={COLORS.primary} style={styles.dayCard}>
-      <View style={styles.dayHeader}>
-        <Ionicons name="barbell-outline" size={16} color={COLORS.primary} />
-        <View style={styles.dayTitleWrap}>
-          <Text style={styles.dayTitle}>{day.day}</Text>
-          <StatBadge icon="fitness-outline" label="Focus" value={day.focus} color={COLORS.accent} />
-        </View>
+const formatUpdated = (iso?: string): string => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const DayCard: React.FC<{ day: WorkoutDay }> = ({ day }) => (
+  <GlassCard glowColor={COLORS.primary} style={styles.dayCard}>
+    <View style={styles.dayHeader}>
+      <Ionicons name="barbell-outline" size={16} color={COLORS.primary} />
+      <View style={styles.dayTitleWrap}>
+        <Text style={styles.dayTitle}>{day.day}</Text>
+        <StatBadge icon="fitness-outline" label="Focus" value={day.focus} color={COLORS.accent} />
       </View>
-      {day.exercises.map((ex, idx) => (
-        <View key={`${ex.name}-${idx}`} style={styles.exerciseRow}>
-          <Text style={styles.exerciseName}>{ex.name}</Text>
-          <Text style={styles.exerciseMeta}>
-            {ex.sets} sets × {ex.reps} · rest {ex.rest}
-          </Text>
-        </View>
-      ))}
-    </GlassCard>
-  </StaggerItem>
+    </View>
+    {(day.exercises ?? []).map((ex, idx) => (
+      <View key={`${ex.name}-${idx}`} style={styles.exerciseRow}>
+        <Text style={styles.exerciseName}>{ex.name}</Text>
+        <Text style={styles.exerciseMeta}>
+          {ex.sets} sets × {ex.reps} · rest {ex.rest}
+        </Text>
+      </View>
+    ))}
+  </GlassCard>
 );
 
 export const WorkoutPlanScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const route = useRoute<RouteProp<RootStackParams, 'WorkoutPlan'>>();
   const insets = useSafeAreaInsets();
-  const paramPlan = route.params?.plan ?? null;
-  const shouldGenerate = !!route.params?.generate;
-
-  const [plan, setPlan] = useState<AiPlan | null>(paramPlan);
-  const [loading, setLoading] = useState(!paramPlan);
-  const [generating, setGenerating] = useState(shouldGenerate);
-  const [error, setError] = useState<string | null>(null);
-
-  const generateNew = useCallback(async () => {
-    setLoading(true);
-    setGenerating(true);
-    setError(null);
-    try {
-      const newPlan = await generateWorkoutPlan();
-      setPlan(newPlan);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to generate workout plan.';
-      setError(message);
-      Alert.alert('Error', message);
-    } finally {
-      setLoading(false);
-      setGenerating(false);
-    }
-  }, []);
-
-  const fetchLatest = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { plans } = await getAiPlans(1, 10);
-      const latest = plans.find((p) => p.type === 'WORKOUT');
-      if (!latest) {
-        setError('No workout plan found. Generate one from Quick Actions on Home.');
-        setPlan(null);
-        return;
-      }
-      const full = await getAiPlan(latest.id);
-      setPlan(full);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load workout plan.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { workout, loadPlan, generatePlan, setPlan } = usePlans();
 
   useEffect(() => {
-    if (paramPlan) return;
-    if (shouldGenerate) {
-      generateNew();
+    const paramPlan = route.params?.plan ?? null;
+    const shouldGenerate = !!route.params?.generate;
+
+    if (paramPlan) {
+      setPlan('WORKOUT', paramPlan);
       return;
     }
-    fetchLatest();
-  }, [paramPlan, shouldGenerate, generateNew, fetchLatest]);
+    if (shouldGenerate) {
+      generatePlan('WORKOUT');
+      return;
+    }
+    loadPlan('WORKOUT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleRegenerate = () => {
+  const plan = workout.plan;
+  const content = plan ? (plan.content as WorkoutPlanContent) : null;
+  const days = content?.weeklyPlan ?? [];
+  const showBlockingLoader = (workout.generating || workout.loading) && days.length === 0;
+
+  const handleGenerateNew = useCallback(() => {
     Alert.alert(
-      'Regenerate Plan',
-      'Go to Home and tap "Create Workout" to generate a fresh plan from your profile.',
-      [{ text: 'OK' }],
+      'Generate a fresh plan?',
+      'This builds a new weekly workout split from your current fitness profile. It can take up to a minute.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Generate', onPress: () => generatePlan('WORKOUT') },
+      ],
     );
-  };
+  }, [generatePlan]);
 
-  if (loading) {
-    return (
-      <AnimatedScreen>
-        <View style={[styles.center, { paddingTop: insets.top + 56 }]}>
-          {generating ? <AiLoadingPulse icon="barbell-outline" size={48} /> : <LoadingSpinner />}
+  const renderBody = () => {
+    if (showBlockingLoader) {
+      return (
+        <View style={styles.center}>
+          <AiLoadingPulse icon="barbell-outline" size={48} />
+          <Text style={styles.loadingTitle}>
+            {workout.generating ? 'Building your workout split' : 'Loading your workout plan'}
+          </Text>
           <Text style={styles.loadingText}>
-            {generating
-              ? 'Generating your personalized workout plan…\nThis may take up to a minute.'
-              : 'Loading your workout plan…'}
+            {workout.generating
+              ? 'Our AI coach is structuring your training week. This may take up to a minute.'
+              : 'Fetching your saved plan…'}
           </Text>
         </View>
-      </AnimatedScreen>
-    );
-  }
+      );
+    }
 
-  if (error || !plan) {
-    return (
-      <AnimatedScreen>
-        <View style={[styles.center, { paddingTop: insets.top + 56 }]}>
-          <Ionicons name="barbell-outline" size={48} color={COLORS.textMuted} />
-          <Text style={styles.errorText}>{error ?? 'No plan available.'}</Text>
-          <AnimatedButton label="Retry" onPress={shouldGenerate ? generateNew : fetchLatest} />
+    if (days.length === 0) {
+      return (
+        <View style={styles.center}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="barbell-outline" size={42} color={COLORS.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>No workout plan yet</Text>
+          <Text style={styles.errorText}>
+            {workout.error ?? 'Generate a personalised training split from your fitness profile.'}
+          </Text>
+          <AnimatedButton
+            label={workout.generating ? 'Generating…' : 'Generate My Workout Plan'}
+            onPress={() => generatePlan('WORKOUT')}
+            loading={workout.generating}
+            disabled={workout.generating}
+            icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
+          />
+          <AnimatedButton
+            label="Update Fitness Profile"
+            variant="secondary"
+            onPress={() => navigation.navigate('Onboarding')}
+            icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
+          />
         </View>
-      </AnimatedScreen>
-    );
-  }
+      );
+    }
 
-  const content = plan.content as WorkoutPlanContent;
+    const totalExercises = days.reduce((sum, d) => sum + (d.exercises?.length ?? 0), 0);
+    const updatedLabel = formatUpdated(plan?.createdAt);
 
-  return (
-    <AnimatedScreen>
+    return (
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={workout.loading}
+            onRefresh={() => loadPlan('WORKOUT', true)}
+            tintColor={COLORS.primary}
+          />
+        }
       >
+        {workout.generating && (
+          <View style={styles.banner}>
+            <AiLoadingPulse icon="sparkles" size={18} />
+            <Text style={styles.bannerText}>Generating a fresh plan…</Text>
+          </View>
+        )}
+
         <GlassCard glowColor={COLORS.accent} style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="fitness" size={20} color={COLORS.accent} />
             <Text style={styles.summaryTitle}>Your Workout Plan</Text>
           </View>
           <Text style={styles.summaryText}>
-            {content.weeklyPlan?.length ?? 0}-day personalised split based on your fitness profile.
+            {days.length}-day personalised split based on your fitness profile.
           </Text>
+          <View style={styles.statsRow}>
+            <StatBadge icon="calendar-outline" label="Days" value={`${days.length}`} color={COLORS.primary} />
+            <StatBadge icon="barbell-outline" label="Exercises" value={`${totalExercises}`} color={COLORS.info} />
+          </View>
+          {!!updatedLabel && (
+            <View style={styles.updatedRow}>
+              <Ionicons name="time-outline" size={13} color={COLORS.textMuted} />
+              <Text style={styles.updatedText}>Updated {updatedLabel}</Text>
+            </View>
+          )}
         </GlassCard>
 
-        {(content.weeklyPlan ?? []).map((day, i) => (
-          <DayCard key={day.day} day={day} index={i} />
+        {days.map((day, i) => (
+          <DayCard key={`${day.day}-${i}`} day={day} />
         ))}
 
         <AnimatedButton
-          label="Regenerate Plan"
+          label={workout.generating ? 'Generating…' : 'Generate New Plan'}
           variant="secondary"
-          onPress={handleRegenerate}
-          icon={<Ionicons name="refresh" size={18} color={COLORS.primary} />}
+          onPress={handleGenerateNew}
+          loading={workout.generating}
+          disabled={workout.generating}
+          icon={<Ionicons name="sparkles" size={18} color={COLORS.primary} />}
         />
       </ScrollView>
-    </AnimatedScreen>
+    );
+  };
+
+  return (
+    <ScreenBackground>
+      <View style={[styles.shell, { paddingTop: insets.top + 56 }]}>
+        {renderBody()}
+      </View>
+    </ScreenBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  shell: { flex: 1 },
   root: { flex: 1 },
   scroll: { padding: SPACING.lg, gap: SPACING.md },
 
@@ -182,13 +210,42 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     gap: SPACING.md,
   },
+  loadingTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.lg, textAlign: 'center' },
   loadingText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
   errorText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
+
+  emptyIconWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  emptyTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.xl, textAlign: 'center' },
+
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
 
   summaryCard: { gap: SPACING.sm },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   summaryTitle: { ...TYPOGRAPHY.title, color: COLORS.text, fontSize: FONT_SIZE.xl },
   summaryText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, lineHeight: 21 },
+  statsRow: { flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap' },
+  updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  updatedText: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs },
 
   dayCard: { gap: SPACING.sm },
   dayHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },

@@ -123,11 +123,15 @@ export const OnboardingScreen: React.FC = () => {
   const [activity, setActivity] = useState<ActivityLevel | null>(null);
   const [allergies, setAllergies] = useState('');
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadProfile = async () => {
-      const existing = await getProfile();
-      if (existing) {
+      try {
+        const existing = await getProfile();
+        if (cancelled || !existing) return;
         if (existing.age) setAge(String(existing.age));
         if (existing.weight) setWeight(String(existing.weight));
         if (existing.height) setHeight(String(existing.height));
@@ -136,9 +140,15 @@ export const OnboardingScreen: React.FC = () => {
         if (existing.dietPreference) setDiet(existing.dietPreference);
         if (existing.activityLevel) setActivity(existing.activityLevel);
         if (existing.allergies) setAllergies(existing.allergies);
+      } finally {
+        if (!cancelled) setProfileLoading(false);
       }
     };
+
     loadProfile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const completion = useMemo(() => {
@@ -189,14 +199,16 @@ export const OnboardingScreen: React.FC = () => {
         allergies: allergies.trim() || undefined,
       });
 
+      // Refresh auth so isOnboarded is set before navigation.
+      await refreshUser();
+
       if (aiPlan) {
+        // Plan was already generated (e.g. cache hit) — pass it directly.
         navigation.replace('DietPlan', { plan: aiPlan, fromOnboarding: true });
       } else {
-        Alert.alert(
-          'Profile Saved',
-          'Your profile was saved but the diet plan could not be generated. You can retry from your profile.',
-          [{ text: 'OK', onPress: () => refreshUser() }],
-        );
+        // Plan is generating in the background. Navigate to the DietPlan screen
+        // without a pre-loaded plan — it will fetch from the API once ready.
+        navigation.replace('DietPlan', { fromOnboarding: true });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save your profile.';
@@ -212,6 +224,14 @@ export const OnboardingScreen: React.FC = () => {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        {profileLoading ? (
+          <View style={styles.profileLoader}>
+            <AiLoadingPulse icon="fitness-outline" size={40} />
+            <Text style={[styles.profileLoaderText, { color: colors.textSecondary }]}>
+              Loading your profile…
+            </Text>
+          </View>
+        ) : (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <GlassCard glowColor={COLORS.primary} style={styles.logoCard} noPadding>
@@ -267,12 +287,13 @@ export const OnboardingScreen: React.FC = () => {
           </GlassCard>
 
           <AnimatedButton
-            label={loading ? 'Generating your diet plan…' : 'Create My Plan'}
+            label="Create My Plan"
             onPress={handleSubmit}
             loading={loading}
-            icon={loading ? <AiLoadingPulse icon="nutrition-outline" size={22} /> : undefined}
+            disabled={loading}
           />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </AnimatedScreen>
   );
@@ -281,6 +302,14 @@ export const OnboardingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, padding: SPACING.lg, paddingBottom: SPACING.xxl, gap: SPACING.md },
+  profileLoader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    padding: SPACING.lg,
+  },
+  profileLoaderText: { fontSize: FONT_SIZE.md, textAlign: 'center' as const },
   header: { alignItems: 'center', marginBottom: SPACING.sm },
   logoCard: { marginBottom: SPACING.md, borderRadius: RADIUS.xl },
   logoInner: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
