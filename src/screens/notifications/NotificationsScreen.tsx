@@ -52,10 +52,13 @@ const NotificationCard: React.FC<{ item: AppNotification; index: number }> = ({ 
 
   return (
     <StaggerItem index={index}>
-      <GlassCard glowColor={isUnread ? color : undefined} style={styles.card}>
+      <GlassCard 
+        glowColor={isUnread ? color : undefined} 
+        style={[styles.card, isUnread && { borderColor: `${color}40`, borderWidth: 1 }]}
+      >
         <View style={styles.cardLeft}>
-          <View style={[styles.iconBox, { backgroundColor: `${color}18` }]}>
-            <Ionicons name={icon} size={20} color={color} />
+          <View style={[styles.iconBox, { backgroundColor: `${color}20` }]}>
+            <Ionicons name={icon} size={22} color={color} />
           </View>
           <View style={styles.details}>
             <View style={styles.titleRow}>
@@ -69,9 +72,13 @@ const NotificationCard: React.FC<{ item: AppNotification; index: number }> = ({ 
               >
                 {item.title}
               </Text>
-              {isUnread && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+              {isUnread && (
+                <View style={[styles.unreadBadge, { backgroundColor: `${colors.primary}20` }]}>
+                  <Text style={[styles.unreadBadgeText, { color: colors.primary }]}>New</Text>
+                </View>
+              )}
             </View>
-            <Text style={[styles.body, { color: colors.textSecondary }]}>{item.body}</Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]} numberOfLines={2}>{item.body}</Text>
             <Text style={[styles.time, { color: colors.textMuted }]}>{formatTimeAgo(item.createdAt)}</Text>
           </View>
         </View>
@@ -89,13 +96,15 @@ export const NotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
+    setError(null);
     try {
       const data = await getNotifications();
       setNotifications(data);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      setError(err.message || 'Failed to load notifications');
     }
   };
 
@@ -111,13 +120,32 @@ export const NotificationsScreen: React.FC = () => {
 
   if (loading) return <LoadingSpinner fullScreen />;
 
+  if (error) {
+    return (
+      <AnimatedScreen>
+        <View style={{ flex: 1, paddingTop: insets.top + 90, paddingHorizontal: SPACING.lg }}>
+          <EmptyState
+            icon="warning-outline"
+            title="Oops, something went wrong!"
+            subtitle={error}
+            actionLabel="Try Again"
+            onAction={() => {
+              setLoading(true);
+              load().finally(() => setLoading(false));
+            }}
+          />
+        </View>
+      </AnimatedScreen>
+    );
+  }
+
   return (
     <AnimatedScreen>
       <FlatList
-        style={[styles.root, { backgroundColor: colors.background }]}
+        style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 100 }
+          { paddingTop: insets.top + 90, paddingBottom: insets.bottom + 100 }
         ]}
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -139,37 +167,43 @@ export const NotificationsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: SPACING.md, gap: SPACING.sm },
-  card: { padding: SPACING.sm },
-  cardLeft: { flexDirection: 'row', gap: SPACING.md },
+  content: { padding: SPACING.md, gap: SPACING.md },
+  card: { marginHorizontal: 2, marginBottom: 4 },
+  cardLeft: { flexDirection: 'row', gap: SPACING.md, alignItems: 'center' },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  details: { flex: 1, gap: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  details: { flex: 1, gap: 4, paddingVertical: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: {
     fontSize: FONT_SIZE.md,
-    fontWeight: '500',
+    fontWeight: '600',
     flex: 1,
   },
   unreadText: {
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  unreadDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  unreadBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   body: {
     fontSize: FONT_SIZE.sm,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   time: {
     fontSize: FONT_SIZE.xs,
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '500',
   },
 });

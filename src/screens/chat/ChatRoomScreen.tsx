@@ -26,6 +26,7 @@ import { DARK_COLORS, LIGHT_COLORS, SPACING, RADIUS, FONT_SIZE } from '../../con
 import { useAuth } from '../../context/AuthContext';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import { EmojiPicker } from '../../components/chat/EmojiPicker';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 type ChatRoomRoute = RouteProp<ChatStackParams, 'ChatRoom'>;
 
@@ -184,6 +185,7 @@ export const ChatRoomScreen: React.FC = () => {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -197,6 +199,7 @@ export const ChatRoomScreen: React.FC = () => {
   const loadMessages = useCallback(async (cursor?: string) => {
     try {
       if (cursor) setLoadingMore(true);
+      if (!cursor) setError(null);
       const data = await chatService.getMessages(roomId, cursor);
       if (cursor) {
         setMessages((prev) => [...data.messages, ...prev]);
@@ -205,8 +208,8 @@ export const ChatRoomScreen: React.FC = () => {
       }
       setNextCursor(data.nextCursor);
       setHasMore(data.hasMore);
-    } catch (err) {
-      console.error('[ChatRoom] Failed to load messages', err);
+    } catch (err: any) {
+      if (!cursor) setError(err.message || 'Failed to load messages');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -510,6 +513,23 @@ export const ChatRoomScreen: React.FC = () => {
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
         <ActivityIndicator size="large" color={colors.primary} />
+      </LinearGradient>
+    );
+  }
+
+  if (error) {
+    return (
+      <LinearGradient
+        colors={[...colors.backgroundGradient]}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg }}
+      >
+        <EmptyState
+          icon="warning-outline"
+          title="Oops, something went wrong!"
+          subtitle={error}
+          actionLabel="Try Again"
+          onAction={() => { setLoading(true); loadMessages(); }}
+        />
       </LinearGradient>
     );
   }

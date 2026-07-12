@@ -47,13 +47,15 @@ export const BookingsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ClassBooking | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const data = await getMyBookings();
       setBookings(data);
-    } catch {
-      // silently fail on refresh
+    } catch (err: any) {
+      setError(err.message || 'Failed to load bookings');
     }
   }, []);
 
@@ -101,11 +103,19 @@ export const BookingsScreen: React.FC = () => {
       />
 
       <ScrollView
-        style={[styles.root, { backgroundColor: colors.background }]}
+        style={styles.root}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {bookings.length === 0 ? (
+        {error ? (
+          <EmptyState
+            icon="warning-outline"
+            title="Oops, something went wrong!"
+            subtitle={error}
+            actionLabel="Try Again"
+            onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}
+          />
+        ) : bookings.length === 0 ? (
           <EmptyState
             icon="bookmark-outline"
             title="No bookings yet"

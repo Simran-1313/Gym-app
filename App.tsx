@@ -14,6 +14,7 @@ export default function App() {
       <SafeAreaProvider>
         <AuthProvider>
           <PlansProvider>
+            <StatusBar style="auto" translucent={true} />
             <AppNavigator />
           </PlansProvider>
         </AuthProvider>
@@ -23,5 +24,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1, backgroundColor: '#000' },
 });

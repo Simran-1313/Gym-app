@@ -21,7 +21,8 @@
       "googleServicesFile": "./google-services.json"
     },
     "androidStatusBar": {
-      "translucent": true
+      "translucent": true,
+      "backgroundColor": "#00000000"
     },
     "web": {
       "favicon": "./assets/favicon.png"

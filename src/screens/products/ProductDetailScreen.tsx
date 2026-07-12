@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getProduct } from '../../services/pos.service';
 import { Product } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -52,13 +53,14 @@ export const ProductDetailScreen: React.FC = () => {
   if (error || !product) {
     return (
       <AnimatedScreen>
-        <View style={[styles.centered, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-          <GlassCard glowColor={colors.danger}>
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
-              <Text style={[styles.errorText, { color: colors.danger }]}>{error ?? 'Product not found'}</Text>
-            </View>
-          </GlassCard>
+        <View style={[styles.centered, { paddingTop: insets.top }]}>
+          <EmptyState
+            icon="warning-outline"
+            title="Oops, something went wrong!"
+            subtitle={error ?? 'Product not found'}
+            actionLabel="Try Again"
+            onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}
+          />
         </View>
       </AnimatedScreen>
     );
@@ -67,8 +69,8 @@ export const ProductDetailScreen: React.FC = () => {
   return (
     <AnimatedScreen>
       <ScrollView
-        style={[styles.root, { backgroundColor: colors.background }]}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + 100 }]}
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }]}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
       >

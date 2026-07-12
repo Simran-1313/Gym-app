@@ -167,8 +167,8 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode }) => {
                       ]}
                     >
                       <LinearGradient
-                        colors={isSelected ? (colors as [string, string]) : [colors[0] + 'B0', colors[1] + 'A0']}
-                        style={StyleSheet.absoluteFill}
+                        colors={colors as [string, string]}
+                        style={[StyleSheet.absoluteFill, { opacity: isSelected ? 1 : 0.55 }]}
                       />
                     </Animated.View>
                   ) : (

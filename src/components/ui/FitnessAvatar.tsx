@@ -71,9 +71,14 @@ export const FitnessAvatar: React.FC<Props> = ({
           ]}
         />
       ) : (
-        <View style={[styles.initialWrap, { borderRadius: radius, backgroundColor: `${colors.primary}26` }]}>
-          <DefaultAvatarSvg size={size} />
-        </View>
+        <Image
+          source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=1000&auto=format&fit=crop' }}
+          style={[
+            styles.image,
+            { width: size, height: size, borderRadius: radius, backgroundColor: colors.card },
+            imageStyle,
+          ]}
+        />
       )}
 
       {editable ? (
@@ -81,7 +86,7 @@ export const FitnessAvatar: React.FC<Props> = ({
           backgroundColor: isDark ? colors.white : colors.white,
           borderColor: isDark ? colors.black : 'rgba(0,0,0,0.15)',
         }]}>
-          <Ionicons name="camera" size={14} color={colors.black} />
+          <Ionicons name="pencil" size={14} color={colors.black} />
         </View>
       ) : null}
     </View>

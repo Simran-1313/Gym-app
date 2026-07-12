@@ -1,21 +1,26 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  FadeInUp,
-  useAnimatedScrollHandler,
-  useAnimatedStyle as useReanimatedStyle,
+  withTiming,
+  FadeIn,
+  interpolate,
+  interpolateColor,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DARK_COLORS, LIGHT_COLORS, RADIUS } from '../../config/theme';
+import * as Haptics from 'expo-haptics';
+import { DARK_COLORS, LIGHT_COLORS, RADIUS, FONT_SIZE } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const AnimatedView = Animated.View;
 
 const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Home: ['home', 'home-outline'],
@@ -25,58 +30,133 @@ const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Io
   Profile: ['person', 'person-outline'],
 };
 
+const TAB_LABELS: Record<string, string> = {
+  Home: 'Home',
+  Classes: 'Gym',
+  Chat: 'Chat',
+  CheckIns: 'Check-In',
+  Profile: 'Profile',
+};
+
+const TAB_COLORS: Record<string, keyof typeof DARK_COLORS> = {
+  Home: 'primary', // Cyan
+  Classes: 'accent', // Purple
+  Chat: 'info', // Blue
+  CheckIns: 'warning', // Yellow
+  Profile: 'secondary', // Pink
+};
+
 function TabIcon({
   name,
   focused,
   onPress,
+  index,
+  totalTabs,
 }: {
   name: string;
   focused: boolean;
   onPress: () => void;
+  index: number;
+  totalTabs: number;
 }) {
-  const scale = useSharedValue(focused ? 1.15 : 1);
+  const scale = useSharedValue(focused ? 1 : 1);
+  const iconScale = useSharedValue(focused ? 1.12 : 1);
+  const labelOpacity = useSharedValue(focused ? 1 : 0);
+  const labelTranslateY = useSharedValue(focused ? 0 : 6);
+  const pillScale = useSharedValue(focused ? 1 : 0);
+  const glowOpacity = useSharedValue(focused ? 1 : 0);
+
   const [active, inactive] = TAB_ICONS[name] ?? ['help', 'help-outline'];
+  const label = TAB_LABELS[name] ?? name;
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  React.useEffect(() => {
-    scale.value = withSpring(focused ? 1.15 : 1, { damping: 12, stiffness: 200 });
-  }, [focused, scale]);
+  const tabColorKey = TAB_COLORS[name] ?? 'primary';
+  const activeColor = colors[tabColorKey] as string;
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+  useEffect(() => {
+    iconScale.value = withSpring(focused ? 1.15 : 1, { damping: 14, stiffness: 220 });
+    labelOpacity.value = withTiming(focused ? 1 : 0, { duration: 200 });
+    labelTranslateY.value = withSpring(focused ? 0 : 6, { damping: 16, stiffness: 180 });
+    pillScale.value = withSpring(focused ? 1 : 0, { damping: 16, stiffness: 200 });
+    glowOpacity.value = withTiming(focused ? 1 : 0, { duration: 250 });
+  }, [focused, iconScale, labelOpacity, labelTranslateY, pillScale, glowOpacity]);
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  const labelAnimStyle = useAnimatedStyle(() => ({
+    opacity: labelOpacity.value,
+    transform: [{ translateY: labelTranslateY.value }],
+  }));
+
+  const pillAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scaleX: pillScale.value },
+      { scaleY: interpolate(pillScale.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
+    ],
+    opacity: pillScale.value,
+  }));
+
+  const glowAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glowOpacity.value, [0, 1], [0, 0.6], Extrapolation.CLAMP),
   }));
 
   const handlePress = () => {
-    scale.value = withSpring(0.9, { damping: 10 }, () => {
-      scale.value = withSpring(focused ? 1.15 : 1);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Squish-and-bounce
+    iconScale.value = withSpring(0.8, { damping: 8, stiffness: 400 }, () => {
+      iconScale.value = withSpring(focused ? 1.15 : 1, { damping: 12, stiffness: 200 });
     });
     onPress();
   };
 
   return (
     <AnimatedPressable onPress={handlePress} style={styles.tabBtn}>
-      <Animated.View style={[styles.iconWrap, animStyle]}>
+      {/* Background pill for active tab */}
+      <AnimatedView
+        style={[
+          styles.activePill,
+          pillAnimStyle,
+          {
+            backgroundColor: isDark ? `${activeColor}15` : `${activeColor}12`,
+            borderColor: isDark ? `${activeColor}30` : `${activeColor}20`,
+          },
+        ]}
+      />
+
+      {/* Glow behind active icon */}
+      <AnimatedView
+        style={[
+          styles.tabGlow,
+          glowAnimStyle,
+          { backgroundColor: `${activeColor}25` },
+        ]}
+      />
+
+      {/* Icon */}
+      <AnimatedView style={[styles.iconWrap, iconAnimStyle]}>
         <Ionicons
           name={focused ? active : inactive}
-          size={23}
-          color={focused ? colors.primary : colors.textMuted}
+          size={22}
+          color={focused ? activeColor : colors.textMuted}
         />
-        {focused ? (
-          <Animated.View 
-            entering={FadeInUp.duration(180)} 
-            style={[
-              styles.activeDot,
-              {
-                backgroundColor: colors.primary,
-                shadowColor: colors.primary,
-              }
-            ]} 
-          />
-        ) : null}
-        {focused ? <View style={[styles.glow, { backgroundColor: `${colors.primary}18` }]} /> : null}
-      </Animated.View>
+      </AnimatedView>
+
+      {/* Label — only visible for active tab */}
+      <AnimatedView style={[styles.labelWrap, labelAnimStyle]}>
+        <Text
+          style={[
+            styles.tabLabel,
+            { color: activeColor },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      </AnimatedView>
     </AnimatedPressable>
   );
 }
@@ -98,15 +178,42 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
 
   return (
     <View style={[styles.container, { bottom: Math.max(insets.bottom, 12) + 4 }]}>
-      <View 
+      {/* Outer shadow layer for 3D depth */}
+      <View style={[styles.shadowLayer, { shadowColor: isDark ? '#000' : '#4A4A68' }]} />
+      <BlurView
+        tint={isDark ? 'dark' : 'light'}
+        intensity={isDark ? 100 : 85}
         style={[
           styles.bar,
           {
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)',
-            backgroundColor: isDark ? 'rgba(12, 12, 16, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-          }
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(200,205,215,0.5)',
+            backgroundColor: isDark ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.55)',
+          },
         ]}
       >
+        <LinearGradient
+          colors={
+            isDark
+              ? ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)']
+              : ['rgba(255,255,255,0.6)', 'rgba(245,247,250,0.3)']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        {/* Top edge inner highlight */}
+        <View
+          style={[
+            styles.topEdge,
+            {
+              backgroundColor: isDark
+                ? 'rgba(255,255,255,0.06)'
+                : 'rgba(255,255,255,0.8)',
+            },
+          ]}
+          pointerEvents="none"
+        />
         <View style={styles.inner}>
           {state.routes.map((route, index) => {
             const focused = state.index === index;
@@ -128,11 +235,13 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
                 name={route.name}
                 focused={focused}
                 onPress={onPress}
+                index={index}
+                totalTabs={state.routes.length}
               />
             );
           })}
         </View>
-      </View>
+      </BlurView>
     </View>
   );
 };
@@ -140,9 +249,21 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: 12,
+    right: 12,
     alignItems: 'center',
+  },
+  shadowLayer: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: 4,
+    bottom: -4,
+    borderRadius: RADIUS.xl + 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   bar: {
     width: '100%',
@@ -150,36 +271,53 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
   },
+  topEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
   inner: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 64,
-    paddingHorizontal: 8,
+    height: 68,
+    paddingHorizontal: 6,
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
+    position: 'relative',
   },
-  iconWrap: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 4,
+  activePill: {
     position: 'absolute',
-    bottom: -10,
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
+    width: '80%',
+    height: 52,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
   },
-  glow: {
+  tabGlow: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     zIndex: -1,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  labelWrap: {
+    marginTop: 2,
+    height: 14,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
 });

@@ -3,13 +3,47 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View, ImageBackground, Text } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { FloatingTabBar } from '../components/ui/FloatingTabBar';
-import { DARK_COLORS, LIGHT_COLORS } from '../config/theme';
+import { AnimatedMeshBackground } from '../components/ui/AnimatedMeshBackground';
+import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE } from '../config/theme';
 import { AiPlan } from '../types';
+
+// Sleek minimal header — no heavy bar, just a clean frosted strip
+const SleekHeaderBackground = ({ isDark }: { isDark: boolean }) => (
+  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(10,10,18,0.65)' : 'rgba(250,250,255,0.7)' }]}>
+    <BlurView
+      tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+      intensity={isDark ? 60 : 70}
+      style={StyleSheet.absoluteFill}
+    />
+    <LinearGradient
+      colors={
+        isDark
+          ? ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.005)']
+          : ['rgba(255,255,255,0.45)', 'rgba(248,249,252,0.15)']
+      }
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+    />
+    {/* Subtle bottom separator */}
+    <View style={{
+      position: 'absolute',
+      bottom: 0,
+      left: 20,
+      right: 20,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+    }} />
+  </View>
+);
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ChangePasswordScreen } from '../screens/auth/ChangePasswordScreen';
@@ -78,26 +112,31 @@ const Tab = createBottomTabNavigator<TabParams>();
 
 const stackAnimation = Platform.OS === 'ios' ? 'fade_from_bottom' : 'slide_from_right';
 
-const screenOptions = {
+// Sleek screen options — modern minimal header with reduced height feel
+const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS) => ({
   headerStyle: { backgroundColor: 'transparent' },
   headerTransparent: true,
   contentStyle: { backgroundColor: 'transparent' },
   animation: stackAnimation as 'fade_from_bottom' | 'slide_from_right',
-};
+  headerTintColor: colors.text,
+  headerTitleStyle: {
+    color: colors.text,
+    fontWeight: '700' as const,
+    fontSize: FONT_SIZE.lg,
+    letterSpacing: -0.3,
+  },
+  headerShadowVisible: false,
+  headerBackground: () => <SleekHeaderBackground isDark={isDark} />,
+  headerBackTitleVisible: false,
+});
 
 const ProductsNavigator: React.FC = () => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  const dynamicScreenOptions = {
-    ...screenOptions,
-    headerTintColor: colors.text,
-    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
-  };
-
   return (
-    <ProductsStack.Navigator screenOptions={dynamicScreenOptions}>
+    <ProductsStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
       <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ title: 'Products' }} />
       <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: 'Product Details' }} />
     </ProductsStack.Navigator>
@@ -109,14 +148,8 @@ const ChatNavigator: React.FC = () => {
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  const dynamicScreenOptions = {
-    ...screenOptions,
-    headerTintColor: colors.text,
-    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
-  };
-
   return (
-    <ChatStack.Navigator screenOptions={dynamicScreenOptions}>
+    <ChatStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
       <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Messages' }} />
       <ChatStack.Screen
         name="ChatRoom"
@@ -137,15 +170,9 @@ const ClassesNavigator: React.FC = () => {
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  const dynamicScreenOptions = {
-    ...screenOptions,
-    headerTintColor: colors.text,
-    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
-  };
-
   return (
-    <ClassesStack.Navigator screenOptions={dynamicScreenOptions}>
-      <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ title: 'Classes' }} />
+    <ClassesStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
+      <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ headerShown: false }} />
       <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ title: 'My Bookings' }} />
     </ClassesStack.Navigator>
   );
@@ -163,7 +190,14 @@ const MainTabs: React.FC = () => {
         headerStyle: { backgroundColor: 'transparent' },
         headerTransparent: true,
         headerTintColor: colors.text,
-        headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
+        headerTitleStyle: {
+          color: colors.text,
+          fontWeight: '700' as const,
+          fontSize: FONT_SIZE.lg,
+          letterSpacing: -0.3,
+        },
+        headerShadowVisible: false,
+        headerBackground: () => <SleekHeaderBackground isDark={isDark} />,
         sceneStyle: styles.tabScene,
       }}
     >
@@ -178,8 +212,8 @@ const MainTabs: React.FC = () => {
         component={ChatNavigator}
         options={{ title: 'Messages', headerShown: false }}
       />
-      <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ title: 'Check-ins' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 };
@@ -192,12 +226,7 @@ export const AppNavigator: React.FC = () => {
 
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
-
-  const dynamicScreenOptions = {
-    ...screenOptions,
-    headerTintColor: colors.text,
-    headerTitleStyle: { color: colors.text, fontWeight: '600' as const },
-  };
+  const dynamicScreenOptions = makeScreenOptions(isDark, colors);
 
   if (isLoading) return <LoadingSpinner fullScreen />;
 
@@ -253,11 +282,12 @@ export const AppNavigator: React.FC = () => {
     );
   }
 
-  const navigationTheme = isDark ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.background } } : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.background } };
+  const navigationTheme = isDark ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } } : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } };
 
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+      <AnimatedMeshBackground isDark={isDark} />
       <NavigationContainer theme={navigationTheme}>{content}</NavigationContainer>
     </>
   );

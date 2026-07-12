@@ -155,26 +155,32 @@ export const DietPlanScreen: React.FC = () => {
     if (!content) {
       return (
         <View style={styles.center}>
-          <View style={styles.emptyIconWrap}>
-            <Ionicons name="nutrition-outline" size={42} color={COLORS.accent} />
+          <View style={[styles.emptyIconWrap, diet.error && { borderColor: `${COLORS.danger}40`, backgroundColor: `${COLORS.danger}10` }]}>
+            <Ionicons name={diet.error ? "warning-outline" : "nutrition-outline"} size={42} color={diet.error ? COLORS.danger : COLORS.accent} />
           </View>
-          <Text style={styles.emptyTitle}>No diet plan yet</Text>
+          <Text style={styles.emptyTitle}>{diet.error ? "Oops, something went wrong!" : "No diet plan yet"}</Text>
           <Text style={styles.errorText}>
             {diet.error ?? 'Generate a personalised 7-day diet plan from your fitness profile.'}
           </Text>
-          <AnimatedButton
-            label={diet.generating ? 'Generating…' : 'Generate My Diet Plan'}
-            onPress={() => generatePlan('DIET')}
-            loading={diet.generating}
-            disabled={diet.generating}
-            icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
-          />
-          <AnimatedButton
-            label="Update Fitness Profile"
-            variant="secondary"
-            onPress={() => navigation.navigate('Onboarding')}
-            icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
-          />
+          {diet.error ? (
+            <AnimatedButton label="Try Again" onPress={() => loadPlan('DIET')} />
+          ) : (
+            <>
+              <AnimatedButton
+                label={diet.generating ? 'Generating…' : 'Generate My Diet Plan'}
+                onPress={() => generatePlan('DIET')}
+                loading={diet.generating}
+                disabled={diet.generating}
+                icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
+              />
+              <AnimatedButton
+                label="Update Fitness Profile"
+                variant="secondary"
+                onPress={() => navigation.navigate('Onboarding')}
+                icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
+              />
+            </>
+          )}
         </View>
       );
     }

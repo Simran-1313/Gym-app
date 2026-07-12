@@ -151,8 +151,8 @@ export const ProductsScreen: React.FC = () => {
   return (
     <AnimatedScreen>
       <FlatList
-        style={[styles.root, { backgroundColor: colors.background }]}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + 100 }]}
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }]}
         data={products}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
@@ -213,12 +213,13 @@ export const ProductsScreen: React.FC = () => {
             ) : null}
 
             {error ? (
-              <GlassCard glowColor={colors.danger}>
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle-outline" size={24} color={colors.danger} />
-                  <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
-                </View>
-              </GlassCard>
+              <EmptyState
+                icon="warning-outline"
+                title="Oops, something went wrong!"
+                subtitle={error}
+                actionLabel="Try Again"
+                onAction={() => { setLoading(true); load(1).finally(() => setLoading(false)); }}
+              />
             ) : null}
           </View>
         }

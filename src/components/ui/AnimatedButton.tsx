@@ -7,6 +7,7 @@ import {
   View,
   ViewStyle,
   StyleProp,
+  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -14,8 +15,10 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, GRADIENTS, RADIUS } from '../../config/theme';
+
+import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, GRADIENTS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -52,7 +55,7 @@ export const AnimatedButton: React.FC<Props> = ({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
   };
 
   const handlePressOut = () => {
@@ -61,16 +64,13 @@ export const AnimatedButton: React.FC<Props> = ({
 
   const handlePress = () => {
     if (disabled || loading) return;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      // haptics unavailable
-    }
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     onPress();
   };
 
   const isDisabled = disabled || loading;
 
+  // ── PRIMARY ──
   if (variant === 'primary') {
     return (
       <AnimatedPressable
@@ -78,20 +78,20 @@ export const AnimatedButton: React.FC<Props> = ({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={isDisabled}
-        style={[animStyle, styles.wrapper, style, isDisabled && styles.disabled]}
+        style={[animStyle, s.btn, style, isDisabled && s.disabled]}
       >
         <LinearGradient
           colors={[...GRADIENTS.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.primaryInner}
+          style={s.btnInner}
         >
           {loading ? (
-            <ActivityIndicator color={colors.white} />
+            <ActivityIndicator color="#FFF" />
           ) : (
-            <View style={styles.labelRow}>
+            <View style={s.row}>
               {icon}
-              <Text style={styles.primaryText}>{label}</Text>
+              <Text style={s.primaryLabel}>{label}</Text>
             </View>
           )}
         </LinearGradient>
@@ -99,67 +99,90 @@ export const AnimatedButton: React.FC<Props> = ({
     );
   }
 
-  const secondaryStyle: ViewStyle = {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: isDark ? colors.surface : 'rgba(255,79,24,0.06)',
-    paddingHorizontal: 20,
-  };
+  // ── SECONDARY: Clean iOS Frosted Glass ──
+  if (variant === 'secondary') {
+    return (
+      <AnimatedPressable
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isDisabled}
+        style={[
+          animStyle,
+          s.btn,
+          s.glassBtnOuter,
+          { backgroundColor: isDark ? 'rgba(50,50,50,0.2)' : 'rgba(200,200,200,0.18)' },
+          style,
+          isDisabled && s.disabled
+        ]}
+      >
+        <BlurView
+          tint={isDark ? 'dark' : 'light'}
+          intensity={Platform.OS === 'ios' ? 50 : 80}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={s.btnInner}>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <View style={s.row}>
+              {icon}
+              <Text style={[s.glassLabel, { color: colors.primary }]}>{label}</Text>
+            </View>
+          )}
+        </View>
+      </AnimatedPressable>
+    );
+  }
 
-  const ghostStyle: ViewStyle = {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    backgroundColor: 'transparent',
-  };
-
+  // ── GHOST ──
   return (
     <AnimatedPressable
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={isDisabled}
-      style={[
-        animStyle,
-        styles.wrapper,
-        variant === 'secondary' ? secondaryStyle : ghostStyle,
-        style,
-        isDisabled && styles.disabled,
-      ]}
+      style={[animStyle, s.btn, { height: 44 }, style, isDisabled && s.disabled]}
     >
       {loading ? (
         <ActivityIndicator color={colors.primary} />
       ) : (
-        <View style={styles.labelRow}>
+        <View style={s.row}>
           {icon}
-          <Text
-            style={[
-              variant === 'secondary'
-                ? { color: colors.primary, fontSize: FONT_SIZE.md, fontWeight: '700' }
-                : { color: colors.textSecondary, fontSize: FONT_SIZE.md, fontWeight: '600' },
-            ]}
-          >
-            {label}
-          </Text>
+          <Text style={[s.ghostLabel, { color: colors.textSecondary }]}>{label}</Text>
         </View>
       )}
     </AnimatedPressable>
   );
 };
 
-const styles = StyleSheet.create({
-  wrapper: { borderRadius: RADIUS.md, overflow: 'hidden' },
-  primaryInner: {
-    height: 52,
+const s = StyleSheet.create({
+  btn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  btnInner: {
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  primaryText: { color: '#FFFFFF', fontSize: FONT_SIZE.lg, fontWeight: '700' },
-  disabled: { opacity: 0.55 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  // Glass
+  glassBtnOuter: {
+    backgroundColor: 'rgba(200,200,200,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,79,24,0.30)',
+  },
+
+  // Labels
+  primaryLabel: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  glassLabel: { fontSize: 15, fontWeight: '600' },
+  ghostLabel: { fontSize: 14, fontWeight: '600' },
+  disabled: { opacity: 0.45 },
 });

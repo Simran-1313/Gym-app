@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { getCheckIns } from '../../services/member.service';
 import { CheckIn } from '../../types';
@@ -17,6 +19,7 @@ import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../con
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { AppleActivityRings } from '../../components/ui/AppleActivityRings';
 import { AppleBarChart } from '../../components/ui/AppleBarChart';
 import { useAuth } from '../../context/AuthContext';
@@ -50,25 +53,49 @@ const estimateCalories = (totalMinutes: number): number => {
 
 export const ActivityScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Segment states for interactive chart
   const [activeMetric, setActiveMetric] = useState<'CALORIES' | 'DURATION' | 'WATER'>('CALORIES');
   const [viewMode, setViewMode] = useState<'HOURLY' | 'DAILY' | 'MONTHLY'>('DAILY');
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(null);
     getCheckIns(1, 15)
       .then((res) => setCheckIns(res.checkIns))
-      .catch(() => {})
+      .catch((err: any) => setError(err.message || 'Failed to load activity'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
   if (loading) return <LoadingSpinner fullScreen />;
+
+  if (error) {
+    return (
+      <AnimatedScreen>
+        <View style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: SPACING.lg, paddingTop: headerHeight }]}>
+          <EmptyState
+            icon="warning-outline"
+            title="Oops, something went wrong!"
+            subtitle={error}
+            actionLabel="Try Again"
+            onAction={load}
+          />
+        </View>
+      </AnimatedScreen>
+    );
+  }
 
   const weeklyCheckIns = checkIns.filter(
     (ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * 24 * 60 * 60 * 1000
@@ -99,10 +126,10 @@ export const ActivityScreen: React.FC = () => {
   return (
     <AnimatedScreen>
       <ScrollView
-        style={[styles.root, { backgroundColor: colors.background }]}
+        style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 100 }
+          { paddingTop: headerHeight + 16, paddingBottom: insets.bottom + 100 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -141,6 +168,19 @@ export const ActivityScreen: React.FC = () => {
             </View>
           </View>
         </GlassCard>
+
+        {/* AI Insight Widget (Premium UX) */}
+        <Animated.View entering={FadeInUp.duration(400).delay(150)}>
+          <GlassCard glowColor={colors.accent} style={styles.insightCard}>
+            <View style={styles.insightHeader}>
+              <Ionicons name="sparkles" size={16} color={colors.accent} />
+              <Text style={[styles.insightTitle, { color: colors.accent }]}>AI INSIGHT</Text>
+            </View>
+            <Text style={[styles.insightText, { color: colors.text }]}>
+              You're on a roll! You've burned <Text style={{ fontWeight: '800', color: colors.primary }}>{totalCalories} kcal</Text> this week, putting you in the top 15% of members. Keep up the hydration to maximize recovery.
+            </Text>
+          </GlassCard>
+        </Animated.View>
 
         {/* Segmented metrics grid (Tappable cards) */}
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>SELECT METRIC TO ANALYSE</Text>
@@ -215,10 +255,9 @@ export const ActivityScreen: React.FC = () => {
           </Pressable>
         </View>
 
-        {/* Detailed Graph View Panel */}
         <GlassCard
           glowColor={
-            activeMetric === 'CALORIES' ? '#FF124322' : activeMetric === 'DURATION' ? '#00E67622' : '#00B0FF22'
+            activeMetric === 'CALORIES' ? '#FF1243' : activeMetric === 'DURATION' ? '#00E676' : '#00B0FF'
           }
           style={styles.graphPanel}
         >
@@ -363,6 +402,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+  insightCard: {
+    marginTop: SPACING.xs,
+    padding: SPACING.md,
+    gap: SPACING.xs,
+    borderColor: 'rgba(255,158,24,0.3)',
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  insightTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  insightText: {
+    fontSize: FONT_SIZE.sm,
+    lineHeight: 20,
+    fontWeight: '500',
   },
   sectionHeader: {
     fontSize: 10,

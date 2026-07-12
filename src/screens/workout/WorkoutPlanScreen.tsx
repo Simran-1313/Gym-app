@@ -107,26 +107,32 @@ export const WorkoutPlanScreen: React.FC = () => {
     if (days.length === 0) {
       return (
         <View style={styles.center}>
-          <View style={styles.emptyIconWrap}>
-            <Ionicons name="barbell-outline" size={42} color={COLORS.primary} />
+          <View style={[styles.emptyIconWrap, workout.error && { borderColor: `${COLORS.danger}40`, backgroundColor: `${COLORS.danger}10` }]}>
+            <Ionicons name={workout.error ? "warning-outline" : "barbell-outline"} size={42} color={workout.error ? COLORS.danger : COLORS.primary} />
           </View>
-          <Text style={styles.emptyTitle}>No workout plan yet</Text>
+          <Text style={styles.emptyTitle}>{workout.error ? "Oops, something went wrong!" : "No workout plan yet"}</Text>
           <Text style={styles.errorText}>
             {workout.error ?? 'Generate a personalised training split from your fitness profile.'}
           </Text>
-          <AnimatedButton
-            label={workout.generating ? 'Generating…' : 'Generate My Workout Plan'}
-            onPress={() => generatePlan('WORKOUT')}
-            loading={workout.generating}
-            disabled={workout.generating}
-            icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
-          />
-          <AnimatedButton
-            label="Update Fitness Profile"
-            variant="secondary"
-            onPress={() => navigation.navigate('Onboarding')}
-            icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
-          />
+          {workout.error ? (
+            <AnimatedButton label="Try Again" onPress={() => loadPlan('WORKOUT')} />
+          ) : (
+            <>
+              <AnimatedButton
+                label={workout.generating ? 'Generating…' : 'Generate My Workout Plan'}
+                onPress={() => generatePlan('WORKOUT')}
+                loading={workout.generating}
+                disabled={workout.generating}
+                icon={<Ionicons name="sparkles" size={18} color={COLORS.white} />}
+              />
+              <AnimatedButton
+                label="Update Fitness Profile"
+                variant="secondary"
+                onPress={() => navigation.navigate('Onboarding')}
+                icon={<Ionicons name="create-outline" size={16} color={COLORS.primary} />}
+              />
+            </>
+          )}
         </View>
       );
     }

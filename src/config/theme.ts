@@ -6,19 +6,19 @@ export const DARK_COLORS = {
   card: 'rgba(255,255,255,0.045)',
   cardBorder: 'rgba(255,255,255,0.09)',
 
-  primary: '#FF4F18',
-  primaryGlow: '#FF6F43',
-  primaryDark: '#C83200',
-  primaryLight: '#FF8F65',
+  primary: '#00E5FF', // Neon Cyan
+  primaryGlow: '#18FFFF',
+  primaryDark: '#00B8D4',
+  primaryLight: '#84FFFF',
 
-  secondary: '#FF1744',
-  accent: '#FF9E18',
+  secondary: '#FF007F', // Neon Pink
+  accent: '#7C4DFF', // Vibrant Purple
 
-  success: '#00E676',
-  warning: '#FFD600',
+  success: '#39FF14', // Neon Green
+  warning: '#FFEA00', // Cyber Yellow
   danger: '#FF1744',
   error: '#FF1744',
-  info: '#29B6F6',
+  info: '#00BFFF', // Deep Sky Blue
 
   text: '#FFFFFF',
   textSecondary: 'rgba(255,255,255,0.65)',
@@ -42,19 +42,19 @@ export const LIGHT_COLORS = {
   card: 'rgba(255,255,255,0.72)',
   cardBorder: 'rgba(0,0,0,0.06)',
 
-  primary: '#FF4F18',
-  primaryGlow: '#FF6F43',
-  primaryDark: '#C83200',
-  primaryLight: '#FF8F65',
+  primary: '#00B8D4', // Deep Cyan for light mode
+  primaryGlow: '#00E5FF',
+  primaryDark: '#00838F',
+  primaryLight: '#18FFFF',
 
-  secondary: '#FF1744',
-  accent: '#FF9E18',
+  secondary: '#D500F9', // Deep Neon Purple/Pink
+  accent: '#651FFF', // Deep Purple
 
   success: '#00C853',
   warning: '#FFC400',
   danger: '#FF1744',
   error: '#FF1744',
-  info: '#00B0FF',
+  info: '#0091EA',
 
   text: '#1A1A2E',
   textSecondary: '#4A4A68',
@@ -115,8 +115,8 @@ export const TYPOGRAPHY = {
 };
 
 export const GRADIENTS = {
-  primary: ['#FF4F18', '#FF1744'] as const,
-  accent: ['#FF9E18', '#FF4F18'] as const,
-  surfaceGlow: ['rgba(255,79,24,0.22)', 'transparent'] as const,
-  profileHero: ['#FF4F18', '#FF1744', '#C83200'] as const,
+  primary: ['#00E5FF', '#00B8D4'] as const, // Neon Cyan to Deep Cyan
+  accent: ['#7C4DFF', '#FF007F'] as const, // Purple to Pink
+  surfaceGlow: ['rgba(0,229,255,0.22)', 'transparent'] as const, // Cyan glow
+  profileHero: ['#00E5FF', '#00B8D4', '#00838F'] as const, // Cyan gradient
 };

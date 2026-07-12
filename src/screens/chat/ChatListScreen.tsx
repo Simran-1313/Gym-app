@@ -21,6 +21,7 @@ import { chatService, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
 import { DARK_COLORS, LIGHT_COLORS, SPACING, FONT_SIZE, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { EmptyState } from '../../components/ui/EmptyState';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import type { TabParams } from '../../navigation/AppNavigator';
 
@@ -155,13 +156,15 @@ export const ChatListScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const loadRooms = useCallback(async () => {
+    setError(null);
     try {
       const data = await chatService.getRooms();
       setRooms(normalizeRooms(data));
-    } catch (err) {
-      console.error('[ChatList] Failed to load rooms', err);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load chats');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -274,6 +277,16 @@ export const ChatListScreen: React.FC = () => {
         {loading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : error ? (
+          <View style={[styles.centered, { padding: SPACING.lg }]}>
+            <EmptyState
+              icon="warning-outline"
+              title="Oops, something went wrong!"
+              subtitle={error}
+              actionLabel="Try Again"
+              onAction={() => { setLoading(true); loadRooms(); }}
+            />
           </View>
         ) : (
           <SectionList

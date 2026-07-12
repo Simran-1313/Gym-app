@@ -6,14 +6,16 @@ import {
   Text,
   View,
   Pressable,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
@@ -25,28 +27,27 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
-import { StaggerItem } from '../../components/ui/StaggerItem';
 import { FitnessAvatar } from '../../components/ui/FitnessAvatar';
+import { EmptyState } from '../../components/ui/EmptyState';
+
+/* ─────── Sub-components ─────── */
 
 const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = ({
-  icon,
-  label,
-  value,
+  icon, label, value,
 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   return (
-    <View style={styles.infoRow}>
-      <View style={[styles.infoIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+    <View style={s.infoRow}>
+      <View style={[s.infoIconWrap, { backgroundColor: `${colors.primary}12` }]}>
         <Ionicons name={icon} size={16} color={colors.primary} />
       </View>
-      <View style={styles.infoText}>
-        <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text>
-        <Text style={[styles.infoValue, { color: colors.text }]}>{value || '—'}</Text>
+      <View style={s.infoText}>
+        <Text style={[s.infoLabel, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[s.infoValue, { color: colors.text }]}>{value || '—'}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
     </View>
   );
 };
@@ -65,27 +66,50 @@ const MenuRow: React.FC<{
 
   return (
     <Pressable
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        onPress();
-      }}
-      style={styles.menuRow}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
+      style={({ pressed }) => [s.menuRow, pressed && { opacity: 0.7 }]}
     >
-      <View style={[styles.menuIconWrap, { backgroundColor: `${color}14` }]}>
+      <View style={[s.menuIconWrap, { backgroundColor: `${color}14` }]}>
         <Ionicons name={icon} size={18} color={color} />
       </View>
-      <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
-      <View style={styles.menuRight}>
+      <Text style={[s.menuLabel, { color: colors.text }]}>{label}</Text>
+      <View style={s.menuRight}>
         {rightElement ?? <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />}
       </View>
     </Pressable>
   );
 };
 
+const MetricTile: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  delay?: number;
+}> = ({ icon, label, value, delay = 0 }) => {
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  return (
+    <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={[s.metricTile, {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.5)',
+      borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(200,205,215,0.35)',
+    }]}>
+      <View style={[s.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+        <Ionicons name={icon} size={18} color={colors.primary} />
+      </View>
+      <Text style={[s.metricLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[s.metricValue, { color: colors.text }]}>{value}</Text>
+    </Animated.View>
+  );
+};
+
+/* ─────── Main Screen ─────── */
+
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const insets = useSafeAreaInsets();
-  const { user, logout, refreshUser, theme } = useAuth();
+  const { user, logout, refreshUser, theme, toggleTheme } = useAuth();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
@@ -98,64 +122,70 @@ export const ProfileScreen: React.FC = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [profile, setProfile] = useState<any>(null);
 
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const loadProfile = () => {
+    setProfileError(null);
+    getProfile()
+      .then(setProfile)
+      .catch((err: any) => setProfileError(err.message || 'Failed to load profile'));
+  };
+
   useEffect(() => {
-    const fetchProfileData = async () => {
-      const p = await getProfile();
-      setProfile(p);
-    };
-    fetchProfileData();
+    loadProfile();
   }, []);
 
-  const formatGoal = (g: string) => {
-    const mapping: Record<string, string> = {
-      WEIGHT_LOSS: 'Weight Loss 📉',
-      MUSCLE_GAIN: 'Muscle Gain 🦾',
-      FITNESS: 'Fitness ⚡',
-      ENDURANCE: 'Endurance 🏃',
-    };
-    return mapping[g] ?? g;
-  };
+  const formatGoal = (g: string) => ({
+    WEIGHT_LOSS: 'Weight Loss 📉', MUSCLE_GAIN: 'Muscle Gain 🦾',
+    FITNESS: 'Fitness ⚡', ENDURANCE: 'Endurance 🏃',
+  }[g] ?? g);
 
-  const formatActivity = (level: string) => {
-    const mapping: Record<string, string> = {
-      SEDENTARY: 'Sedentary 💼',
-      LIGHT: 'Light 🚶',
-      MODERATE: 'Moderate 🏃',
-      VERY_ACTIVE: 'Active ⚡',
-    };
-    return mapping[level] ?? level;
-  };
+  const formatActivity = (level: string) => ({
+    SEDENTARY: 'Sedentary 💼', LIGHT: 'Light 🚶',
+    MODERATE: 'Moderate 🏃', VERY_ACTIVE: 'Active ⚡',
+  }[level] ?? level);
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Name cannot be empty.');
-      return;
-    }
+    if (!name.trim()) { Alert.alert('Error', 'Name cannot be empty.'); return; }
     setSaving(true);
     try {
-      await updateProfile({
-        name: name.trim(),
-        phone: phone.trim() || undefined,
-        avatarUrl: avatarUrl.trim() || null,
-      });
+      await updateProfile({ name: name.trim(), phone: phone.trim() || undefined, avatarUrl: avatarUrl.trim() || null });
       await refreshUser();
       setEditing(false);
       Alert.alert('Saved', 'Profile updated successfully.');
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Update failed');
-    } finally {
-      setSaving(false);
+    } finally { setSaving(false); }
+  };
+
+  const handlePickImage = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedUri = result.assets[0].uri;
+      setAvatarUrl(selectedUri);
+      
+      // Auto-save the avatar if we are not in edit mode
+      if (!editing) {
+        try {
+          await updateProfile({ name: user?.name ?? '', avatarUrl: selectedUri });
+          await refreshUser();
+        } catch (e) {
+          console.warn('Failed to auto-save avatar', e);
+        }
+      }
     }
   };
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      setLoggingOut(false);
-      setShowLogoutConfirm(false);
-    }
+    try { await logout(); } finally { setLoggingOut(false); setShowLogoutConfirm(false); }
   };
 
   const memberSince = user?.createdAt
@@ -177,198 +207,155 @@ export const ProfileScreen: React.FC = () => {
       />
 
       <ScrollView
-        style={[styles.root, { backgroundColor: colors.background }]}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + 100 }]}
+        style={s.root}
+        contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 110 }]}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
       >
-        {/* Hero Profile Header */}
-        <Animated.View entering={FadeInUp.duration(400)}>
-          <View style={styles.heroContainer}>
-            <LinearGradient
-              colors={[...GRADIENTS.primary, 'transparent']}
-              style={styles.heroGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <GlassCard glowColor={colors.primary} style={styles.hero}>
-              <FitnessAvatar
-                name={user?.name}
-                uri={user?.avatarUrl}
-                size={88}
-                editable
-                onPress={() => setEditing(true)}
+        {/* ── Inline page title ── */}
+        <Animated.View entering={FadeInUp.duration(350)} style={s.pageHeader}>
+          <Text style={[s.pageTitle, { color: colors.text }]}>Profile</Text>
+          <Text style={[s.pageSubtitle, { color: colors.textSecondary }]}>Manage your account & fitness data</Text>
+        </Animated.View>
+
+        {/* ── Hero Profile Card (Centered Avatar Redesign) ── */}
+        <Animated.View entering={FadeInUp.duration(400).delay(80)}>
+          <GlassCard glowColor={colors.primary} style={s.heroCardCenter}>
+            <View style={s.heroCenterWrap}>
+              <FitnessAvatar 
+                name={user?.name} 
+                uri={avatarUrl || user?.avatarUrl} 
+                size={110} 
+                editable 
+                onPress={handlePickImage} 
+                style={s.heroAvatar}
               />
-              <Text style={[styles.heroName, { color: colors.text }]}>{user?.name ?? 'Member'}</Text>
-              <Text style={[styles.heroEmail, { color: colors.textSecondary }]}>{user?.email ?? ''}</Text>
-              <View style={[styles.memberBadge, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}30` }]}>
-                <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
-                <Text style={[styles.memberSince, { color: colors.primary }]}>Member since {memberSince}</Text>
+              <Text style={[s.heroNameCenter, { color: colors.text }]}>{user?.name ?? 'Member'}</Text>
+              <Text style={[s.heroEmailCenter, { color: colors.textSecondary }]} numberOfLines={1}>{user?.email ?? ''}</Text>
+              <View style={[s.memberBadgeCenter, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}25` }]}>
+                <Ionicons name="shield-checkmark" size={11} color={colors.primary} />
+                <Text style={[s.memberSince, { color: colors.primary }]}>Since {memberSince}</Text>
               </View>
-            </GlassCard>
-          </View>
+            </View>
+            
+            {/* Status pill */}
+            <View style={[s.statusStrip, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
+              <View style={s.statusLeft}>
+                <View style={[s.statusDot, { backgroundColor: user?.isActive ? colors.success : colors.danger }]} />
+                <Text style={[s.statusText, { color: colors.textSecondary }]}>
+                  Account {user?.isActive ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
+              <Pressable onPress={() => setEditing(!editing)} style={({ pressed }) => [s.editPill, pressed && { opacity: 0.7 }, { borderColor: `${colors.primary}30`, backgroundColor: editing ? `${colors.primary}15` : 'transparent' }]}>
+                <Ionicons name={editing ? "close-outline" : "create-outline"} size={13} color={colors.primary} />
+                <Text style={[s.editPillText, { color: colors.primary }]}>{editing ? "Cancel Edit" : "Edit Profile"}</Text>
+              </Pressable>
+            </View>
+          </GlassCard>
         </Animated.View>
 
         {user?.isFirstLogin && (
           <GlassCard glowColor={colors.warning}>
-            <View style={styles.alertBanner}>
+            <View style={s.alertBanner}>
               <Ionicons name="warning" size={18} color={colors.warning} />
-              <Text style={[styles.alertText, { color: colors.warning }]}>Please change your temporary password.</Text>
+              <Text style={[s.alertText, { color: colors.warning }]}>Please change your temporary password.</Text>
             </View>
           </GlassCard>
         )}
 
-        {/* Personal Info */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Personal Info</Text>
-            {!editing && (
-              <AnimatedButton label="Edit" variant="ghost" onPress={() => setEditing(true)} />
-            )}
-          </View>
-
-          {editing ? (
-            <Animated.View entering={FadeInUp.duration(300)}>
-              <GlassCard style={styles.editCard}>
-                <GlassInput label="Full Name" value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" editable={!saving} />
-                <GlassInput label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" editable={!saving} />
-                <GlassInput label="Avatar URL" value={avatarUrl} onChangeText={setAvatarUrl} placeholder="https://example.com/avatar.jpg" autoCapitalize="none" keyboardType="url" editable={!saving} />
-                <View style={styles.editActions}>
-                  <AnimatedButton
-                    label="Cancel"
-                    variant="secondary"
-                    onPress={() => {
-                      setEditing(false);
-                      setName(user?.name ?? '');
-                      setPhone(user?.phone ?? '');
-                      setAvatarUrl(user?.avatarUrl ?? '');
-                    }}
-                    disabled={saving}
-                    style={styles.flex1}
-                  />
-                  <AnimatedButton label="Save" onPress={handleSave} loading={saving} style={styles.flex1} />
-                </View>
-              </GlassCard>
-            </Animated.View>
-          ) : (
-            <GlassCard>
-              <InfoRow icon="person-outline" label="Name" value={user?.name ?? ''} />
-              <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
-              <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
-              <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
-              <InfoRow icon="call-outline" label="Phone" value={user?.phone ?? ''} />
+        {/* ── Edit Mode ── */}
+        {editing && (
+          <Animated.View entering={FadeInUp.duration(300)}>
+            <GlassCard style={s.editCard}>
+              <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>EDIT DETAILS</Text>
+              <GlassInput label="Full Name" value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" editable={!saving} />
+              <GlassInput label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" editable={!saving} />
+              {/* Removed Avatar URL input! Handled via ImagePicker now. */}
+              
+              <View style={s.editActions}>
+                <AnimatedButton 
+                  label="Cancel" 
+                  variant="secondary" 
+                  onPress={() => { setEditing(false); setName(user?.name ?? ''); setPhone(user?.phone ?? ''); }} 
+                  disabled={saving} 
+                  style={s.flex1} 
+                />
+                <AnimatedButton 
+                  label="Save Changes" 
+                  onPress={handleSave} 
+                  loading={saving} 
+                  style={s.flex1} 
+                />
+              </View>
             </GlassCard>
+          </Animated.View>
+        )}
+
+        {/* ── Fitness Metrics ── */}
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>FITNESS METRICS</Text>
+          {profileError ? (
+            <EmptyState
+              icon="warning-outline"
+              title="Oops, something went wrong!"
+              subtitle={profileError}
+              actionLabel="Try Again"
+              onAction={loadProfile}
+            />
+          ) : (
+            <>
+              <View style={s.metricsGrid}>
+                <MetricTile icon="barbell-outline" label="Weight" value={profile?.weight ? `${profile.weight} kg` : '—'} delay={100} />
+                <MetricTile icon="resize-outline" label="Height" value={profile?.height ? `${profile.height} cm` : '—'} delay={150} />
+                <MetricTile icon="trophy-outline" label="Goal" value={profile?.fitnessGoal ? formatGoal(profile.fitnessGoal) : '—'} delay={200} />
+                <MetricTile icon="pulse-outline" label="Activity" value={profile?.activityLevel ? formatActivity(profile.activityLevel) : '—'} delay={250} />
+              </View>
+              <AnimatedButton
+                label="Update Fitness Profile"
+                variant="secondary"
+                onPress={() => navigation.navigate('Onboarding')}
+                icon={<Ionicons name="create-outline" size={16} color={colors.primary} />}
+              />
+            </>
           )}
         </View>
 
-        {/* Fitness Metrics */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Fitness Metrics</Text>
-          <GlassCard glowColor={colors.accent}>
-            <View style={styles.metricsGrid}>
-              <View style={[styles.metricCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: colors.surfaceBorder }]}>
-                <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}14` }]}>
-                  <Ionicons name="barbell-outline" size={16} color={colors.primary} />
-                </View>
-                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Weight</Text>
-                <Text style={[styles.metricValue, { color: colors.text }]}>
-                  {profile?.weight ? `${profile.weight} kg` : '—'}
-                </Text>
-              </View>
-              <View style={[styles.metricCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: colors.surfaceBorder }]}>
-                <View style={[styles.metricIconWrap, { backgroundColor: `${colors.accent}14` }]}>
-                  <Ionicons name="resize-outline" size={16} color={colors.accent} />
-                </View>
-                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Height</Text>
-                <Text style={[styles.metricValue, { color: colors.text }]}>
-                  {profile?.height ? `${profile.height} cm` : '—'}
-                </Text>
-              </View>
-              <View style={[styles.metricCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: colors.surfaceBorder }]}>
-                <View style={[styles.metricIconWrap, { backgroundColor: `${colors.warning}14` }]}>
-                  <Ionicons name="trophy-outline" size={16} color={colors.warning} />
-                </View>
-                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Goal</Text>
-                <Text style={[styles.metricValue, { color: colors.text }]}>
-                  {profile?.fitnessGoal ? formatGoal(profile.fitnessGoal) : '—'}
-                </Text>
-              </View>
-              <View style={[styles.metricCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: colors.surfaceBorder }]}>
-                <View style={[styles.metricIconWrap, { backgroundColor: `${colors.success}14` }]}>
-                  <Ionicons name="pulse-outline" size={16} color={colors.success} />
-                </View>
-                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Activity</Text>
-                <Text style={[styles.metricValue, { color: colors.text }]}>
-                  {profile?.activityLevel ? formatActivity(profile.activityLevel) : '—'}
-                </Text>
-              </View>
-            </View>
-            
-            <AnimatedButton
-              label="Update Fitness Profile"
-              variant="secondary"
-              onPress={() => navigation.navigate('Onboarding')}
-              style={{ marginTop: SPACING.md }}
-              icon={<Ionicons name="create-outline" size={16} color={colors.primary} />}
-            />
+        {/* ── Quick Links ── */}
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>QUICK LINKS</Text>
+          <GlassCard style={s.menuCard}>
+            <MenuRow icon="nutrition-outline" label="My Diet Plan" onPress={() => navigation.navigate('DietPlan')} />
+            <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
+            <MenuRow icon="barbell-outline" label="My Workout Plan" onPress={() => navigation.navigate('WorkoutPlan')} />
+            <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
+            <MenuRow icon="fitness-outline" label="Activity Dashboard" onPress={() => navigation.navigate('Activity')} />
+            <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
+            <MenuRow icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
           </GlassCard>
         </View>
 
-        {/* Account Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
-          <GlassCard style={styles.menuCard}>
-            <MenuRow
-              icon="nutrition-outline"
-              label="My Diet Plan"
-              onPress={() => navigation.navigate('DietPlan')}
-              accent={colors.accent}
-            />
-            <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
-            <MenuRow
-              icon="barbell-outline"
-              label="My Workout Plan"
-              onPress={() => navigation.navigate('WorkoutPlan')}
-              accent={colors.info}
-            />
-            <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
-            <MenuRow
-              icon="fitness-outline"
-              label="Activity Dashboard"
-              onPress={() => navigation.navigate('Activity')}
-              accent={colors.success}
-            />
-            <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
-            <MenuRow
-              icon="notifications-outline"
-              label="Notifications"
-              onPress={() => navigation.navigate('Notifications')}
-              accent={colors.warning}
-            />
-          </GlassCard>
-        </View>
-
-        {/* Status & Logout */}
-        <GlassCard style={styles.menuCard}>
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <Ionicons
-                name={user?.isActive ? 'checkmark-circle' : 'close-circle'}
-                size={20}
-                color={user?.isActive ? colors.success : colors.danger}
+        {/* ── Preferences ── */}
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>PREFERENCES</Text>
+          <GlassCard style={s.menuCard}>
+            <View style={s.menuRow}>
+              <View style={[s.menuIconWrap, { backgroundColor: `${colors.primary}14` }]}>
+                <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={18} color={colors.primary} />
+              </View>
+              <Text style={[s.menuLabel, { color: colors.text }]}>Dark Mode</Text>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: 'rgba(0,0,0,0.1)', true: `${colors.primary}60` }}
+                thumbColor="#FFF"
               />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Account Status</Text>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: user?.isActive ? `${colors.success}18` : `${colors.danger}18` }]}>
-              <Text style={{ color: user?.isActive ? colors.success : colors.danger, fontSize: FONT_SIZE.xs, fontWeight: '700' }}>
-                {user?.isActive ? 'Active' : 'Inactive'}
-              </Text>
-            </View>
-          </View>
-        </GlassCard>
+          </GlassCard>
+        </View>
 
-        <View style={{ marginTop: SPACING.sm }}>
+        {/* ── Logout ── */}
+        <View style={{ marginTop: SPACING.xs }}>
           <AnimatedButton
             label="Logout"
             variant="secondary"
@@ -382,115 +369,74 @@ export const ProfileScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  content: { padding: SPACING.lg, gap: SPACING.md },
+/* ─────── Styles ─────── */
 
-  heroContainer: { position: 'relative' },
-  heroGradient: {
-    position: 'absolute',
-    top: -20,
-    left: -20,
-    right: -20,
-    height: 160,
-    borderRadius: RADIUS.xl,
-    opacity: 0.15,
+const s = StyleSheet.create({
+  root: { flex: 1 },
+  content: { paddingHorizontal: 14, gap: 14 },
+
+  pageHeader: { gap: 4, marginBottom: 4 },
+  pageTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: FONT_SIZE.sm },
+
+  // Centered Hero card
+  heroCardCenter: { gap: 0, paddingBottom: 0, paddingTop: SPACING.xl },
+  heroCenterWrap: { alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.md },
+  heroAvatar: { marginBottom: SPACING.xs },
+  heroNameCenter: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5, textAlign: 'center' },
+  heroEmailCenter: { fontSize: FONT_SIZE.md, textAlign: 'center' },
+  memberBadgeCenter: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: RADIUS.full, borderWidth: 1, marginTop: 4,
   },
-  hero: { alignItems: 'center', gap: SPACING.sm },
-  heroName: { ...TYPOGRAPHY.title, marginTop: SPACING.xs },
-  heroEmail: { ...TYPOGRAPHY.body },
-  memberBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    marginTop: SPACING.xs,
+  memberSince: { fontSize: 11, fontWeight: '700' },
+  statusStrip: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: SPACING.lg, marginHorizontal: -SPACING.md, paddingHorizontal: SPACING.md,
+    paddingVertical: 12, borderBottomLeftRadius: RADIUS.lg, borderBottomRightRadius: RADIUS.lg,
   },
-  memberSince: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  editPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1,
+  },
+  editPillText: { fontSize: 11, fontWeight: '700' },
 
   alertBanner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   alertText: { fontSize: FONT_SIZE.sm, flex: 1 },
 
   section: { gap: SPACING.sm },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
+  sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
 
+  // Info rows
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 10 },
-  infoIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  infoIconWrap: { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1 },
   infoLabel: { fontSize: FONT_SIZE.xs, marginBottom: 2 },
   infoValue: { fontSize: FONT_SIZE.md, fontWeight: '500' },
-  separator: { height: 1 },
 
-  editCard: { gap: SPACING.md },
-  editActions: { flexDirection: 'row', gap: SPACING.md },
+  // Edit
+  editCard: { gap: SPACING.md, padding: SPACING.lg },
+  editActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.sm },
   flex1: { flex: 1 },
 
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: SPACING.sm,
+  // Metrics
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  metricTile: {
+    width: '48%', borderRadius: RADIUS.lg, padding: SPACING.md, gap: 6, borderWidth: 1,
   },
-  metricCard: {
-    width: '48%',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: 6,
-    borderWidth: 1,
-  },
-  metricIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  metricLabel: {
-    fontSize: FONT_SIZE.xs,
-  },
-  metricValue: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
-  },
+  metricIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  metricLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  metricValue: { fontSize: FONT_SIZE.lg, fontWeight: '800' },
 
+  // Menu
   menuCard: { gap: 0 },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: 12,
-  },
-  menuIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 13 },
+  menuIconWrap: { width: 34, height: 34, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { fontSize: FONT_SIZE.md, fontWeight: '500', flex: 1 },
   menuRight: {},
-
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: SPACING.xs },
-  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, flex: 1 },
-  statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-  },
+  sep: { height: StyleSheet.hairlineWidth },
 });
