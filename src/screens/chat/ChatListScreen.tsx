@@ -72,7 +72,7 @@ function getInitials(name: string) {
 interface RoomItemProps {
   room: ChatRoom;
   currentUserId: string;
-  colors: typeof DARK_COLORS;
+  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
   onPress: () => void;
 }
 

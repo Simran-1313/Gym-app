@@ -180,7 +180,7 @@ export const HomeScreen: React.FC = () => {
   const bmi = (weight / Math.pow(height / 100, 2)).toFixed(1);
   const bmiValue = parseFloat(bmi);
   let bmiCategory = 'Normal';
-  let bmiColor = colors.success;
+  let bmiColor: string = colors.success;
   if (bmiValue < 18.5) { bmiCategory = 'Underweight'; bmiColor = colors.info; }
   else if (bmiValue > 25) { bmiCategory = 'Overweight'; bmiColor = colors.warning; }
   else if (bmiValue > 30) { bmiCategory = 'Obese'; bmiColor = colors.danger; }

@@ -162,20 +162,20 @@ export const ClassesScreen: React.FC = () => {
         
         data = [
           {
-            id: 'd1', classId: 'c1', startTime: new Date(now.setHours(9, 0, 0, 0)).toISOString(), capacity: 20, bookedCount: 20, isBooked: false,
-            class: { id: 'c1', name: 'Morning HIIT Blast', description: 'Intense cardio.', durationMinutes: 45, trainerId: 't1', isActive: true, trainer: { id: 't1', name: 'Sarah Chen' } }
+            id: 'd1', classId: 'c1', startTime: new Date(now.setHours(9, 0, 0, 0)).toISOString(), endTime: new Date(now.setHours(9, 45, 0, 0)).toISOString(), capacity: 20, bookedCount: 20, isBooked: false,
+            class: { id: 'c1', name: 'Morning HIIT Blast', description: 'Intense cardio.', durationMinutes: 45, trainer: { id: 't1', name: 'Sarah Chen' } }
           },
           {
-            id: 'd2', classId: 'c2', startTime: new Date(now.setHours(17, 30, 0, 0)).toISOString(), capacity: 15, bookedCount: 12, isBooked: true,
-            class: { id: 'c2', name: 'Powerlifting Base', description: 'Heavy lifting.', durationMinutes: 60, trainerId: 't2', isActive: true, trainer: { id: 't2', name: 'Mike Ross' } }
+            id: 'd2', classId: 'c2', startTime: new Date(now.setHours(17, 30, 0, 0)).toISOString(), endTime: new Date(now.setHours(18, 30, 0, 0)).toISOString(), capacity: 15, bookedCount: 12, isBooked: true,
+            class: { id: 'c2', name: 'Powerlifting Base', description: 'Heavy lifting.', durationMinutes: 60, trainer: { id: 't2', name: 'Mike Ross' } }
           },
           {
-            id: 'd3', classId: 'c3', startTime: new Date(tomorrow.setHours(8, 0, 0, 0)).toISOString(), capacity: 30, bookedCount: 10, isBooked: false,
-            class: { id: 'c3', name: 'Vinyasa Flow Yoga', description: 'Flexibility.', durationMinutes: 60, trainerId: 't3', isActive: true, trainer: { id: 't3', name: 'Elena Gilbert' } }
+            id: 'd3', classId: 'c3', startTime: new Date(tomorrow.setHours(8, 0, 0, 0)).toISOString(), endTime: new Date(tomorrow.setHours(9, 0, 0, 0)).toISOString(), capacity: 30, bookedCount: 10, isBooked: false,
+            class: { id: 'c3', name: 'Vinyasa Flow Yoga', description: 'Flexibility.', durationMinutes: 60, trainer: { id: 't3', name: 'Elena Gilbert' } }
           },
           {
-            id: 'd4', classId: 'c4', startTime: new Date(dayAfter.setHours(18, 0, 0, 0)).toISOString(), capacity: 25, bookedCount: 25, isBooked: false,
-            class: { id: 'c4', name: 'Spin Class Extreme', description: 'Cycling.', durationMinutes: 45, trainerId: 't4', isActive: true, trainer: { id: 't4', name: 'Jason Todd' } }
+            id: 'd4', classId: 'c4', startTime: new Date(dayAfter.setHours(18, 0, 0, 0)).toISOString(), endTime: new Date(dayAfter.setHours(18, 45, 0, 0)).toISOString(), capacity: 25, bookedCount: 25, isBooked: false,
+            class: { id: 'c4', name: 'Spin Class Extreme', description: 'Cycling.', durationMinutes: 45, trainer: { id: 't4', name: 'Jason Todd' } }
           }
         ];
       }
@@ -248,7 +248,7 @@ export const ClassesScreen: React.FC = () => {
           <AnimatedButton
             label="View My Bookings"
             variant="secondary"
-            onPress={() => nav.navigate('Bookings')}
+            onPress={() => nav.navigate('MyBookings')}
             icon={<Ionicons name="calendar-outline" size={16} color={isDark ? '#FFF' : colors.primary} />}
           />
         </Animated.View>

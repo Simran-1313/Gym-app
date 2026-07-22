@@ -193,3 +193,117 @@ export interface ApiResponse<T> {
   data?: T;
   meta?: Meta;
 }
+
+// ─── Activity & Analytics ───────────────────────────────────────────────────
+
+export type WorkoutType =
+  | 'STRENGTH'
+  | 'HIIT'
+  | 'CARDIO'
+  | 'RUNNING'
+  | 'CYCLING'
+  | 'YOGA'
+  | 'PILATES'
+  | 'BOXING';
+
+export type WorkoutSource =
+  | 'APP_TIMER'
+  | 'SMARTWATCH_APP'
+  | 'MANUAL_ENTRY'
+  | 'APPLE_HEALTH'
+  | 'GOOGLE_HEALTH_CONNECT';
+
+export interface LogWorkoutPayload {
+  workoutType: WorkoutType;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  caloriesBurned: number;
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  source?: WorkoutSource;
+  notes?: string;
+}
+
+export interface WorkoutSession extends LogWorkoutPayload {
+  id: string;
+  createdAt: string;
+}
+
+export interface ActivitySummary {
+  summaryDate: string;
+  metrics: {
+    calories: { burned: number; goal: number; unit: string; progress: number };
+    exerciseDuration: { minutes: number; goal: number; unit: string; progress: number };
+    hydration: { consumedMl: number; goalMl: number; unit: string; progress: number };
+  };
+  weeklyCheckIns: {
+    count: number;
+    goal: number;
+    daysWithCheckIn: string[];
+  };
+  aiInsight: string;
+}
+
+export interface AnalyticsDataPoint {
+  label: string;
+  value: number;
+  displayValue: string;
+  timestamp?: string;
+}
+
+export interface AnalyticsResult {
+  metric: 'CALORIES' | 'DURATION' | 'WATER';
+  period: 'HOURLY' | 'DAILY' | 'MONTHLY';
+  unit: string;
+  maxValue: number;
+  points: AnalyticsDataPoint[];
+}
+
+export interface LogWaterPayload {
+  amountMl: number;
+  timestamp?: string;
+}
+
+export interface WaterLogEntry {
+  id: string;
+  amountMl: number;
+  timestamp: string;
+}
+
+export interface WaterSummary {
+  date: string;
+  totalMl: number;
+  goalMl: number;
+  logs: WaterLogEntry[];
+}
+
+export type DeviceSyncProvider =
+  | 'APPLE_HEALTH'
+  | 'GOOGLE_HEALTH_CONNECT'
+  | 'FITBIT'
+  | 'GARMIN'
+  | 'SAMSUNG_HEALTH';
+
+export interface SyncDevicePayload {
+  provider: DeviceSyncProvider;
+  deviceId?: string;
+  deviceName?: string;
+  syncedAt: string;
+  metrics: {
+    stepCount?: number;
+    activeCalories?: number;
+    restingCalories?: number;
+    distanceMeters?: number;
+    avgHeartRate?: number;
+    restingHeartRate?: number;
+  };
+}
+
+export interface SyncDeviceStatus {
+  isConnected: boolean;
+  provider: DeviceSyncProvider | null;
+  deviceName: string | null;
+  lastSyncedAt: string | null;
+}
+

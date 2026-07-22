@@ -71,7 +71,7 @@ interface BubbleProps {
   isGroupChat: boolean;
   memberCount: number;
   currentUserId: string;
-  colors: typeof DARK_COLORS;
+  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
   onRetry: (msg: ChatMessage) => void;
 }
 
@@ -156,7 +156,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 
-const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS }> = ({ names, colors }) => {
+const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS | typeof LIGHT_COLORS }> = ({ names, colors }) => {
   if (!names.length) return null;
   const label = names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
   return (

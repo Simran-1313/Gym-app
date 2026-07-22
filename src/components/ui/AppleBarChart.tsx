@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
-interface DataPoint {
+export interface DataPoint {
   label: string;
   value: number;
   displayValue: string;
@@ -14,6 +14,7 @@ interface DataPoint {
 interface Props {
   metricType: 'CALORIES' | 'DURATION' | 'WATER';
   viewMode: 'HOURLY' | 'DAILY' | 'MONTHLY';
+  customData?: DataPoint[];
 }
 
 const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[]>> = {
@@ -105,12 +106,12 @@ const themeColors: Record<Props['metricType'], string[]> = {
   WATER: ['#00B0FF', '#00E5FF'],
 };
 
-export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode }) => {
+export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const themeColorsDynamic = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  const data = mockData[metricType]?.[viewMode] ?? [];
+  const data = (customData && customData.length > 0) ? customData : (mockData[metricType]?.[viewMode] ?? []);
   const colors = themeColors[metricType] ?? ['#FF5722', '#FF8A65'];
 
   const maxValue = Math.max(...data.map((d) => d.value), 1);

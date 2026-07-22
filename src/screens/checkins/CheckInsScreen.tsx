@@ -58,7 +58,7 @@ const methodIcon: Record<string, keyof typeof Ionicons.glyphMap> = {
   BIOMETRIC: 'finger-print-outline',
 };
 
-const getMethodColor = (colors: typeof DARK_COLORS) => ({
+const getMethodColor = (colors: typeof DARK_COLORS | typeof LIGHT_COLORS) => ({
   MANUAL: colors.accent,
   QR: colors.primary,
   BIOMETRIC: colors.success,

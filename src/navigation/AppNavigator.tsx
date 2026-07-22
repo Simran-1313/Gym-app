@@ -113,7 +113,7 @@ const Tab = createBottomTabNavigator<TabParams>();
 const stackAnimation = Platform.OS === 'ios' ? 'fade_from_bottom' : 'slide_from_right';
 
 // Sleek screen options — modern minimal header with reduced height feel
-const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS) => ({
+const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS | typeof LIGHT_COLORS) => ({
   headerStyle: { backgroundColor: 'transparent' },
   headerTransparent: true,
   contentStyle: { backgroundColor: 'transparent' },
