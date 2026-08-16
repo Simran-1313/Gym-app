@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { COLORS, FONT_SIZE } from '../../config/theme';
+import { COLORS, FONT_SIZE, FONTS } from '../../config/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -86,6 +86,6 @@ export const ProgressRing: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: { alignItems: 'center', justifyContent: 'center' },
   center: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  value: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '800' },
+  value: { color: COLORS.text, fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyExtra },
   label: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginTop: 2 },
 });

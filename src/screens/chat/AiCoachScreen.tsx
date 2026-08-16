@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
-import { DARK_COLORS, LIGHT_COLORS, SPACING, RADIUS, FONT_SIZE } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -342,11 +342,11 @@ const styles = StyleSheet.create({
 
   emptyState: { alignItems: 'center', paddingHorizontal: SPACING.lg, gap: SPACING.md },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700' },
+  emptyTitle: { fontSize: FONT_SIZE.xl, fontFamily: FONTS.bodyBold },
   emptySubtitle: { fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20 },
   suggestions: { gap: SPACING.sm, width: '100%' },
   chip: { borderWidth: 1, borderRadius: RADIUS.full, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs + 2 },
-  chipText: { fontSize: FONT_SIZE.sm, fontWeight: '500' },
+  chipText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium },
 
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.xs },
   msgRowUser: { justifyContent: 'flex-end' },

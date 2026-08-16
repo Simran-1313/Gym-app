@@ -18,7 +18,7 @@ import { getProducts } from '../../services/pos.service';
 import { Product } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  categoryChipText: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  categoryChipText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 
   card: { marginBottom: SPACING.sm },
   cardInner: { flexDirection: 'row', padding: SPACING.md, gap: SPACING.md, alignItems: 'center' },
@@ -284,12 +284,12 @@ const styles = StyleSheet.create({
   },
   image: { width: 64, height: 64 },
   infoBlock: { flex: 1, gap: 2 },
-  category: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  productName: { fontSize: 16, fontWeight: '700' },
-  price: { fontSize: 15, fontWeight: '800', marginTop: 2 },
+  category: { fontSize: 11, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  productName: { fontSize: 16, fontFamily: FONTS.bodyBold },
+  price: { fontSize: 15, fontFamily: FONTS.bodyExtra, marginTop: 2 },
   statusCol: { alignItems: 'flex-end', gap: SPACING.sm },
   stockBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },
-  stockText: { fontSize: 11, fontWeight: '700' },
+  stockText: { fontSize: 11, fontFamily: FONTS.bodyBold },
 
   errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.md },
   errorText: { fontSize: FONT_SIZE.md, textAlign: 'center' },

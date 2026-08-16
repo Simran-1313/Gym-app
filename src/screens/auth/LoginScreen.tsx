@@ -20,17 +20,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { COLORS, FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
+import { GymLogo } from '../../components/ui/GymLogo';
 
 const BACKGROUND_IMAGE =
   'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=1000&auto=format&fit=crop';
 
 export const LoginScreen: React.FC = () => {
-  const { login } = useAuth();
+  const { login, gym } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -89,18 +90,21 @@ export const LoginScreen: React.FC = () => {
         >
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-              <GlassCard glowColor={COLORS.primary} style={styles.logoCard} noPadding>
-                <View style={styles.logoInner}>
-                  <Ionicons name="barbell" size={40} color={COLORS.primary} />
-                </View>
-              </GlassCard>
-              <Text style={styles.brand}>FitStack</Text>
-              <Text style={styles.tagline}>Your gym, in your pocket.</Text>
+              <GymLogo name={gym?.name} logo={gym?.logo} size={80} style={styles.logoCard} />
+              <Text style={styles.brand} numberOfLines={2} adjustsFontSizeToFit>
+                {gym?.name ?? 'Clasendra'}
+              </Text>
+              <Text style={styles.tagline}>
+                {gym ? 'Your gym, in your pocket.' : 'Sign in with the details your gym sent you.'}
+              </Text>
             </Animated.View>
 
             <Animated.View style={shakeStyle}>
-              <GlassCard glowColor={COLORS.primaryGlow}>
-                <Text style={styles.cardTitle}>Member Login</Text>
+              <GlassCard glowColor={COLORS.primaryGlow} innerStyle={styles.cardInner}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>Member Login</Text>
+                  <Text style={styles.cardSubtitle}>Welcome back — let's get you training.</Text>
+                </View>
 
                 <GlassInput
                   label="Email"
@@ -126,7 +130,12 @@ export const LoginScreen: React.FC = () => {
                   returnKeyType="done"
                   leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} />}
                   rightIcon={
-                    <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+                    <TouchableOpacity
+                      onPress={() => setShowPassword((v) => !v)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    >
                       <Ionicons
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                         size={20}
@@ -141,6 +150,9 @@ export const LoginScreen: React.FC = () => {
                 <Text style={styles.hint}>Use the email and password sent by your gym.</Text>
               </GlassCard>
             </Animated.View>
+
+            {/* Platform credit stays small and out of the way — the gym owns this screen. */}
+            <Text style={styles.poweredBy}>Powered by Clasendra</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </ImageBackground>
@@ -148,21 +160,53 @@ export const LoginScreen: React.FC = () => {
   );
 };
 
+// Vertical rhythm is one scale, applied consistently: 8 inside a pair (label to
+// field), 16 between fields, 24 before an action, 32 between sections.
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: SPACING.lg },
-  header: { alignItems: 'center', marginBottom: SPACING.xl },
-  logoCard: { marginBottom: SPACING.md, borderRadius: RADIUS.xl },
-  logoInner: {
-    width: 80,
-    height: 80,
-    alignItems: 'center',
+  scroll: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xxl,
   },
-  brand: { ...TYPOGRAPHY.hero, color: COLORS.text, letterSpacing: 1 },
-  tagline: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginTop: 4 },
-  cardTitle: { ...TYPOGRAPHY.title, color: COLORS.text, marginBottom: SPACING.xs },
-  btn: { marginTop: SPACING.xs },
-  hint: { color: COLORS.textMuted, fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 18 },
+  header: { alignItems: 'center', marginBottom: SPACING.xl },
+  logoCard: { marginBottom: SPACING.md },
+  brand: {
+    ...TYPOGRAPHY.hero,
+    color: COLORS.text,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+  tagline: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+
+  // `gap` sets the base spacing between every child of the card, so no element
+  // needs its own margin to stay clear of its neighbour.
+  cardInner: { padding: SPACING.lg, gap: SPACING.md },
+  cardHeader: { gap: SPACING.xs, marginBottom: SPACING.xs },
+  cardTitle: { ...TYPOGRAPHY.title, color: COLORS.text },
+  cardSubtitle: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontSize: FONT_SIZE.sm },
+
+  // 8 on top of the card's 16 gap = 24 clear above the primary action.
+  btn: { marginTop: SPACING.sm },
+  hint: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  poweredBy: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xl,
+    letterSpacing: 0.4,
+  },
 });

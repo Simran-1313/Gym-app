@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 export interface DataPoint {
@@ -179,7 +179,7 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
                 <Text style={[
                   styles.axisLabel, 
                   { color: themeColorsDynamic.textMuted },
-                  isSelected && { color: themeColorsDynamic.text, fontWeight: '700' }
+                  isSelected && { color: themeColorsDynamic.text, fontFamily: FONTS.bodyBold }
                 ]}>
                   {point.label}
                 </Text>
@@ -204,10 +204,10 @@ const styles = StyleSheet.create({
   },
   tooltipLabel: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
   },
   tooltipValue: {
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
   },
   chartTip: {
     fontSize: FONT_SIZE.xs,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   },
   axisLabel: {
     fontSize: 10,
-    fontWeight: '500',
+    fontFamily: FONTS.bodyMedium,
     marginTop: 2,
     textAlign: 'center',
   },

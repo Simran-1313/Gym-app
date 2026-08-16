@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getNotifications, AppNotification } from '../../services/member.service';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -181,11 +181,11 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: {
     fontSize: FONT_SIZE.md,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
     flex: 1,
   },
   unreadText: {
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
   },
   unreadBadge: {
     paddingHorizontal: 8,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     textTransform: 'uppercase',
   },
   body: {
@@ -204,6 +204,6 @@ const styles = StyleSheet.create({
   time: {
     fontSize: FONT_SIZE.xs,
     marginTop: 4,
-    fontWeight: '500',
+    fontFamily: FONTS.bodyMedium,
   },
 });

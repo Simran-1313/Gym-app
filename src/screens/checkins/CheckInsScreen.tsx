@@ -15,7 +15,7 @@ import { getCheckIns } from '../../services/member.service';
 import { CheckIn, Meta } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StatBadge } from '../../components/ui/StatBadge';
@@ -274,7 +274,7 @@ const s = StyleSheet.create({
 
   listHeader: { gap: 12 },
   pageHeader: { gap: 4, marginBottom: 2 },
-  pageTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  pageTitle: { fontSize: 28, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
   pageSubtitle: { fontSize: FONT_SIZE.sm },
 
   // Summary
@@ -282,8 +282,8 @@ const s = StyleSheet.create({
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   summaryIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   summaryInfo: { flex: 1, gap: 2 },
-  summaryLabel: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
-  summaryValue: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  summaryLabel: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodySemi },
+  summaryValue: { fontSize: 26, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
   summaryBadge: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 
   // Card
@@ -294,20 +294,20 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   details: { flex: 1, gap: 3 },
-  dateText: { fontSize: FONT_SIZE.md, fontWeight: '700' },
+  dateText: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyBold },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  timeText: { fontSize: FONT_SIZE.xs, fontWeight: '500' },
+  timeText: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodyMedium },
 
   rightCol: { alignItems: 'flex-end' },
   durationBox: { alignItems: 'center', gap: 2 },
-  durationText: { fontSize: FONT_SIZE.sm, fontWeight: '800' },
+  durationText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyExtra },
 
   activeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.full, borderWidth: 1,
   },
   activeDot: { width: 7, height: 7, borderRadius: 4 },
-  activeText: { fontSize: 11, fontWeight: '700' },
+  activeText: { fontSize: 11, fontFamily: FONTS.bodyBold },
 
   cardBottom: {
     marginTop: SPACING.sm, marginHorizontal: -SPACING.md, paddingHorizontal: SPACING.md,
@@ -318,15 +318,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full,
     borderWidth: 1, alignSelf: 'flex-start',
   },
-  methodText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  methodText: { fontSize: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.5 },
 
   // Error
   errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.md },
   errorText: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
-  retryText: { fontSize: FONT_SIZE.sm, fontWeight: '700', marginTop: 4 },
+  retryText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold, marginTop: 4 },
 
   // Footer
   footer: { gap: SPACING.sm, marginTop: SPACING.sm },
   loadMoreBtn: { alignItems: 'center', paddingVertical: SPACING.md },
-  loadMoreText: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  loadMoreText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 });

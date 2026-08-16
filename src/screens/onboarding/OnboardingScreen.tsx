@@ -10,16 +10,19 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
+  Easing,
+  FadeInUp,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { COLORS, DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { COLORS, DARK_COLORS, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import {
   ActivityLevel,
   DietPreference,
@@ -35,6 +38,9 @@ import { AnimatedChip } from '../../components/ui/AnimatedChip';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
 
 type Option<T extends string> = { value: T; label: string };
+
+/** age, weight, height, gender, goal, diet, activity — drives the progress bar. */
+const REQUIRED_FIELDS = 7;
 
 const GENDER_OPTIONS: Option<Gender>[] = [
   { value: 'MALE', label: 'Male' },
@@ -94,7 +100,8 @@ const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
   const width = useSharedValue(0);
 
   useEffect(() => {
-    width.value = withTiming(progress, { duration: 400 });
+    // Ease-out so the bar settles instead of stopping dead on each field.
+    width.value = withTiming(progress, { duration: 450, easing: Easing.out(Easing.cubic) });
   }, [progress, width]);
 
   const barStyle = useAnimatedStyle(() => ({
@@ -103,10 +110,32 @@ const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
 
   return (
     <View style={styles.progressTrack}>
-      <Animated.View style={[styles.progressFill, barStyle]} />
+      <Animated.View style={[styles.progressFillWrap, barStyle]}>
+        <LinearGradient
+          colors={[...GRADIENTS.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.progressFill}
+        />
+      </Animated.View>
     </View>
   );
 };
+
+/** Icon + title, so each card announces what it's asking for. */
+const SectionHeader: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  color: string;
+  tint: string;
+}> = ({ icon, title, color, tint }) => (
+  <View style={styles.sectionHeader}>
+    <View style={[styles.sectionIcon, { backgroundColor: `${tint}1F` }]}>
+      <Ionicons name={icon} size={16} color={tint} />
+    </View>
+    <Text style={[styles.sectionTitle, { color }]}>{title}</Text>
+  </View>
+);
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
@@ -153,7 +182,7 @@ export const OnboardingScreen: React.FC = () => {
 
   const completion = useMemo(() => {
     let filled = 0;
-    const total = 7;
+    const total = REQUIRED_FIELDS;
     if (age) filled++;
     if (weight) filled++;
     if (height) filled++;
@@ -232,48 +261,67 @@ export const OnboardingScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <GlassCard glowColor={COLORS.primary} style={styles.logoCard} noPadding>
-              <View style={styles.logoInner}>
-                <Ionicons name="fitness" size={36} color={COLORS.primary} />
-              </View>
-            </GlassCard>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInUp.duration(400)} style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Tell us about yourself</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>We'll use this to build your personalised diet plan.</Text>
-            <FormProgress progress={completion} />
-            <Text style={[styles.progressLabel, { color: colors.textMuted }]}>{Math.round(completion * 100)}% complete</Text>
-          </View>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              We'll use this to build your personalised diet and training plans.
+            </Text>
 
-          <GlassCard glowColor={COLORS.accent} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Info</Text>
+            <View style={styles.progressBlock}>
+              <FormProgress progress={completion} />
+              <View style={styles.progressMeta}>
+                <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+                  {Math.round(completion * 100)}% complete
+                </Text>
+                <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+                  {REQUIRED_FIELDS - Math.round(completion * REQUIRED_FIELDS)} left
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          <GlassCard glowColor={COLORS.accent} innerStyle={styles.section}>
+            <SectionHeader icon="person-outline" title="Personal info" color={colors.text} tint={COLORS.accent} />
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <GlassInput label="Age" placeholder="25" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} editable={!loading} />
               </View>
               <View style={styles.flex1}>
-                <GlassInput label="Weight (kg)" placeholder="70" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
+                <GlassInput label="Weight" placeholder="70 kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
               </View>
               <View style={styles.flex1}>
-                <GlassInput label="Height (cm)" placeholder="175" value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
+                <GlassInput label="Height" placeholder="175 cm" value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
               </View>
             </View>
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Gender</Text>
-            <OptionSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} disabled={loading} />
+            <View style={styles.group}>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Gender</Text>
+              <OptionSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} disabled={loading} />
+            </View>
           </GlassCard>
 
-          <GlassCard glowColor={COLORS.primary} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Goals</Text>
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Fitness Goal</Text>
-            <OptionSelector options={GOAL_OPTIONS} selected={goal} onSelect={setGoal} disabled={loading} />
+          <GlassCard glowColor={COLORS.primary} innerStyle={styles.section}>
+            <SectionHeader icon="trophy-outline" title="Goals" color={colors.text} tint={COLORS.primary} />
+            <View style={styles.group}>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>What are you training for?</Text>
+              <OptionSelector options={GOAL_OPTIONS} selected={goal} onSelect={setGoal} disabled={loading} />
+            </View>
           </GlassCard>
 
-          <GlassCard glowColor={COLORS.primaryGlow} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Preferences</Text>
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Diet Preference</Text>
-            <OptionSelector options={DIET_OPTIONS} selected={diet} onSelect={setDiet} disabled={loading} />
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Activity Level</Text>
-            <OptionSelector options={ACTIVITY_OPTIONS} selected={activity} onSelect={setActivity} disabled={loading} />
+          <GlassCard glowColor={COLORS.primaryGlow} innerStyle={styles.section}>
+            <SectionHeader icon="restaurant-outline" title="Preferences" color={colors.text} tint={COLORS.primaryGlow} />
+            <View style={styles.group}>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Diet preference</Text>
+              <OptionSelector options={DIET_OPTIONS} selected={diet} onSelect={setDiet} disabled={loading} />
+            </View>
+            <View style={styles.group}>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Activity level</Text>
+              <OptionSelector options={ACTIVITY_OPTIONS} selected={activity} onSelect={setActivity} disabled={loading} />
+            </View>
             <GlassInput
               label="Allergies (optional)"
               placeholder="e.g. peanuts, lactose"
@@ -286,12 +334,17 @@ export const OnboardingScreen: React.FC = () => {
             />
           </GlassCard>
 
-          <AnimatedButton
-            label="Create My Plan"
-            onPress={handleSubmit}
-            loading={loading}
-            disabled={loading}
-          />
+          <View style={styles.footer}>
+            <AnimatedButton
+              label="Create My Plan"
+              onPress={handleSubmit}
+              loading={loading}
+              disabled={loading}
+            />
+            <Text style={[styles.footerNote, { color: colors.textMuted }]}>
+              You can update these details anytime from your profile.
+            </Text>
+          </View>
         </ScrollView>
         )}
       </KeyboardAvoidingView>
@@ -299,9 +352,17 @@ export const OnboardingScreen: React.FC = () => {
   );
 };
 
+// One spacing scale: 8 inside a label/control pair, 16 between groups in a
+// card, 24 between cards, 32 before and after the page's edges.
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, padding: SPACING.lg, paddingBottom: SPACING.xxl, gap: SPACING.md },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xxl,
+    gap: SPACING.lg,
+  },
   profileLoader: {
     flex: 1,
     alignItems: 'center',
@@ -309,33 +370,46 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.lg,
   },
-  profileLoaderText: { fontSize: FONT_SIZE.md, textAlign: 'center' as const },
-  header: { alignItems: 'center', marginBottom: SPACING.sm },
-  logoCard: { marginBottom: SPACING.md, borderRadius: RADIUS.xl },
-  logoInner: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
-  title: { ...TYPOGRAPHY.title, textAlign: 'center' as const },
-  subtitle: { ...TYPOGRAPHY.body, textAlign: 'center' as const, marginTop: SPACING.xs, lineHeight: 20 },
+  profileLoaderText: { ...TYPOGRAPHY.body, textAlign: 'center' as const },
+
+  header: { gap: SPACING.sm },
+  title: { ...TYPOGRAPHY.title },
+  subtitle: { ...TYPOGRAPHY.body },
+  progressBlock: { gap: SPACING.sm, marginTop: SPACING.xs },
   progressTrack: {
     width: '100%',
-    height: 6,
+    height: 8,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.full,
-    marginTop: SPACING.md,
     overflow: 'hidden' as const,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
+  progressFillWrap: { height: '100%', borderRadius: RADIUS.full, overflow: 'hidden' as const },
+  progressFill: { flex: 1, borderRadius: RADIUS.full },
+  progressMeta: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { ...TYPOGRAPHY.caption, fontFamily: FONTS.bodyMedium },
+
+  section: { padding: SPACING.lg, gap: SPACING.md },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  progressLabel: { fontSize: FONT_SIZE.xs, marginTop: SPACING.xs },
-  section: { gap: SPACING.md },
-  sectionTitle: { ...TYPOGRAPHY.heading },
-  fieldLabel: { fontSize: FONT_SIZE.sm, fontWeight: '500' as const, marginTop: SPACING.xs },
+  sectionTitle: { ...TYPOGRAPHY.heading, fontFamily: FONTS.displaySemi },
+
+  // A label and the control it names belong together — 8 apart, while the
+  // card's own 16 gap keeps one group clear of the next.
+  group: { gap: SPACING.sm },
+  fieldLabel: { ...TYPOGRAPHY.label },
   row: { flexDirection: 'row', gap: SPACING.sm },
   flex1: { flex: 1 },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  textArea: { minHeight: 72, textAlignVertical: 'top', paddingTop: SPACING.sm },
+  textArea: { minHeight: 80, textAlignVertical: 'top', paddingTop: SPACING.sm },
+
+  footer: { gap: SPACING.md, marginTop: SPACING.xs },
+  footerNote: { ...TYPOGRAPHY.caption, textAlign: 'center' as const, lineHeight: 18 },
 });

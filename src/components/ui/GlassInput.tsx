@@ -14,7 +14,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 interface Props extends TextInputProps {
@@ -77,18 +77,18 @@ export const GlassInput: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  field: { gap: SPACING.xs },
-  label: { fontSize: FONT_SIZE.sm, fontWeight: '500' },
+  field: { gap: SPACING.sm },
+  label: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium, letterSpacing: 0.1 },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: RADIUS.md,
     borderWidth: 1,
     paddingHorizontal: SPACING.md,
-    minHeight: 52,
+    minHeight: 54,
     gap: SPACING.sm,
   },
-  input: { flex: 1, fontSize: FONT_SIZE.md },
+  input: { flex: 1, fontSize: FONT_SIZE.md, fontFamily: FONTS.body, paddingVertical: SPACING.sm },
   focusGlow: {
     position: 'absolute',
     bottom: -2,

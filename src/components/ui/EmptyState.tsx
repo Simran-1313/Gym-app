@@ -13,7 +13,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 interface Props {
@@ -148,14 +148,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     letterSpacing: -0.3,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FONTS.bodyMedium,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: SPACING.md,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   actionText: {
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     letterSpacing: 0.3,
   },
 });

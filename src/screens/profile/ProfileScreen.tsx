@@ -20,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
 import { getProfile } from '../../services/member.service';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY, GRADIENTS } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -376,21 +376,21 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 14, gap: 14 },
 
   pageHeader: { gap: 4, marginBottom: 4 },
-  pageTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  pageTitle: { fontSize: 28, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
   pageSubtitle: { fontSize: FONT_SIZE.sm },
 
   // Centered Hero card
   heroCardCenter: { gap: 0, paddingBottom: 0, paddingTop: SPACING.xl },
   heroCenterWrap: { alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.md },
   heroAvatar: { marginBottom: SPACING.xs },
-  heroNameCenter: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5, textAlign: 'center' },
+  heroNameCenter: { fontSize: 24, fontFamily: FONTS.displayExtra, letterSpacing: -0.5, textAlign: 'center' },
   heroEmailCenter: { fontSize: FONT_SIZE.md, textAlign: 'center' },
   memberBadgeCenter: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: RADIUS.full, borderWidth: 1, marginTop: 4,
   },
-  memberSince: { fontSize: 11, fontWeight: '700' },
+  memberSince: { fontSize: 11, fontFamily: FONTS.bodyBold },
   statusStrip: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginTop: SPACING.lg, marginHorizontal: -SPACING.md, paddingHorizontal: SPACING.md,
@@ -398,25 +398,25 @@ const s = StyleSheet.create({
   },
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  statusText: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodySemi },
   editPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1,
   },
-  editPillText: { fontSize: 11, fontWeight: '700' },
+  editPillText: { fontSize: 11, fontFamily: FONTS.bodyBold },
 
   alertBanner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   alertText: { fontSize: FONT_SIZE.sm, flex: 1 },
 
   section: { gap: SPACING.sm },
-  sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 11, fontFamily: FONTS.displaySemi, letterSpacing: 1, textTransform: 'uppercase' },
 
   // Info rows
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 10 },
   infoIconWrap: { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1 },
   infoLabel: { fontSize: FONT_SIZE.xs, marginBottom: 2 },
-  infoValue: { fontSize: FONT_SIZE.md, fontWeight: '500' },
+  infoValue: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyMedium },
 
   // Edit
   editCard: { gap: SPACING.md, padding: SPACING.lg },
@@ -429,14 +429,14 @@ const s = StyleSheet.create({
     width: '48%', borderRadius: RADIUS.lg, padding: SPACING.md, gap: 6, borderWidth: 1,
   },
   metricIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  metricLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  metricValue: { fontSize: FONT_SIZE.lg, fontWeight: '800' },
+  metricLabel: { fontSize: 10, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  metricValue: { fontSize: FONT_SIZE.lg, fontFamily: FONTS.bodyExtra },
 
   // Menu
   menuCard: { gap: 0 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 13 },
   menuIconWrap: { width: 34, height: 34, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { fontSize: FONT_SIZE.md, fontWeight: '500', flex: 1 },
+  menuLabel: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyMedium, flex: 1 },
   menuRight: {},
   sep: { height: StyleSheet.hairlineWidth },
 });

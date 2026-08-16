@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { chatService, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
-import { DARK_COLORS, LIGHT_COLORS, SPACING, RADIUS, FONT_SIZE } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import { EmojiPicker } from '../../components/chat/EmojiPicker';
@@ -128,7 +128,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
     <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
       {!isOwn && isGroupChat && showSender && (
         <View style={[styles.avatarSmall, { backgroundColor: `${colors.info}25` }]}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.info }}>
+          <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: colors.info }}>
             {msg.sender.name.charAt(0).toUpperCase()}
           </Text>
         </View>
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
   },
   senderName: {
     fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
     marginBottom: 2,
     paddingLeft: 4,
   },
@@ -826,6 +826,6 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
   },
 });

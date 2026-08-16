@@ -14,7 +14,7 @@ import { getProduct } from '../../services/pos.service';
 import { Product } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -138,18 +138,18 @@ const styles = StyleSheet.create({
   placeholderImage: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center' },
 
   details: { padding: SPACING.md, gap: 6 },
-  category: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  name: { fontSize: 24, fontWeight: '800' },
-  price: { fontSize: 22, fontWeight: '900', marginTop: 4 },
+  category: { fontSize: 12, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', letterSpacing: 0.8 },
+  name: { fontSize: 24, fontFamily: FONTS.bodyExtra },
+  price: { fontSize: 22, fontFamily: FONTS.bodyExtra, marginTop: 4 },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: SPACING.sm },
-  stockLabel: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  stockLabel: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: SPACING.sm },
+  sectionTitle: { fontSize: 16, fontFamily: FONTS.bodyBold, marginBottom: SPACING.sm },
   description: { fontSize: FONT_SIZE.md, lineHeight: 22 },
 
   purchaseInfo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   purchaseText: { flex: 1, gap: 4 },
-  purchaseTitle: { fontSize: FONT_SIZE.md, fontWeight: '700' },
+  purchaseTitle: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyBold },
   purchaseSubtitle: { fontSize: FONT_SIZE.sm, lineHeight: 20 },
 
   errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.lg },

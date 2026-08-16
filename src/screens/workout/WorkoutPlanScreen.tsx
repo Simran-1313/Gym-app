@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePlans } from '../../context/PlansContext';
-import { COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { COLORS, FONT_SIZE, FONTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { WorkoutDay, WorkoutPlanContent } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { ScreenBackground } from '../../components/ui/ScreenBackground';
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
-  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 
   summaryCard: { gap: SPACING.sm },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
@@ -266,6 +266,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
-  exerciseName: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '600' },
+  exerciseName: { color: COLORS.text, fontSize: FONT_SIZE.md, fontFamily: FONTS.bodySemi },
   exerciseMeta: { color: COLORS.textMuted, fontSize: FONT_SIZE.sm },
 });

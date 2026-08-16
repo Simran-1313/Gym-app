@@ -19,7 +19,7 @@ import { getClassSchedules, bookClass } from '../../services/member.service';
 import { ClassSchedule } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -326,7 +326,7 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 14, gap: 12 },
 
   pageHeader: { gap: 4, marginBottom: 4 },
-  pageTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  pageTitle: { fontSize: 28, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
   pageSubtitle: { fontSize: FONT_SIZE.sm },
 
   dayPickerContent: { gap: SPACING.md, paddingVertical: SPACING.sm, paddingHorizontal: 4 },
@@ -346,10 +346,10 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
   },
-  dayBubbleName: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
-  dayBubbleNum: { fontSize: 20, fontWeight: '900' },
+  dayBubbleName: { fontSize: 11, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', marginBottom: 4 },
+  dayBubbleNum: { fontSize: 20, fontFamily: FONTS.bodyExtra },
 
-  countLabel: { fontSize: FONT_SIZE.xs, fontWeight: '600', letterSpacing: 0.3, marginTop: 2 },
+  countLabel: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodySemi, letterSpacing: 0.3, marginTop: 2 },
 
   // Card
   card: { gap: 0 },
@@ -357,13 +357,13 @@ const s = StyleSheet.create({
   dateBlock: {
     width: 62, height: 66, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md,
   },
-  dateMonth: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  dateNum: { fontSize: 26, fontWeight: '900', marginTop: -2 },
+  dateMonth: { fontSize: 11, fontFamily: FONTS.bodyExtra, textTransform: 'uppercase', letterSpacing: 1 },
+  dateNum: { fontSize: 26, fontFamily: FONTS.bodyExtra, marginTop: -2 },
 
   infoBlock: { flex: 1, gap: 4, justifyContent: 'center' },
-  className: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  className: { fontSize: 17, fontFamily: FONTS.bodyExtra, letterSpacing: -0.2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: FONT_SIZE.xs, fontWeight: '500' },
+  metaText: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodyMedium },
 
   // Capacity section
   capacitySection: {
@@ -373,18 +373,18 @@ const s = StyleSheet.create({
   capacityInfo: { flex: 1, gap: 4 },
   capacityBarBg: { height: 5, borderRadius: 3, overflow: 'hidden' },
   capacityBarFill: { height: '100%', borderRadius: 3 },
-  spotsText: { fontSize: 11, fontWeight: '600' },
+  spotsText: { fontSize: 11, fontFamily: FONTS.bodySemi },
 
   bookedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 16, height: 50, borderRadius: 14, borderWidth: 1,
     justifyContent: 'center', minWidth: 110,
   },
-  bookedText: { fontSize: 15, fontWeight: '700' },
+  bookedText: { fontSize: 15, fontFamily: FONTS.bodyBold },
   bookBtn: { minWidth: 110 },
 
   // Error
   errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.lg },
-  errorTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700' },
+  errorTitle: { fontSize: FONT_SIZE.lg, fontFamily: FONTS.bodyBold },
   errorText: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
 });

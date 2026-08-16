@@ -146,7 +146,7 @@ export const getNotifications = async (): Promise<AppNotification[]> => {
       {
         id: '1',
         title: 'Membership Activated! 🎉',
-        body: 'Welcome to FitStack. Your membership is now active.',
+        body: 'Welcome to Clasendra. Your membership is now active.',
         type: 'SYSTEM',
         readAt: null,
         createdAt: new Date().toISOString(),

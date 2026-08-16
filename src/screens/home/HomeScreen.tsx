@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { ActiveSubscription, User } from '../../types';
 import { RootStackParams, TabParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -30,6 +30,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { FitnessAvatar } from '../../components/ui/FitnessAvatar';
 import { AppleActivityRings } from '../../components/ui/AppleActivityRings';
 import { HeroFigure3D } from '../../components/ui/HeroFigure3D';
+import { GymLogo } from '../../components/ui/GymLogo';
 
 type HomeNavProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParams, 'Home'>,
@@ -145,7 +146,7 @@ const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onP
 };
 
 export const HomeScreen: React.FC = () => {
-  const { user, refreshUser, theme, toggleTheme } = useAuth();
+  const { user, refreshUser, gym, theme, toggleTheme } = useAuth();
   const nav = useNavigation<HomeNavProp>();
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
@@ -271,7 +272,7 @@ export const HomeScreen: React.FC = () => {
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, alignSelf: 'flex-start' }}>
                 <Ionicons name="trophy" size={10} color="#FFD700" />
-                <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFD700', marginLeft: 4 }}>Gold Tier</Text>
+                <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: '#FFD700', marginLeft: 4 }}>Gold Tier</Text>
               </View>
             </View>
           </Pressable>
@@ -302,7 +303,12 @@ export const HomeScreen: React.FC = () => {
             <Text style={[styles.heroGreeting, { color: colors.textSecondary }]}>
               {greeting()} 👋
             </Text>
-            <Text style={[styles.heroTitle, { color: colors.text }]}>FitStack</Text>
+            <View style={styles.heroBrandRow}>
+              <GymLogo name={gym?.name} logo={gym?.logo} size={34} />
+              <Text style={[styles.heroTitle, { color: colors.text }]} numberOfLines={1}>
+                {gym?.name ?? 'Clasendra'}
+              </Text>
+            </View>
           </Animated.View>
           
           <Animated.View entering={FadeInRight.duration(500).delay(200)} style={styles.heroFigureWrap}>
@@ -408,22 +414,22 @@ export const HomeScreen: React.FC = () => {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                 {/* Metric 1 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>12.4k</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '600' }}>KG LIFTED</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>12.4k</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>KG LIFTED</Text>
                   <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>↑ 12%</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', marginHorizontal: 8 }} />
                 {/* Metric 2 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>4/5</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '600' }}>WORKOUTS</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>4/5</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>WORKOUTS</Text>
                   <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>On Track</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', marginHorizontal: 8 }} />
                 {/* Metric 3 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>3,200</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '600' }}>KCAL BURNED</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>3,200</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>KCAL BURNED</Text>
                   <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>↑ 5%</Text>
                 </View>
               </View>
@@ -473,12 +479,12 @@ export const HomeScreen: React.FC = () => {
                     <Ionicons name="calendar" size={24} color={colors.info} />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>HIIT Cardio</Text>
-                    <Text style={{ fontSize: 13, color: colors.info, marginTop: 2, fontWeight: '600' }}>Starts in 45 mins</Text>
+                    <Text style={{ fontSize: 16, fontFamily: FONTS.bodyBold, color: colors.text }}>HIIT Cardio</Text>
+                    <Text style={{ fontSize: 13, color: colors.info, marginTop: 2, fontFamily: FONTS.bodySemi }}>Starts in 45 mins</Text>
                   </View>
                 </View>
                 <Pressable onPress={() => nav.navigate('Classes')} style={{ backgroundColor: colors.info, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
-                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Join</Text>
+                  <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Join</Text>
                 </Pressable>
               </View>
             </GlassCard>
@@ -492,7 +498,7 @@ export const HomeScreen: React.FC = () => {
                   <Ionicons name="hardware-chip" size={24} color={colors.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent, marginBottom: 4 }}>FitCoach AI Insight</Text>
+                  <Text style={{ fontSize: 14, fontFamily: FONTS.bodyBold, color: colors.accent, marginBottom: 4 }}>FitCoach AI Insight</Text>
                   <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>You crushed leg day yesterday! Focus on active recovery and high protein today to maximize muscle growth.</Text>
                 </View>
               </View>
@@ -580,12 +586,19 @@ const styles = StyleSheet.create({
   },
   heroGreeting: {
     fontSize: FONT_SIZE.md,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
     letterSpacing: 0.3,
   },
+  heroBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: '900',
+    flexShrink: 1,
+    fontSize: 24,
+    fontFamily: FONTS.displayExtra,
     letterSpacing: -0.5,
   },
   heroFigureWrap: {
@@ -617,7 +630,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     letterSpacing: -0.3,
   },
   headerActions: {
@@ -666,7 +679,7 @@ const styles = StyleSheet.create({
   motivationText: {
     flex: 1,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     letterSpacing: 0.2,
   },
 
@@ -704,13 +717,13 @@ const styles = StyleSheet.create({
   dailyWorkoutTitle: {
     color: '#FFF',
     fontSize: FONT_SIZE.lg,
-    fontWeight: '900',
+    fontFamily: FONTS.displayBold,
     letterSpacing: 0.5,
   },
   dailyWorkoutSub: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: FONT_SIZE.xs,
-    fontWeight: '500',
+    fontFamily: FONTS.bodyMedium,
     marginTop: 2,
   },
   dailyWorkoutPlayBtn: {
@@ -733,7 +746,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: FONTS.displayBold,
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
     marginLeft: 4,
@@ -759,7 +772,7 @@ const styles = StyleSheet.create({
   },
   quickActionTitle: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     textAlign: 'center',
   },
 
@@ -782,7 +795,7 @@ const styles = StyleSheet.create({
   },
   bentoTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     letterSpacing: 0.8,
   },
   
@@ -814,7 +827,7 @@ const styles = StyleSheet.create({
   },
   bentoValue: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FONTS.displayBold,
   },
   bentoWaterBody: {
     flex: 1,
@@ -864,7 +877,7 @@ const styles = StyleSheet.create({
   },
   bmiBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     textTransform: 'uppercase',
   },
   bmiDisplayRow: {
@@ -875,7 +888,7 @@ const styles = StyleSheet.create({
   },
   bmiValue: {
     fontSize: 48,
-    fontWeight: '900',
+    fontFamily: FONTS.displayExtra,
     letterSpacing: -1,
   },
   bmiControlsWrap: {
@@ -886,7 +899,7 @@ const styles = StyleSheet.create({
   },
   bmiControlLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     marginBottom: 2,
   },
   bmiStepper: {
@@ -896,7 +909,7 @@ const styles = StyleSheet.create({
   },
   bmiControlValue: {
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     minWidth: 24,
     textAlign: 'center',
   },
@@ -971,13 +984,13 @@ const styles = StyleSheet.create({
   },
   productsBannerEyebrow: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FONTS.bodyExtra,
     letterSpacing: 1.2,
     color: 'rgba(255,255,255,0.75)',
   },
   productsBannerTitle: {
     fontSize: FONT_SIZE.lg,
-    fontWeight: '900',
+    fontFamily: FONTS.displayBold,
     color: '#FFF',
   },
   productsBannerSubtitle: {

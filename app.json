@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gym-App",
+    "name": "Clasendra",
     "slug": "Gym-App",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,9 +32,10 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Gym-App to access your photos to share images in chat."
+          "photosPermission": "Allow Clasendra to access your photos to share images in chat."
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

@@ -18,7 +18,7 @@ import {
   getRecentEmojis,
   saveRecentEmoji,
 } from '../../constants/chatEmojis';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 
 interface Props {
   visible: boolean;
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     textTransform: 'uppercase',
     letterSpacing: 0.7,
     paddingHorizontal: 14,

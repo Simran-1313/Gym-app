@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { FloatingTabBar } from '../components/ui/FloatingTabBar';
 import { AnimatedMeshBackground } from '../components/ui/AnimatedMeshBackground';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE } from '../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS } from '../config/theme';
 import { AiPlan } from '../types';
 
 // Sleek minimal header — no heavy bar, just a clean frosted strip
@@ -121,7 +121,7 @@ const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS | typeof 
   headerTintColor: colors.text,
   headerTitleStyle: {
     color: colors.text,
-    fontWeight: '700' as const,
+    fontFamily: FONTS.displaySemi,
     fontSize: FONT_SIZE.lg,
     letterSpacing: -0.3,
   },
@@ -192,7 +192,7 @@ const MainTabs: React.FC = () => {
         headerTintColor: colors.text,
         headerTitleStyle: {
           color: colors.text,
-          fontWeight: '700' as const,
+          fontFamily: FONTS.displaySemi,
           fontSize: FONT_SIZE.lg,
           letterSpacing: -0.3,
         },

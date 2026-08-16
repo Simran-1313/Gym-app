@@ -106,12 +106,35 @@ export const FONT_SIZE = {
   hero: 32,
 } as const;
 
+/**
+ * Two families, two jobs. Outfit is a geometric sans with open, rounded forms —
+ * warm at large sizes, which is what headings need. Inter was drawn for screen
+ * UI at small sizes: tall x-height, unambiguous 1/l/I, so credentials and body
+ * copy stay readable on a phone in a gym.
+ *
+ * Weights are separate files, not `fontWeight` — Android does not synthesise
+ * weights for custom fonts, so asking for '700' on a regular face silently
+ * gives you the regular face. Always pick the family that already is the weight.
+ */
+export const FONTS = {
+  displayExtra: 'Outfit_800ExtraBold',
+  displayBold: 'Outfit_700Bold',
+  displaySemi: 'Outfit_600SemiBold',
+  displayMedium: 'Outfit_500Medium',
+  body: 'Inter_400Regular',
+  bodyMedium: 'Inter_500Medium',
+  bodySemi: 'Inter_600SemiBold',
+  bodyBold: 'Inter_700Bold',
+  bodyExtra: 'Inter_800ExtraBold',
+} as const;
+
 export const TYPOGRAPHY = {
-  hero: { fontSize: 32, fontWeight: '800' as const, letterSpacing: 0.5 },
-  title: { fontSize: 24, fontWeight: '700' as const },
-  heading: { fontSize: 18, fontWeight: '600' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  caption: { fontSize: 12, fontWeight: '400' as const },
+  hero: { fontFamily: FONTS.displayBold, fontSize: 32, letterSpacing: -0.5, lineHeight: 38 },
+  title: { fontFamily: FONTS.displaySemi, fontSize: 22, letterSpacing: -0.3, lineHeight: 28 },
+  heading: { fontFamily: FONTS.displayMedium, fontSize: 18, lineHeight: 24 },
+  label: { fontFamily: FONTS.bodyMedium, fontSize: 13, letterSpacing: 0.1 },
+  body: { fontFamily: FONTS.body, fontSize: 15, lineHeight: 22 },
+  caption: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 16 },
 };
 
 export const GRADIENTS = {

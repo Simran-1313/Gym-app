@@ -7,7 +7,8 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, GRADIENTS, RADIUS, SPACING } from '../../config/theme';
+import * as Haptics from 'expo-haptics';
+import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 interface Props {
@@ -37,10 +38,12 @@ export const AnimatedChip: React.FC<Props> = ({
     transform: [{ scale: scale.value }],
   }));
 
+  // Press *in* to 0.96 and release back to 1, rather than bouncing outward on
+  // release — the finger is still on the chip, so the feedback should track it.
+  const springIn = { damping: 18, stiffness: 320 };
+
   const handlePress = () => {
-    scale.value = withSpring(1.08, { damping: 8, stiffness: 400 }, () => {
-      scale.value = withSpring(1);
-    });
+    Haptics.selectionAsync().catch(() => {});
     onPress();
   };
 
@@ -48,7 +51,15 @@ export const AnimatedChip: React.FC<Props> = ({
     <Animated.View entering={FadeInDown.delay(index * 40).duration(300)}>
       <AnimatedPressable
         onPress={handlePress}
+        onPressIn={() => {
+          scale.value = withSpring(0.96, springIn);
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, springIn);
+        }}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ selected, disabled: Boolean(disabled) }}
         style={[animStyle, styles.chipOuter, disabled && styles.disabled]}
       >
         {selected ? (
@@ -75,18 +86,24 @@ export const AnimatedChip: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   chipOuter: { borderRadius: RADIUS.full, overflow: 'hidden' },
+  // 44pt is the smallest comfortable touch target; the old 8pt padding left
+  // these at ~34 and they were easy to miss.
   chipInner: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md + 2,
+    paddingVertical: 10,
     borderRadius: RADIUS.full,
   },
   chipOutline: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md + 2,
+    paddingVertical: 10,
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  text: { fontSize: FONT_SIZE.sm, fontWeight: '500' },
-  textSelected: { color: '#FFFFFF', fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  text: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium },
+  textSelected: { color: '#FFFFFF', fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
   disabled: { opacity: 0.5 },
 });

@@ -19,7 +19,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 
 import { chatService, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { DARK_COLORS, LIGHT_COLORS, SPACING, FONT_SIZE, RADIUS } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { EmptyState } from '../../components/ui/EmptyState';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
   },
   roomInfo: {
     flex: 1,
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   },
   roomName: {
     fontSize: FONT_SIZE.md,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
     flex: 1,
   },
   timeText: {
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
   },
   emptyState: {
     alignItems: 'center',
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
     marginTop: 8,
   },
   emptySubtitle: {
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   aiCoachTitle: {
     color: '#fff',
     fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
   },
   aiCoachSub: {
     color: 'rgba(255,255,255,0.8)',

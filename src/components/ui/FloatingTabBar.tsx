@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { DARK_COLORS, LIGHT_COLORS, RADIUS, FONT_SIZE } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
     letterSpacing: 0.3,
     textAlign: 'center',
   },

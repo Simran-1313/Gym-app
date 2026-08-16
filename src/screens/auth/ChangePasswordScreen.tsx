@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,14 +20,17 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
+import { GymLogo } from '../../components/ui/GymLogo';
 
 export const ChangePasswordScreen: React.FC = () => {
-  const { logout, setFirstLoginDone } = useAuth();
+  const { logout, setFirstLoginDone, gym } = useAuth();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  // Each field reveals independently — toggling one shouldn't expose the others.
+  const [revealed, setRevealed] = useState({ current: false, next: false, confirm: false });
 
   const handleSubmit = async () => {
     if (!current || !next || !confirm) {
@@ -74,7 +78,7 @@ export const ChangePasswordScreen: React.FC = () => {
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <Animated.View entering={ZoomIn.duration(400)} style={styles.iconBox}>
-            <Ionicons name="shield-checkmark" size={48} color={COLORS.primary} />
+            <GymLogo name={gym?.name} logo={gym?.logo} size={64} />
           </Animated.View>
           <Text style={styles.title}>Set Your Password</Text>
           <Text style={styles.subtitle}>
@@ -82,21 +86,37 @@ export const ChangePasswordScreen: React.FC = () => {
           </Text>
 
           <GlassCard glowColor={COLORS.primary}>
-            {[
-              { label: 'Current Password', value: current, onChange: setCurrent },
-              { label: 'New Password', value: next, onChange: setNext },
-              { label: 'Confirm New Password', value: confirm, onChange: setConfirm },
-            ].map(({ label, value, onChange }, i) => (
-              <Animated.View key={label} entering={FadeIn.delay(i * 80).duration(300)}>
+            {([
+              { key: 'current', label: 'Current Password', value: current, onChange: setCurrent },
+              { key: 'next', label: 'New Password', value: next, onChange: setNext },
+              { key: 'confirm', label: 'Confirm New Password', value: confirm, onChange: setConfirm },
+            ] as const).map(({ key, label, value, onChange }, i) => (
+              <Animated.View key={key} entering={FadeIn.delay(i * 80).duration(300)}>
                 <GlassInput
                   label={label}
                   placeholder={label}
                   value={value}
                   onChangeText={onChange}
-                  secureTextEntry
+                  secureTextEntry={!revealed[key]}
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType={key === 'current' ? 'password' : 'newPassword'}
                   editable={!loading}
                   leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} />}
+                  rightIcon={
+                    <TouchableOpacity
+                      onPress={() => setRevealed((r) => ({ ...r, [key]: !r[key] }))}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${revealed[key] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+                    >
+                      <Ionicons
+                        name={revealed[key] ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color={COLORS.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  }
                 />
               </Animated.View>
             ))}

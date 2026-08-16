@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, GRADIENTS } from '../../config/theme';
+import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, GRADIENTS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -181,8 +181,8 @@ const s = StyleSheet.create({
   },
 
   // Labels
-  primaryLabel: { color: '#FFF', fontSize: 15, fontWeight: '700' },
-  glassLabel: { fontSize: 15, fontWeight: '600' },
-  ghostLabel: { fontSize: 14, fontWeight: '600' },
+  primaryLabel: { color: '#FFF', fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
+  ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },
 });

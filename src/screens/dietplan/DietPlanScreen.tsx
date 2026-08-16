@@ -9,14 +9,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { CommonActions, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../context/AuthContext';
 import { usePlans } from '../../context/PlansContext';
-import { COLORS, FONT_SIZE, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { COLORS, FONT_SIZE, FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { DietPlanDay } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { normalizeDietPlanContent } from '../../utils/dietPlan';
@@ -128,7 +128,21 @@ export const DietPlanScreen: React.FC = () => {
 
   const handleDone = async () => {
     await refreshUser();
-    if (navigation.canGoBack()) navigation.goBack();
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    // Onboarding arrives here through `replace`, so this screen is the only
+    // route on the stack and there is nothing to go back to — without an
+    // explicit destination the button does nothing at all. Reset to the app
+    // root instead, but only once the post-onboarding stack is mounted;
+    // otherwise the auth state flip that refreshUser just triggered is what
+    // swaps the navigator.
+    if (navigation.getState()?.routeNames.includes('MainTabs')) {
+      navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'MainTabs' }] }));
+    }
   };
 
   const renderBody = () => {
@@ -336,7 +350,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
-  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  bannerText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 
   summaryCard: { gap: SPACING.md },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
@@ -346,7 +360,7 @@ const styles = StyleSheet.create({
   updatedText: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs },
 
   caloriesRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xs },
-  caloriesValue: { color: COLORS.text, fontSize: FONT_SIZE.hero, fontWeight: '800' },
+  caloriesValue: { color: COLORS.text, fontSize: FONT_SIZE.hero, fontFamily: FONTS.bodyExtra },
   caloriesUnit: { color: COLORS.textMuted, fontSize: FONT_SIZE.sm },
 
   macrosRow: { flexDirection: 'row', justifyContent: 'space-around' },
@@ -365,8 +379,8 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
   },
-  dayTabText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
-  dayTabTextActive: { color: COLORS.white, fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  dayTabText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
+  dayTabTextActive: { color: COLORS.white, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
 
   mealCard: { gap: SPACING.sm, marginBottom: SPACING.sm },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

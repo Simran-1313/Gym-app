@@ -1,9 +1,9 @@
-# FitStack Member Mobile App — Complete Implementation Guide
+# Clasendra Member Mobile App — Complete Implementation Guide
 
 **Version:** 1.0  
 **Date:** June 2026  
 **Audience:** Backend engineers, mobile engineers, QA, product — no prior context required  
-**Platform:** Expo (React Native) + existing FitStack multi-tenant backend (to be extended)
+**Platform:** Expo (React Native) + existing Clasendra multi-tenant backend (to be extended)
 
 ---
 
@@ -32,7 +32,7 @@
 
 ## 1. What We Are Building
 
-FitStack is a **multi-tenant gym management SaaS**. Each gym is a **tenant**. Gym owners use the **Admin Web Panel** (Next.js, port 3000) to manage members, billing, classes, staff, etc.
+Clasendra is a **multi-tenant gym management SaaS**. Each gym is a **tenant**. Gym owners use the **Admin Web Panel** (Next.js, port 3000) to manage members, billing, classes, staff, etc.
 
 This document describes the **Member Mobile App** — a **branded iOS + Android app** that gym members use to:
 
@@ -83,7 +83,7 @@ Our member app is a **key differentiator** in Phase 2 of the product roadmap.
 
 ```
 ┌─────────────────────┐         ┌──────────────────────────────┐
-│  Member Mobile App  │  HTTPS  │   FitStack Backend API       │
+│  Member Mobile App  │  HTTPS  │   Clasendra Backend API       │
 │  (Expo / RN)        │────────▶│   localhost:4000 (dev)       │
 │  iOS + Android      │  Bearer │                              │
 └─────────────────────┘  JWT    │  /api/admin/*  ← Admin panel │
@@ -787,10 +787,10 @@ app.use('/api/member', memberAuthMiddleware, memberProtectedRoutes);
 
 ## 5. Mobile App — Folder Structure
 
-Create the app as **`fitstack-member-app`** (or use existing `GymMemberApp` and rename).
+Create the app as **`clasendra-member-app`** (or use existing `GymMemberApp` and rename).
 
 ```
-fitstack-member-app/
+clasendra-member-app/
 ├── app/                          # Expo Router (file-based routing)
 │   ├── _layout.tsx               # Root: providers, auth gate, theme
 │   ├── index.tsx                 # Redirect → login or (tabs)
@@ -907,8 +907,8 @@ return <Slot />;
 ## 6. Mobile App — Dependencies
 
 ```bash
-npx create-expo-app@latest fitstack-member-app -t expo-template-blank-typescript
-cd fitstack-member-app
+npx create-expo-app@latest clasendra-member-app -t expo-template-blank-typescript
+cd clasendra-member-app
 npx expo install expo-router expo-secure-store expo-notifications expo-linking expo-constants
 npm install axios @tanstack/react-query zod react-hook-form @hookform/resolvers
 npm install react-native-razorpay   # or WebView checkout — see §11
@@ -947,7 +947,7 @@ Use LAN IP in development — Android emulator cannot reach `localhost` on your 
 For production:
 
 ```env
-EXPO_PUBLIC_API_URL=https://api.fitstack.in
+EXPO_PUBLIC_API_URL=https://api.clasendra.com
 ```
 
 Access in code: `process.env.EXPO_PUBLIC_API_URL`.
@@ -1025,9 +1025,9 @@ export default api;
 ### Secure storage keys
 
 ```
-fitstack_access_token
-fitstack_refresh_token
-fitstack_gym_slug        # remember last gym for login UX
+clasendra_access_token
+clasendra_refresh_token
+clasendra_gym_slug        # remember last gym for login UX
 ```
 
 ---
@@ -1114,7 +1114,7 @@ Apply `primaryColor` to:
 - Primary buttons
 - Header accents
 
-**Do not** show "FitStack" prominently — show gym name. Small "Powered by FitStack" in profile footer is acceptable for Starter tier; remove for Enterprise white-label.
+**Do not** show "Clasendra" prominently — show gym name. Small "Powered by Clasendra" in profile footer is acceptable for Starter tier; remove for Enterprise white-label.
 
 ---
 
@@ -1309,7 +1309,7 @@ Install: `curl -Ls "https://get.maestro.mobile.dev" | bash`
 **`e2e/flows/login.yaml`:**
 
 ```yaml
-appId: com.fitstack.member
+appId: com.clasendra.member
 ---
 - launchApp
 - tapOn: "Email"
@@ -1398,7 +1398,7 @@ Steps:
 
 ### App Store metadata
 
-- App name: `{Gym Name}` not "FitStack"
+- App name: `{Gym Name}` not "Clasendra"
 - Screenshots: membership, classes, booking
 - Privacy policy URL required
 
@@ -1524,7 +1524,7 @@ Always display `response.data.message` to the user — never raw stack traces.
 
 - [ ] Gym logo appears on home
 - [ ] Primary color applied to buttons/tabs
-- [ ] Gym name in header, not FitStack
+- [ ] Gym name in header, not Clasendra
 
 ### Push
 
@@ -1541,7 +1541,7 @@ Always display `response.data.message` to the user — never raw stack traces.
 cd backend && npm run dev   # port 4000
 
 # 2. Mobile app
-cd fitstack-member-app
+cd clasendra-member-app
 cp .env.example .env          # set EXPO_PUBLIC_API_URL to your LAN IP
 npm install
 npx expo start
@@ -1566,4 +1566,4 @@ When adding a feature:
 
 ---
 
-*End of document — FitStack Member Mobile App Implementation Guide v1.0*
+*End of document — Clasendra Member Mobile App Implementation Guide v1.0*

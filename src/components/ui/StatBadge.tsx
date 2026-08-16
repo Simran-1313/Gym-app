@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 interface Props {
@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   label: { fontSize: FONT_SIZE.xs },
-  value: { fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  value: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
 });
