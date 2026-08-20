@@ -17,7 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 
-import { chatService, ChatRoom } from '../../services/chat.service';
+import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
 import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -87,11 +87,13 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPres
     : (otherUser?.name || 'Direct Message');
 
   const lastMsg = room.messages?.[0] ?? null;
-  const preview = lastMsg
-    ? lastMsg.type === 'IMAGE'
-      ? (lastMsg.senderId === currentUserId ? 'You: Photo' : 'Photo')
-      : (lastMsg.senderId === currentUserId ? `You: ${lastMsg.content}` : lastMsg.content)
-    : 'No messages yet';
+  const preview = !lastMsg
+    ? 'No messages yet'
+    : lastMsg.isDeleted
+      ? deletedLabel(lastMsg, currentUserId)
+      : lastMsg.type === 'IMAGE'
+        ? (lastMsg.senderId === currentUserId ? 'You: Photo' : 'Photo')
+        : (lastMsg.senderId === currentUserId ? `You: ${lastMsg.content}` : lastMsg.content);
   const time = lastMsg ? formatTime(lastMsg.createdAt) : '';
   const unread = room.unreadCount ?? 0;
 
@@ -177,6 +179,8 @@ export const ChatListScreen: React.FC = () => {
 
   useEffect(() => {
     let active = true;
+    let unsubscribe: (() => void) | undefined;
+
     connectSocket().then((socket) => {
       if (!active) return;
 
@@ -194,12 +198,22 @@ export const ChatListScreen: React.FC = () => {
         });
       };
 
+      // A message was deleted — re-fetch so the preview reflects what's left
+      const onMessageDeleted = () => { loadRooms(); };
+
       socket.on('chat:message', onMessage);
-      return () => { socket.off('chat:message', onMessage); };
+      socket.on('chat:message_deleted', onMessageDeleted);
+      unsubscribe = () => {
+        socket.off('chat:message', onMessage);
+        socket.off('chat:message_deleted', onMessageDeleted);
+      };
     });
 
-    return () => { active = false; };
-  }, [user?.id]);
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, [user?.id, loadRooms]);
 
   const openRoom = (room: ChatRoom) => {
     const roomName = room.type === 'GROUP'

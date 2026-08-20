@@ -24,6 +24,7 @@ export interface ChatMessage {
   createdAt: string;
   statuses: MessageStatus[];
   isDeleted?: boolean;
+  deletedById?: string | null;
   clientId?: string | null;
   pending?: boolean;
   failed?: boolean;
@@ -44,6 +45,14 @@ export interface MessagesResponse {
   messages: ChatMessage[];
   nextCursor: string | null;
   hasMore: boolean;
+}
+
+/** WhatsApp-style tombstone text for a deleted message. */
+export function deletedLabel(msg: ChatMessage, currentUserId: string): string {
+  if (msg.deletedById && msg.deletedById === currentUserId) return 'You deleted this message';
+  // A deleter other than the sender can only be an admin moderating the group.
+  if (msg.deletedById && msg.deletedById !== msg.senderId) return 'This message was deleted by admin';
+  return 'This message was deleted';
 }
 
 export const chatService = {

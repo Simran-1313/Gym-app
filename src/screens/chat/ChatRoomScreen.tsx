@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { chatService, ChatMessage, ChatRoom } from '../../services/chat.service';
+import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
 import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
@@ -80,7 +80,27 @@ const MessageBubble: React.FC<BubbleProps> = ({
 }) => {
   const time = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const bubbleInner = (
+  const bubbleInner = msg.isDeleted ? (
+    <View
+      style={[
+        styles.bubble,
+        isOwn ? styles.bubbleOwn : styles.bubbleOther,
+        // after the own/other style — bubbleOwn zeroes the border width
+        styles.bubbleDeleted,
+        { borderColor: colors.surfaceBorder },
+      ]}
+    >
+      <View style={styles.deletedRow}>
+        <Ionicons name="ban-outline" size={13} color={colors.textMuted} />
+        <Text style={[styles.deletedText, { color: colors.textMuted }]}>
+          {deletedLabel(msg, currentUserId)}
+        </Text>
+      </View>
+      <View style={styles.msgFooter}>
+        <Text style={[styles.msgTime, { color: colors.textMuted }]}>{time}</Text>
+      </View>
+    </View>
+  ) : (
     <View
       style={[
         styles.bubble,
@@ -221,7 +241,8 @@ export const ChatRoomScreen: React.FC = () => {
   const markRead = useCallback(async (msgs: ChatMessage[]) => {
     if (!user) return;
     const unreadIds = msgs.filter(
-      (m) => m.senderId !== user.id && !m.statuses.some((s) => s.userId === user.id && s.status === 'READ')
+      (m) => m.senderId !== user.id && !m.isDeleted &&
+        !m.statuses.some((s) => s.userId === user.id && s.status === 'READ')
     ).map((m) => m.id);
 
     if (!unreadIds.length) return;
@@ -320,6 +341,18 @@ export const ChatRoomScreen: React.FC = () => {
         );
       });
 
+      // An admin (or the sender) deleted a message — leave a tombstone in place
+      socket.on('chat:message_deleted', (
+        { messageId, roomId: rid, deletedById }: { messageId: string; roomId: string; deletedById: string }
+      ) => {
+        if (rid !== roomId) return;
+        setMessages((prev) => prev.map((m) => (
+          m.id === messageId
+            ? { ...m, isDeleted: true, deletedById, content: '', type: 'TEXT' as const }
+            : m
+        )));
+      });
+
       socket.on('chat:typing', ({ userId: tid, name, roomId: rid }: { userId: string; name: string; roomId: string }) => {
         if (rid !== roomId) return;
         setTypingUsers((prev) => ({ ...prev, [tid]: name }));
@@ -346,6 +379,7 @@ export const ChatRoomScreen: React.FC = () => {
         socket.off('chat:message');
         socket.off('chat:status_update');
         socket.off('chat:status_update_bulk');
+        socket.off('chat:message_deleted');
         socket.off('chat:typing');
         socket.off('chat:stop_typing');
       }
@@ -733,6 +767,20 @@ const styles = StyleSheet.create({
   },
   bubbleOther: {
     borderTopLeftRadius: 4,
+  },
+  bubbleDeleted: {
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  deletedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  deletedText: {
+    fontSize: FONT_SIZE.sm,
+    fontStyle: 'italic',
   },
   bubbleImage: {
     paddingHorizontal: 4,
