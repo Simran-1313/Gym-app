@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -8,12 +8,16 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 import { getCheckIns } from '../../services/member.service';
 import {
@@ -21,7 +25,6 @@ import {
   getActivityAnalytics,
   logWorkout,
   logWater,
-  syncDevice,
   getSyncDeviceStatus,
 } from '../../services/activity.service';
 import {
@@ -31,7 +34,7 @@ import {
   SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -46,7 +49,6 @@ const DAYS_OF_WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const hasCheckedInOnDay = (checkIns: CheckIn[], dayIndex: number): boolean => {
   const targetDay = dayIndex === 6 ? 0 : dayIndex + 1;
   const now = new Date();
-
   return checkIns.some((ci) => {
     const ciDate = new Date(ci.checkedInAt);
     const isSameWeek = now.getTime() - ciDate.getTime() < 7 * 24 * 60 * 60 * 1000;
@@ -62,16 +64,14 @@ const calcTotalMinutes = (checkIns: CheckIn[]): number => {
   }, 0);
 };
 
-const estimateCalories = (totalMinutes: number): number => {
-  return Math.round(totalMinutes * 8);
-};
+const estimateCalories = (totalMinutes: number): number => Math.round(totalMinutes * 8);
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: keyof typeof Ionicons.glyphMap; calPerMin: number }[] = [
   { type: 'HIIT', label: 'HIIT Training', icon: 'flame', calPerMin: 12 },
-  { type: 'STRENGTH', label: 'Strength Training', icon: 'barbell', calPerMin: 8 },
-  { type: 'CARDIO', label: 'Cardio Workout', icon: 'heart', calPerMin: 10 },
-  { type: 'RUNNING', label: 'Treadmill Run', icon: 'walk', calPerMin: 11 },
-  { type: 'YOGA', label: 'Yoga & Stretch', icon: 'leaf', calPerMin: 5 },
+  { type: 'STRENGTH', label: 'Strength', icon: 'barbell', calPerMin: 8 },
+  { type: 'CARDIO', label: 'Cardio', icon: 'heart', calPerMin: 10 },
+  { type: 'RUNNING', label: 'Running', icon: 'walk', calPerMin: 11 },
+  { type: 'YOGA', label: 'Yoga', icon: 'leaf', calPerMin: 5 },
 ];
 
 export const ActivityScreen: React.FC = () => {
@@ -90,18 +90,16 @@ export const ActivityScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Segment states for interactive chart
   const [activeMetric, setActiveMetric] = useState<'CALORIES' | 'DURATION' | 'WATER'>('CALORIES');
-  const [viewMode, setViewMode] = useState<'HOURLY' | 'DAILY' | 'MONTHLY'>('DAILY');
+  const [viewMode, setViewMode] = useState<'DAILY' | 'MONTHLY'>('DAILY');
 
-  // Live Workout Timer Modal state
   const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<typeof WORKOUT_TYPES[0]>(WORKOUT_TYPES[0]);
   const [isWorkoutActive, setIsWorkoutActive] = useState(false);
   const [workoutElapsedSec, setWorkoutElapsedSec] = useState(0);
   const timerRef = useRef<any>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -111,12 +109,11 @@ export const ActivityScreen: React.FC = () => {
         getActivityAnalytics(activeMetric, viewMode),
         getSyncDeviceStatus(),
       ]);
-
       setCheckIns(checkInRes.checkIns);
       setSummary(summaryRes);
       setChartPoints(analyticsRes.points);
       setDeviceStatus(deviceRes);
-      if (summaryRes.metrics?.hydration?.consumedMl) {
+      if (summaryRes.metrics?.hydration?.consumedMl !== undefined) {
         setWaterLoggedMl(summaryRes.metrics.hydration.consumedMl);
       }
     } catch (err: any) {
@@ -124,88 +121,64 @@ export const ActivityScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeMetric, viewMode]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
-  // Fetch analytics chart points whenever metric or view mode changes
   useEffect(() => {
     getActivityAnalytics(activeMetric, viewMode)
       .then((res) => setChartPoints(res.points))
       .catch((err) => console.log('Analytics error:', err));
   }, [activeMetric, viewMode]);
 
-  // Live workout timer effect
   useEffect(() => {
     if (isWorkoutActive) {
-      timerRef.current = setInterval(() => {
-        setWorkoutElapsedSec((prev) => prev + 1);
-      }, 1000);
+      timerRef.current = setInterval(() => setWorkoutElapsedSec((prev) => prev + 1), 1000);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isWorkoutActive]);
 
   const handleMetricSelect = (metric: typeof activeMetric) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     setActiveMetric(metric);
   };
 
   const handleSegmentSelect = (mode: typeof viewMode) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     setViewMode(mode);
   };
 
   const handleAddWater = async (amountMl: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    const newTotal = Math.min(4000, waterLoggedMl + amountMl);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+    const newTotal = Math.max(0, Math.min(2000, waterLoggedMl + amountMl));
+    if (newTotal === waterLoggedMl) return;
+    const diff = newTotal - waterLoggedMl;
     setWaterLoggedMl(newTotal);
-    try {
-      await logWater({ amountMl });
-    } catch (e) {
-      console.log('Water log API error:', e);
+    
+    if (newTotal >= 2000 && diff > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
+    try { await logWater({ amountMl: diff }); } catch (e) { console.log('Water log API error:', e); }
   };
 
-  const handleToggleDeviceSync = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    const isConnecting = !deviceStatus?.isConnected;
-    try {
-      const updated = await syncDevice({
-        provider: 'APPLE_HEALTH',
-        deviceName: 'Smartwatch / Health Connect',
-        syncedAt: new Date().toISOString(),
-        metrics: { stepCount: 8450, activeCalories: 450 },
-      });
-      setDeviceStatus({ ...updated, isConnected: isConnecting });
-      Alert.alert(
-        isConnecting ? 'Device Connected 🎉' : 'Device Disconnected',
-        isConnecting
-          ? 'Your smartwatch & health app metrics are now synchronized.'
-          : 'Health app auto-sync turned off.',
-      );
-    } catch (e) {
-      Alert.alert('Error', 'Failed to toggle device sync');
-    }
+  const handleWearableNotice = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    Alert.alert('Coming Soon 🚀', 'Smartwatch & Health App integration is currently under active development. Stay tuned!');
   };
 
-  const handleStartWorkoutSession = () => {
-    setWorkoutElapsedSec(0);
-    setIsWorkoutActive(true);
-  };
+  const handleStartWorkoutSession = () => { setWorkoutElapsedSec(0); setIsWorkoutActive(true); };
 
   const handleFinishWorkoutSession = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     setIsWorkoutActive(false);
-
     const minutes = Math.max(1, Math.round(workoutElapsedSec / 60));
     const calories = Math.round(minutes * selectedWorkout.calPerMin);
-
     try {
       await logWorkout({
         workoutType: selectedWorkout.type,
@@ -215,16 +188,10 @@ export const ActivityScreen: React.FC = () => {
         caloriesBurned: calories,
         source: 'APP_TIMER',
       });
-      Alert.alert(
-        'Workout Saved! 🔥',
-        `Great job! You completed ${minutes}m of ${selectedWorkout.label} and burned ~${calories} kcal.`,
-      );
+      Alert.alert('Workout Saved! 🔥', `Great job! You completed ${minutes}m of ${selectedWorkout.label} and burned ~${calories} kcal.`);
       loadData();
-    } catch (e) {
-      console.log('Save workout error:', e);
-    } finally {
-      setIsWorkoutModalOpen(false);
-    }
+    } catch (e) { console.log('Save workout error:', e); }
+    finally { setIsWorkoutModalOpen(false); }
   };
 
   const formatTimer = (sec: number) => {
@@ -239,13 +206,7 @@ export const ActivityScreen: React.FC = () => {
     return (
       <AnimatedScreen>
         <View style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: SPACING.lg, paddingTop: headerHeight }]}>
-          <EmptyState
-            icon="warning-outline"
-            title="Oops, something went wrong!"
-            subtitle={error}
-            actionLabel="Try Again"
-            onAction={loadData}
-          />
+          <EmptyState icon="warning-outline" title="Oops, something went wrong!" subtitle={error} actionLabel="Try Again" onAction={loadData} />
         </View>
       </AnimatedScreen>
     );
@@ -255,7 +216,6 @@ export const ActivityScreen: React.FC = () => {
     (ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * 24 * 60 * 60 * 1000,
   );
   const weeklyVisits = weeklyCheckIns.length;
-
   const totalMinutes = calcTotalMinutes(weeklyCheckIns);
   const totalCalories = estimateCalories(totalMinutes);
   const exerciseGoal = 300;
@@ -263,281 +223,316 @@ export const ActivityScreen: React.FC = () => {
 
   const moveProgress = Math.min(1, totalCalories / calorieGoal);
   const exerciseProgress = Math.min(1, totalMinutes / exerciseGoal);
-  const hydrationProgress = Math.min(1, waterLoggedMl / 3000);
+  const waterProgress = Math.min(1, waterLoggedMl / 2000);
+
+  const activeColor = activeMetric === 'CALORIES' ? '#FF1243' : activeMetric === 'DURATION' ? '#00E676' : '#00B0FF';
 
   return (
     <AnimatedScreen>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: headerHeight + 16, paddingBottom: insets.bottom + 100 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 12, paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Apple Fitness Rings Dashboard */}
-        <GlassCard glowColor={colors.primary} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>ACTIVITY OVERVIEW</Text>
-          <View style={styles.healthDashboardRow}>
-            <AppleActivityRings
-              moveProgress={moveProgress}
-              exerciseProgress={exerciseProgress}
-              standProgress={hydrationProgress}
-              size={110}
-            />
-            <View style={styles.legendContainer}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#FF1243' }]} />
-                <View>
-                  <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Move</Text>
-                  <Text style={[styles.legendValue, { color: colors.text }]}>{totalCalories} / {calorieGoal} kcal</Text>
+        {/* ═══ BENTO BOX: Rings + Water Tracker Side by Side ═══ */}
+        <View style={styles.bentoBox}>
+          {/* Left: Activity Rings */}
+          <Animated.View entering={FadeInUp.duration(320).delay(60)} style={styles.bentoLeft}>
+            <GlassCard glowColor={colors.accent} style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
+              <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>ACTIVITY</Text>
+              <View style={styles.ringsCenter}>
+                <AppleActivityRings
+                  moveProgress={moveProgress}
+                  exerciseProgress={exerciseProgress}
+                  standProgress={waterProgress}
+                  size={100}
+                />
+              </View>
+              <View style={styles.bentoLegendRow}>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color="#FF1243" /></View>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Move</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color="#00E676" /></View>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Exercise</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color="#00B0FF" /></View>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Hydrate</Text>
                 </View>
               </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#00E676' }]} />
-                <View>
-                  <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Exercise</Text>
-                  <Text style={[styles.legendValue, { color: colors.text }]}>{totalMinutes} / {exerciseGoal} min</Text>
+            </GlassCard>
+          </Animated.View>
+
+          {/* Right: Water Tracker */}
+          <Animated.View entering={FadeInUp.duration(320).delay(80)} style={styles.bentoRight}>
+            <GlassCard glowColor="#29B6F6" style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
+              <View style={styles.bentoHeaderRow}>
+                <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>HYDRATION</Text>
+                <Text style={[styles.bentoValue, { color: '#29B6F6' }]}>{Math.min(2000, waterLoggedMl)} ml</Text>
+              </View>
+
+              {/* Vertical Water Bar */}
+              <View style={styles.bentoWaterBody}>
+                <View style={[styles.verticalProgressBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                  <View
+                    style={[
+                      styles.verticalProgressBarFill,
+                      {
+                        height: waterProgress > 0 ? `${Math.max(8, Math.min(100, waterProgress * 100))}%` : '0%',
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.bentoWaterControls}>
+                  {waterLoggedMl >= 2000 ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                      <View style={{ backgroundColor: 'rgba(41, 182, 246, 0.15)', padding: 6, borderRadius: 12, alignItems: 'center', width: '100%' }}>
+                        <Ionicons name="water" size={20} color="#29B6F6" />
+                        <Text style={{ color: '#29B6F6', fontSize: 10, fontFamily: FONTS.bodyBold, textAlign: 'center', marginTop: 2 }}>
+                          Wah! 🎉{'\n'}Goal Met
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <Pressable
+                        style={[styles.bentoWaterBtn, { backgroundColor: 'rgba(41,182,246,0.15)' }]}
+                        onPress={() => handleAddWater(250)}
+                      >
+                        <Ionicons name="add" size={20} color="#29B6F6" />
+                      </Pressable>
+                      <Pressable
+                        style={[styles.bentoWaterBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+                        onPress={() => handleAddWater(500)}
+                      >
+                        <Ionicons name="water" size={18} color={colors.textSecondary} />
+                      </Pressable>
+                    </>
+                  )}
                 </View>
               </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#00B0FF' }]} />
-                <View>
-                  <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Hydration</Text>
-                  <Text style={[styles.legendValue, { color: colors.text }]}>{(waterLoggedMl / 1000).toFixed(2)} / 3.0 L</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </GlassCard>
-
-        {/* Live Smartwatch Workout Trigger Card */}
-        <Animated.View entering={FadeInUp.duration(400).delay(100)}>
-          <GlassCard glowColor={colors.primary} style={styles.actionCard}>
-            <View style={styles.actionRow}>
-              <View style={[styles.actionIconWrap, { backgroundColor: `${colors.primary}20` }]}>
-                <Ionicons name="stopwatch" size={24} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>Live Smartwatch Tracker</Text>
-                <Text style={[styles.actionSub, { color: colors.textMuted }]}>Track live workouts with real-time calorie burn</Text>
-              </View>
-              <AnimatedButton
-                label="Start"
-                onPress={() => setIsWorkoutModalOpen(true)}
-                icon={<Ionicons name="play" size={16} color={colors.white} />}
-              />
-            </View>
-          </GlassCard>
-        </Animated.View>
-
-        {/* Smartwatch / Health App Device Sync Card */}
-        <Animated.View entering={FadeInUp.duration(400).delay(130)}>
-          <GlassCard glowColor={deviceStatus?.isConnected ? colors.success : undefined} style={styles.syncCard}>
-            <View style={styles.actionRow}>
-              <View style={[styles.actionIconWrap, { backgroundColor: deviceStatus?.isConnected ? `${colors.success}20` : 'rgba(255,255,255,0.08)' }]}>
-                <Ionicons name="watch-outline" size={22} color={deviceStatus?.isConnected ? colors.success : colors.textMuted} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>
-                  {deviceStatus?.isConnected ? 'Wearable Synced ⌚' : 'Pair Activity Tracker'}
-                </Text>
-                <Text style={[styles.actionSub, { color: colors.textMuted }]}>
-                  {deviceStatus?.isConnected
-                    ? `Connected to ${deviceStatus.deviceName || 'Smart Device'}`
-                    : 'Auto-sync Apple Health, Health Connect & Smartwatches'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={handleToggleDeviceSync}
-                style={[
-                  styles.syncToggleBtn,
-                  { backgroundColor: deviceStatus?.isConnected ? colors.success : colors.surfaceBorder },
-                ]}
-              >
-                <Text style={styles.syncToggleText}>{deviceStatus?.isConnected ? 'Synced' : 'Pair'}</Text>
-              </TouchableOpacity>
-            </View>
-          </GlassCard>
-        </Animated.View>
-
-        {/* AI Insight Widget */}
-        <Animated.View entering={FadeInUp.duration(400).delay(150)}>
-          <GlassCard glowColor={colors.accent} style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <Ionicons name="sparkles" size={16} color={colors.accent} />
-              <Text style={[styles.insightTitle, { color: colors.accent }]}>AI INSIGHT</Text>
-            </View>
-            <Text style={[styles.insightText, { color: colors.text }]}>
-              {summary?.aiInsight ||
-                `You're on a roll! You've burned ${totalCalories} kcal this week across ${weeklyVisits} workouts. Keep pushing to hit your goal!`}
-            </Text>
-          </GlassCard>
-        </Animated.View>
-
-        {/* Hydration Quick-Log Card */}
-        <GlassCard glowColor="#00B0FF" style={styles.waterCard}>
-          <View style={styles.waterHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="water" size={20} color="#00B0FF" />
-              <Text style={[styles.waterTitle, { color: colors.text }]}>Hydration Logger</Text>
-            </View>
-            <Text style={[styles.waterValue, { color: colors.primary }]}>{waterLoggedMl} ml / 3000 ml</Text>
-          </View>
-          <View style={styles.waterBtnRow}>
-            <TouchableOpacity onPress={() => handleAddWater(250)} style={[styles.waterBtn, { backgroundColor: isDark ? 'rgba(0,176,255,0.15)' : 'rgba(0,176,255,0.1)' }]}>
-              <Ionicons name="add" size={16} color="#00B0FF" />
-              <Text style={[styles.waterBtnText, { color: '#00B0FF' }]}>+250 ml</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleAddWater(500)} style={[styles.waterBtn, { backgroundColor: isDark ? 'rgba(0,176,255,0.15)' : 'rgba(0,176,255,0.1)' }]}>
-              <Ionicons name="add" size={16} color="#00B0FF" />
-              <Text style={[styles.waterBtnText, { color: '#00B0FF' }]}>+500 ml</Text>
-            </TouchableOpacity>
-          </View>
-        </GlassCard>
-
-        {/* Segmented metrics grid (Tappable cards) */}
-        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>SELECT METRIC TO ANALYSE</Text>
-        <View style={styles.metricsGrid}>
-          <Pressable onPress={() => handleMetricSelect('CALORIES')} style={styles.metricCardWrapper}>
-            <GlassCard
-              glowColor={activeMetric === 'CALORIES' ? '#FF1243' : undefined}
-              style={[styles.metricCard, activeMetric === 'CALORIES' && { borderColor: '#FF124355' }]}
-            >
-              <Ionicons name="flame" size={18} color={activeMetric === 'CALORIES' ? '#FF1243' : colors.textMuted} />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Move</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{totalCalories} kcal</Text>
             </GlassCard>
-          </Pressable>
-
-          <Pressable onPress={() => handleMetricSelect('DURATION')} style={styles.metricCardWrapper}>
-            <GlassCard
-              glowColor={activeMetric === 'DURATION' ? '#00E676' : undefined}
-              style={[styles.metricCard, activeMetric === 'DURATION' && { borderColor: '#00E67655' }]}
-            >
-              <Ionicons name="time" size={18} color={activeMetric === 'DURATION' ? '#00E676' : colors.textMuted} />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Exercise</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{totalMinutes} mins</Text>
-            </GlassCard>
-          </Pressable>
-
-          <Pressable onPress={() => handleMetricSelect('WATER')} style={styles.metricCardWrapper}>
-            <GlassCard
-              glowColor={activeMetric === 'WATER' ? '#00B0FF' : undefined}
-              style={[styles.metricCard, activeMetric === 'WATER' && { borderColor: '#00B0FF55' }]}
-            >
-              <Ionicons name="water" size={18} color={activeMetric === 'WATER' ? '#00B0FF' : colors.textMuted} />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Hydration</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{(waterLoggedMl / 1000).toFixed(2)} L</Text>
-            </GlassCard>
-          </Pressable>
+          </Animated.View>
         </View>
 
-        {/* Dynamic Interactive Bar Chart */}
-        <GlassCard
-          glowColor={
-            activeMetric === 'CALORIES' ? '#FF1243' : activeMetric === 'DURATION' ? '#00E676' : '#00B0FF'
-          }
-          style={styles.graphPanel}
-        >
-          <View style={styles.chartHeader}>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>
-              {activeMetric === 'CALORIES' ? 'CALORIES DETAILS' : activeMetric === 'DURATION' ? 'EXERCISE DETAILS' : 'HYDRATION DETAILS'}
-            </Text>
-            <View style={[styles.segmentControl, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-              {(['HOURLY', 'DAILY', 'MONTHLY'] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  onPress={() => handleSegmentSelect(mode)}
-                  style={[
-                    styles.segmentBtn,
-                    viewMode === mode && { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
-                  ]}
-                >
-                  <Text style={[styles.segmentText, { color: viewMode === mode ? colors.text : colors.textMuted }]}>
-                    {mode.slice(0, 1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {/* ═══ WEEKLY SNAPSHOT — 3-stat row ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(100)}>
+          <GlassCard glowColor={colors.primary} style={{ marginBottom: 0 }}>
+            <View style={styles.snapshotHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>WEEKLY SNAPSHOT</Text>
+              <Ionicons name="bar-chart" size={16} color={colors.primary} />
             </View>
-          </View>
+            <View style={styles.snapshotStatsRow}>
+              <View style={styles.snapshotStat}>
+                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{weeklyVisits}</Text>
+                <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>WORKOUTS</Text>
+              </View>
+              <View style={[styles.snapshotDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]} />
+              <View style={styles.snapshotStat}>
+                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>
+                  {totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : totalCalories}
+                </Text>
+                <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>KCAL BURNED</Text>
+              </View>
+              <View style={[styles.snapshotDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]} />
+              <View style={styles.snapshotStat}>
+                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{totalMinutes}m</Text>
+                <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>ACTIVE TIME</Text>
+              </View>
+            </View>
+          </GlassCard>
+        </Animated.View>
 
-          {/* Render AppleBarChart with dynamic chartPoints */}
-          <AppleBarChart metricType={activeMetric} viewMode={viewMode} customData={chartPoints} />
-        </GlassCard>
-
-        {/* Weekly Check-Ins status */}
-        <GlassCard glowColor={colors.primary} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>WEEKLY CHECK-IN STATUS</Text>
-          <Text style={[styles.streakText, { color: colors.text }]}>
-            You checked in <Text style={[styles.highlight, { color: colors.primary }]}>{weeklyVisits} times</Text> this week!
-          </Text>
-          <View style={styles.weekContainer}>
-            {DAYS_OF_WEEK.map((day, index) => {
-              const active = hasCheckedInOnDay(checkIns, index);
-              return (
-                <View key={index} style={styles.dayCol}>
-                  <View style={[
-                    styles.dayDot,
-                    {
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                    },
-                    active && {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                    },
-                  ]}>
-                    {active ? (
-                      <Ionicons name="checkmark" size={14} color={colors.white} />
-                    ) : (
-                      <Text style={[styles.dayDotText, { color: colors.textMuted }]}>{day}</Text>
-                    )}
-                  </View>
-                  <Text style={[styles.dayLabel, { color: colors.textMuted }]}>{day}</Text>
+        {/* ═══ START WORKOUT — Premium Gradient Banner ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(120)}>
+          <Pressable
+            onPress={() => setIsWorkoutModalOpen(true)}
+            style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
+          >
+            <LinearGradient
+              colors={[...GRADIENTS.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.workoutBanner}
+            >
+              <View style={styles.workoutBannerGlow} />
+              <View style={styles.workoutBannerContent}>
+                <View style={styles.workoutBannerIcon}>
+                  <Ionicons name="stopwatch" size={26} color="#FFF" />
                 </View>
-              );
-            })}
-          </View>
-        </GlassCard>
+                <View style={styles.workoutBannerCopy}>
+                  <Text style={styles.workoutBannerTitle}>Start Live Workout</Text>
+                  <Text style={styles.workoutBannerSub}>Track session with real-time calorie burn</Text>
+                </View>
+                <View style={styles.workoutBannerPlayBtn}>
+                  <Ionicons name="play" size={18} color={colors.accent} />
+                </View>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
 
-        {/* Workout Completion Summary */}
-        <GlassCard glowColor={colors.info} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>WORKOUT METRICS SUMMARY</Text>
-          <View style={styles.statsSummary}>
-            <View style={styles.statsItem}>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>{weeklyVisits}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Workouts Done</Text>
+        {/* ═══ WEARABLE TRACKER — Coming Soon ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(140)}>
+          <GlassCard glowColor={undefined}>
+            <View style={styles.wearableRow}>
+              <View style={[styles.wearableIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                <Ionicons name="watch-outline" size={22} color={colors.textMuted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.wearableTitle, { color: colors.text }]}>Wearable Tracker</Text>
+                <Text style={[styles.wearableSub, { color: colors.textMuted }]}>
+                  Apple Health, Health Connect & Smartwatches
+                </Text>
+              </View>
+              <Pressable
+                onPress={handleWearableNotice}
+                style={({ pressed }) => [
+                  styles.comingSoonPill,
+                  { backgroundColor: isDark ? 'rgba(255,158,24,0.18)' : 'rgba(255,158,24,0.12)' },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={styles.comingSoonPillText}>Coming Soon</Text>
+              </Pressable>
             </View>
-            <View style={[styles.divider, { backgroundColor: colors.surfaceBorder }]} />
-            <View style={styles.statsItem}>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>
-                {totalCalories > 0 ? (totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : String(totalCalories)) : '0'}
-              </Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Est. Calories</Text>
+          </GlassCard>
+        </Animated.View>
+
+        {/* ═══ AI INSIGHT ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(160)}>
+          <GlassCard glowColor={colors.accent}>
+            <View style={styles.insightRow}>
+              <View style={[styles.insightIconWrap, { backgroundColor: `${colors.accent}15` }]}>
+                <Ionicons name="sparkles" size={22} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.insightLabel, { color: colors.accent }]}>FitCoach AI Insight</Text>
+                <Text style={[styles.insightBody, { color: colors.text }]}>
+                  {summary?.aiInsight || `You've burned ${totalCalories} kcal this week across ${weeklyVisits} workouts. Keep pushing to hit your goal!`}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.divider, { backgroundColor: colors.surfaceBorder }]} />
-            <View style={styles.statsItem}>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>{totalMinutes > 0 ? `${totalMinutes}m` : '0m'}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Minutes</Text>
+          </GlassCard>
+        </Animated.View>
+
+        {/* ═══ ANALYTICS & INTERACTIVE CHART ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(180)}>
+          <GlassCard glowColor={activeColor}>
+            {/* Header */}
+            <View style={styles.analyticsHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>ANALYTICS</Text>
+              <View style={[styles.periodSegment, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                {(['DAILY', 'MONTHLY'] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    onPress={() => handleSegmentSelect(mode)}
+                    style={[
+                      styles.periodBtn,
+                      viewMode === mode && { backgroundColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.1)' },
+                    ]}
+                  >
+                    <Text style={[styles.periodText, { color: viewMode === mode ? colors.text : colors.textMuted }]}>
+                      {mode === 'DAILY' ? 'D' : 'M'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        </GlassCard>
+
+            {/* Metric Selector — 3 tappable metric cards */}
+            <View style={styles.metricCardsRow}>
+              {([
+                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: '#FF1243' },
+                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'time' as const, color: '#00E676' },
+                { key: 'WATER' as const, label: 'Hydration', value: `${(waterLoggedMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#00B0FF' },
+              ]).map((m) => {
+                const isActive = activeMetric === m.key;
+                return (
+                  <Pressable
+                    key={m.key}
+                    onPress={() => handleMetricSelect(m.key)}
+                    style={[
+                      styles.metricCard,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' },
+                      isActive && { backgroundColor: `${m.color}18`, borderColor: `${m.color}55` },
+                    ]}
+                  >
+                    <Ionicons name={m.icon} size={16} color={isActive ? m.color : colors.textMuted} />
+                    <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>{m.label}</Text>
+                    <Text style={[styles.metricCardValue, { color: isActive ? m.color : colors.text }]}>
+                      {m.value} <Text style={styles.metricCardUnit}>{m.unit}</Text>
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Chart */}
+            <AppleBarChart metricType={activeMetric} viewMode={viewMode} customData={chartPoints} />
+          </GlassCard>
+        </Animated.View>
+
+        {/* ═══ WEEKLY STREAK / CONSISTENCY ═══ */}
+        <Animated.View entering={FadeInUp.duration(320).delay(200)}>
+          <GlassCard glowColor={colors.primary}>
+            <View style={styles.snapshotHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>WEEKLY CONSISTENCY</Text>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            </View>
+
+            <Text style={[styles.streakText, { color: colors.text }]}>
+              You attended gym <Text style={{ fontFamily: FONTS.bodyExtra, color: colors.primary }}>{weeklyVisits} days</Text> this week!
+            </Text>
+
+            <View style={styles.daysRow}>
+              {DAYS_OF_WEEK.map((day, index) => {
+                const active = hasCheckedInOnDay(checkIns, index);
+                return (
+                  <View key={index} style={styles.dayCol}>
+                    <View
+                      style={[
+                        styles.dayCircle,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                        },
+                        active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                    >
+                      {active ? (
+                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                      ) : (
+                        <Text style={[styles.dayCircleText, { color: colors.textMuted }]}>{day}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.dayLabel, { color: active ? colors.primary : colors.textMuted }]}>{day}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </GlassCard>
+        </Animated.View>
       </ScrollView>
 
-      {/* Live Smartwatch Workout Tracker Modal */}
+      {/* ═══ LIVE WORKOUT MODAL ═══ */}
       <Modal visible={isWorkoutModalOpen} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalContent, { backgroundColor: isDark ? '#12121E' : '#FFFFFF' }]}>
+            {/* Modal Handle */}
+            <View style={styles.modalHandle} />
+
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Smartwatch Workout Tracker ⌚</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Live Workout ⏱️</Text>
               <TouchableOpacity onPress={() => { setIsWorkoutActive(false); setIsWorkoutModalOpen(false); }}>
-                <Ionicons name="close-circle" size={26} color={colors.textMuted} />
+                <Ionicons name="close-circle" size={28} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             {/* Workout Type Selector */}
-            <Text style={[styles.selectorLabel, { color: colors.textMuted }]}>SELECT WORKOUT TYPE</Text>
+            <Text style={[styles.selectorLabel, { color: colors.textMuted }]}>SELECT TYPE</Text>
             <View style={styles.typeGrid}>
               {WORKOUT_TYPES.map((w) => {
                 const isSelected = selectedWorkout.type === w.type;
@@ -559,15 +554,14 @@ export const ActivityScreen: React.FC = () => {
               })}
             </View>
 
-            {/* Live Stopwatch & Calorie Counter */}
+            {/* Stopwatch & Calorie Counter */}
             <View style={styles.timerDisplay}>
               <Text style={[styles.timerSec, { color: colors.text }]}>{formatTimer(workoutElapsedSec)}</Text>
               <Text style={[styles.timerMeta, { color: colors.primary }]}>
-                ~{Math.round(Math.max(1, workoutElapsedSec / 60) * selectedWorkout.calPerMin)} EST. KCAL BURNED
+                ~{Math.round(Math.max(1, workoutElapsedSec / 60) * selectedWorkout.calPerMin)} EST. KCAL
               </Text>
             </View>
 
-            {/* Controls */}
             <View style={styles.modalActions}>
               {!isWorkoutActive ? (
                 <AnimatedButton
@@ -577,7 +571,7 @@ export const ActivityScreen: React.FC = () => {
                 />
               ) : (
                 <AnimatedButton
-                  label="Finish Workout & Save"
+                  label="Finish & Save"
                   onPress={handleFinishWorkoutSession}
                   icon={<Ionicons name="checkmark-done" size={18} color={colors.white} />}
                 />
@@ -592,72 +586,386 @@ export const ActivityScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: SPACING.md, gap: SPACING.md },
-  card: { gap: SPACING.sm },
-  cardTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  actionCard: { padding: SPACING.md },
-  syncCard: { padding: SPACING.md },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  actionIconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  actionTitle: { fontSize: FONT_SIZE.md, fontWeight: '700' },
-  actionSub: { fontSize: FONT_SIZE.xs, marginTop: 2 },
-  syncToggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm },
-  syncToggleText: { color: '#FFF', fontSize: FONT_SIZE.xs, fontWeight: '700' },
+  content: { paddingHorizontal: SPACING.md, gap: SPACING.sm },
 
-  insightCard: { marginTop: SPACING.xs, padding: SPACING.md, gap: SPACING.xs, borderColor: 'rgba(255,158,24,0.3)' },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  insightTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  insightText: { fontSize: FONT_SIZE.sm, lineHeight: 20, fontWeight: '500' },
+  sectionTitle: {
+    fontSize: 11,
+    fontFamily: FONTS.bodySemi,
+    letterSpacing: 0.6,
+    marginBottom: SPACING.xs,
+  },
 
-  waterCard: { padding: SPACING.md, gap: SPACING.sm },
-  waterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  waterTitle: { fontSize: FONT_SIZE.md, fontWeight: '700' },
-  waterValue: { fontSize: FONT_SIZE.sm, fontWeight: '800' },
-  waterBtnRow: { flexDirection: 'row', gap: SPACING.sm },
-  waterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: RADIUS.sm, gap: 4 },
-  waterBtnText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
+  /* ── BENTO BOX ── */
+  bentoBox: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  bentoLeft: { flex: 1 },
+  bentoRight: { flex: 1 },
+  bentoCardFull: {
+    flex: 1,
+    minHeight: 190,
+  },
+  bentoCardInner: {
+    flex: 1,
+    padding: SPACING.md,
+  },
+  bentoLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+    letterSpacing: 0.6,
+  },
+  ringsCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoLegendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 6,
+  },
+  bentoLegendDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bentoValue: {
+    fontSize: 12,
+    fontFamily: FONTS.bodyExtra,
+  },
+  bentoWaterBody: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: SPACING.sm,
+  },
+  verticalProgressBarBg: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  verticalProgressBarFill: {
+    width: '100%',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#29B6F6',
+  },
+  bentoWaterControls: {
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  bentoWaterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  sectionHeader: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginTop: SPACING.sm, marginBottom: -SPACING.xs },
-  healthDashboardRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.xs },
-  legendContainer: { flex: 1, gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  legendValue: { fontSize: FONT_SIZE.sm, fontWeight: '800', marginTop: 1 },
-  metricsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
-  metricCardWrapper: { width: '31%' },
-  metricCard: { padding: SPACING.sm, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: 'transparent' },
-  metricLabel: { fontSize: 10, fontWeight: '700' },
-  metricValue: { fontSize: FONT_SIZE.sm, fontWeight: '800' },
-  graphPanel: { gap: SPACING.sm },
-  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
-  chartTitle: { fontSize: FONT_SIZE.sm, fontWeight: '800', letterSpacing: 0.5 },
-  segmentControl: { flexDirection: 'row', borderRadius: RADIUS.sm, padding: 2, gap: 2 },
-  segmentBtn: { width: 28, height: 24, borderRadius: RADIUS.sm - 2, alignItems: 'center', justifyContent: 'center' },
-  segmentText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
-  streakText: { fontSize: FONT_SIZE.md, fontWeight: '600', marginTop: 2 },
-  highlight: { fontWeight: '800' },
-  weekContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.sm },
-  dayCol: { alignItems: 'center', gap: 6 },
-  dayDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  dayDotText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
-  dayLabel: { fontSize: 10, fontWeight: '600' },
-  statsSummary: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: SPACING.xs },
-  statsItem: { alignItems: 'center', gap: 2 },
-  summaryValue: { fontSize: FONT_SIZE.lg, fontWeight: '800' },
-  summaryLabel: { fontSize: 10, fontWeight: '600' },
-  divider: { width: 1, height: 28 },
+  /* ── WEEKLY SNAPSHOT ── */
+  snapshotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  snapshotStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  snapshotStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  snapshotStatValue: {
+    fontSize: 20,
+    fontFamily: FONTS.bodyExtra,
+  },
+  snapshotStatLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+    marginTop: 4,
+    letterSpacing: 0.4,
+  },
+  snapshotDivider: {
+    width: 1,
+    height: 28,
+    marginHorizontal: 8,
+  },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg, gap: SPACING.md },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800' },
-  selectorLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.md },
-  typeChipText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
-  timerDisplay: { alignItems: 'center', paddingVertical: SPACING.md, gap: 4 },
-  timerSec: { fontSize: 44, fontWeight: '900', letterSpacing: 2 },
-  timerMeta: { fontSize: FONT_SIZE.xs, fontWeight: '800', letterSpacing: 1 },
-  modalActions: { marginTop: SPACING.sm },
+  /* ── WORKOUT BANNER ── */
+  workoutBanner: {
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    overflow: 'hidden',
+  },
+  workoutBannerGlow: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  workoutBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  workoutBannerIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutBannerCopy: {
+    flex: 1,
+  },
+  workoutBannerTitle: {
+    fontSize: 16,
+    fontFamily: FONTS.bodyBold,
+    color: '#FFF',
+  },
+  workoutBannerSub: {
+    fontSize: 12,
+    fontFamily: FONTS.bodySemi,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
+  },
+  workoutBannerPlayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* ── WEARABLE ── */
+  wearableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  wearableIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wearableTitle: {
+    fontSize: 15,
+    fontFamily: FONTS.bodyBold,
+  },
+  wearableSub: {
+    fontSize: 12,
+    fontFamily: FONTS.bodyMedium,
+    marginTop: 2,
+  },
+  comingSoonPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,158,24,0.35)',
+  },
+  comingSoonPillText: {
+    fontSize: 10,
+    fontFamily: FONTS.bodyBold,
+    color: '#FF9E18',
+  },
+
+  /* ── AI INSIGHT ── */
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  insightIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  insightLabel: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyBold,
+    marginBottom: 4,
+  },
+  insightBody: {
+    fontSize: 14,
+    fontFamily: FONTS.body,
+    lineHeight: 20,
+  },
+
+  /* ── ANALYTICS ── */
+  analyticsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  periodSegment: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: RADIUS.md,
+    gap: 2,
+  },
+  periodBtn: {
+    width: 30,
+    height: 26,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodText: {
+    fontSize: 11,
+    fontFamily: FONTS.bodyBold,
+  },
+  metricCardsRow: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  metricCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 3,
+  },
+  metricCardLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+  },
+  metricCardValue: {
+    fontSize: 13,
+    fontFamily: FONTS.bodyExtra,
+  },
+  metricCardUnit: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+    opacity: 0.6,
+  },
+
+  /* ── WEEKLY STREAK ── */
+  streakText: {
+    fontSize: 14,
+    fontFamily: FONTS.bodySemi,
+    marginBottom: SPACING.sm,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayCol: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  dayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  dayCircleText: {
+    fontSize: 11,
+    fontFamily: FONTS.bodyBold,
+  },
+  dayLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+  },
+
+  /* ── MODAL ── */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.4)',
+    alignSelf: 'center',
+    marginBottom: SPACING.xs,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: FONTS.displayBold,
+  },
+  selectorLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+    letterSpacing: 1,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+  },
+  typeChipText: {
+    fontSize: 13,
+    fontFamily: FONTS.bodyBold,
+  },
+  timerDisplay: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    gap: 6,
+  },
+  timerSec: {
+    fontSize: 52,
+    fontFamily: FONTS.displayExtra,
+    letterSpacing: 2,
+  },
+  timerMeta: {
+    fontSize: 12,
+    fontFamily: FONTS.bodySemi,
+    letterSpacing: 1,
+  },
+  modalActions: {
+    marginTop: SPACING.xs,
+  },
 });

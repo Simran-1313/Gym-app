@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
 import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
@@ -67,6 +68,7 @@ const BlinkCursor: React.FC<{ color: string }> = ({ color }) => {
 
 export const AiCoachScreen: React.FC = () => {
   const { theme } = useAuth();
+  const headerHeight = useHeaderHeight();
   const isDark = theme === 'dark';
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   const insets = useSafeAreaInsets();
@@ -201,14 +203,32 @@ export const AiCoachScreen: React.FC = () => {
             ]}
           >
             <View style={styles.bubbleInner}>
-              <Text
-                style={[
-                  styles.bubbleText,
-                  { color: isUser ? '#fff' : colors.text },
-                  item.error && { color: colors.danger },
-                ]}
-              >
-                {item.content}
+              <Text style={{ flexShrink: 1 }}>
+                {(() => {
+                  const baseStyle = [
+                    styles.bubbleText,
+                    { color: isUser ? '#fff' : colors.text },
+                    item.error && { color: colors.danger },
+                  ];
+                  const boldStyle = { fontFamily: FONTS.bodyBold };
+                  
+                  if (!item.content) return null;
+                  const parts = item.content.split(/(\*\*.*?\*\*)/g);
+                  return parts.map((part, index) => {
+                    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+                      return (
+                        <Text key={index} style={[baseStyle, boldStyle]}>
+                          {part.slice(2, -2)}
+                        </Text>
+                      );
+                    }
+                    return (
+                      <Text key={index} style={baseStyle}>
+                        {part}
+                      </Text>
+                    );
+                  });
+                })()}
               </Text>
               {isStreaming && !isUser && (
                 <BlinkCursor color={colors.text} />
@@ -238,7 +258,7 @@ export const AiCoachScreen: React.FC = () => {
           contentContainerStyle={[
             styles.listContent,
             isEmpty && styles.listContentEmpty,
-            { paddingBottom: SPACING.md },
+            { paddingBottom: SPACING.md, paddingTop: headerHeight + SPACING.md },
           ]}
           ListHeaderComponent={
             isEmpty ? (

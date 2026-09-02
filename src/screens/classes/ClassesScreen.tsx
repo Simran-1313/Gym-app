@@ -7,6 +7,7 @@ import {
   Text,
   View,
   Pressable,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -145,6 +146,7 @@ export const ClassesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [confirmBookingId, setConfirmBookingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -195,19 +197,26 @@ export const ClassesScreen: React.FC = () => {
   }, [load]);
 
   const handleBook = useCallback(async (scheduleId: string) => {
-    Alert.alert('Confirm Booking', 'Book this class?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Book',
-        onPress: async () => {
-          setBookingId(scheduleId);
-          try { await bookClass(scheduleId); await load(); setShowSuccess(true); }
-          catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Booking failed'); }
-          finally { setBookingId(null); }
-        },
-      },
-    ]);
-  }, [load]);
+    setConfirmBookingId(scheduleId);
+  }, []);
+
+  const confirmBookClass = async () => {
+    if (!confirmBookingId) return;
+    const scheduleId = confirmBookingId;
+    setConfirmBookingId(null);
+    setBookingId(scheduleId);
+    try { 
+      await bookClass(scheduleId); 
+      if (scheduleId.startsWith('d')) {
+        setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, isBooked: true, bookedCount: s.bookedCount + 1 } : s));
+      } else {
+        await load(); 
+      }
+      setShowSuccess(true); 
+    }
+    catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Booking failed'); }
+    finally { setBookingId(null); }
+  };
 
   // Derive unique dates from schedules
   const uniqueDatesMap = new Map<string, Date>();
@@ -315,6 +324,31 @@ export const ClassesScreen: React.FC = () => {
           </>
         )}
       </ScrollView>
+
+      {/* Custom Booking Confirmation Modal */}
+      <Modal transparent visible={!!confirmBookingId} animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#FFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>Confirm Booking</Text>
+            <Text style={[s.modalText, { color: colors.textSecondary }]}>Are you sure you want to book this class?</Text>
+            
+            <View style={s.modalActions}>
+              <AnimatedButton
+                label="Cancel"
+                variant="secondary"
+                onPress={() => setConfirmBookingId(null)}
+                style={{ flex: 1 }}
+              />
+              <AnimatedButton
+                label="Book"
+                variant="primary"
+                onPress={confirmBookClass}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AnimatedScreen>
   );
 };
@@ -387,4 +421,45 @@ const s = StyleSheet.create({
   errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.lg },
   errorTitle: { fontSize: FONT_SIZE.lg, fontFamily: FONTS.bodyBold },
   errorText: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
+
+  // Custom Modal
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: FONTS.displayBold,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: 15,
+    fontFamily: FONTS.bodyMedium,
+    marginBottom: SPACING.xl,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
 });

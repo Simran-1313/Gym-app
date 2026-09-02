@@ -13,20 +13,12 @@ export interface DataPoint {
 
 interface Props {
   metricType: 'CALORIES' | 'DURATION' | 'WATER';
-  viewMode: 'HOURLY' | 'DAILY' | 'MONTHLY';
+  viewMode: 'DAILY' | 'MONTHLY';
   customData?: DataPoint[];
 }
 
 const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[]>> = {
   CALORIES: {
-    HOURLY: [
-      { label: '06AM', value: 0, displayValue: '0 kcal' },
-      { label: '09AM', value: 180, displayValue: '180 kcal' },
-      { label: '12PM', value: 50, displayValue: '50 kcal' },
-      { label: '03PM', value: 120, displayValue: '120 kcal' },
-      { label: '06PM', value: 480, displayValue: '480 kcal' },
-      { label: '09PM', value: 0, displayValue: '0 kcal' },
-    ],
     DAILY: [
       { label: 'M', value: 320, displayValue: '320 kcal' },
       { label: 'T', value: 640, displayValue: '640 kcal' },
@@ -46,14 +38,6 @@ const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[
     ],
   },
   DURATION: {
-    HOURLY: [
-      { label: '06AM', value: 0, displayValue: '0m' },
-      { label: '09AM', value: 45, displayValue: '45m' },
-      { label: '12PM', value: 0, displayValue: '0m' },
-      { label: '03PM', value: 15, displayValue: '15m' },
-      { label: '06PM', value: 60, displayValue: '60m' },
-      { label: '09PM', value: 0, displayValue: '0m' },
-    ],
     DAILY: [
       { label: 'M', value: 30, displayValue: '30m' },
       { label: 'T', value: 45, displayValue: '45m' },
@@ -73,13 +57,6 @@ const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[
     ],
   },
   WATER: {
-    HOURLY: [
-      { label: '08AM', value: 250, displayValue: '250ml' },
-      { label: '12PM', value: 1000, displayValue: '1.0L' },
-      { label: '03PM', value: 500, displayValue: '500ml' },
-      { label: '06PM', value: 750, displayValue: '750ml' },
-      { label: '10PM', value: 500, displayValue: '500ml' },
-    ],
     DAILY: [
       { label: 'M', value: 2000, displayValue: '2.0L' },
       { label: 'T', value: 2500, displayValue: '2.5L' },
@@ -117,6 +94,12 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
+  const formatY = (val: number) => {
+    if (val === 0) return '0';
+    if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+    return val.toString();
+  };
+
   // Reset selected bar when filters change
   useEffect(() => {
     setSelectedIndex(null);
@@ -140,9 +123,14 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
       {/* Bars Grid */}
       <View style={styles.chartArea}>
         <View style={styles.gridLinesContainer}>
-          <View style={[styles.gridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]} />
-          <View style={[styles.gridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]} />
-          <View style={[styles.gridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]} />
+          {[1, 0.5, 0].map((multiplier, i) => (
+            <View key={i} style={styles.gridLineRow}>
+              <Text style={[styles.yAxisLabel, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                {formatY(Math.round(maxValue * multiplier))}
+              </Text>
+              <View style={[styles.gridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]} />
+            </View>
+          ))}
         </View>
 
         <View style={styles.barsRow}>
@@ -222,12 +210,26 @@ const styles = StyleSheet.create({
   gridLinesContainer: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'space-between',
-    paddingBottom: 22,
+    paddingBottom: 22, // Space for X-axis labels
     zIndex: -1,
+  },
+  gridLineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    width: '100%',
+  },
+  yAxisLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodyMedium,
+    width: 30, // Fixed width for alignment
+    textAlign: 'right',
+    marginRight: 6,
+    marginBottom: -4, // Adjust baseline slightly
   },
   gridLine: {
     height: 1,
-    width: '100%',
+    flex: 1, // Take remaining width
+    marginBottom: 4, // Align with text baseline
   },
   barsRow: {
     flexDirection: 'row',
@@ -236,6 +238,7 @@ const styles = StyleSheet.create({
     height: '100%',
     width: '100%',
     paddingHorizontal: SPACING.xs,
+    paddingLeft: 36, // Push past Y-axis labels (30 width + 6 margin)
   },
   barCol: {
     flex: 1,

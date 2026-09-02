@@ -60,26 +60,28 @@ export const FitnessAvatar: React.FC<Props> = ({
   };
 
   const body = (
-    <View style={[avatarStyle, style]}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={[
-            styles.image,
-            { width: size, height: size, borderRadius: radius, backgroundColor: colors.card },
-            imageStyle,
-          ]}
-        />
-      ) : (
-        <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=1000&auto=format&fit=crop' }}
-          style={[
-            styles.image,
-            { width: size, height: size, borderRadius: radius, backgroundColor: colors.card },
-            imageStyle,
-          ]}
-        />
-      )}
+    <View style={[style, { width: size, height: size }]}>
+      <View style={avatarStyle}>
+        {uri ? (
+          <Image
+            source={{ uri }}
+            style={[
+              styles.image,
+              { width: size, height: size, borderRadius: radius, backgroundColor: colors.card },
+              imageStyle,
+            ]}
+          />
+        ) : (
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=1000&auto=format&fit=crop' }}
+            style={[
+              styles.image,
+              { width: size, height: size, borderRadius: radius, backgroundColor: colors.card },
+              imageStyle,
+            ]}
+          />
+        )}
+      </View>
 
       {editable ? (
         <View style={[styles.editBadge, {

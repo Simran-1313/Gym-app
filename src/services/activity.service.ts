@@ -191,7 +191,7 @@ export const syncDevice = async (payload: SyncDevicePayload): Promise<SyncDevice
   } catch (error) {
     console.log('[activity.service] syncDevice fallback:', error);
     return {
-      isConnected: true,
+      isConnected: false,
       provider: payload.provider,
       deviceName: payload.deviceName || 'Smart Device',
       lastSyncedAt: payload.syncedAt,

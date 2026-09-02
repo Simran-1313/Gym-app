@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CommonActions, useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,7 +23,9 @@ import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
-import { ActiveSubscription, User } from '../../types';
+import { ActiveSubscription, User, ActivitySummary, CheckIn } from '../../types';
+import { getCheckIns } from '../../services/member.service';
+import { getActivitySummary, logWater } from '../../services/activity.service';
 import { RootStackParams, TabParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -31,19 +33,12 @@ import { FitnessAvatar } from '../../components/ui/FitnessAvatar';
 import { AppleActivityRings } from '../../components/ui/AppleActivityRings';
 import { HeroFigure3D } from '../../components/ui/HeroFigure3D';
 import { GymLogo } from '../../components/ui/GymLogo';
+import { MOTIVATIONAL_QUOTES } from '../../constants/quotes';
 
 type HomeNavProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParams, 'Home'>,
   NativeStackNavigationProp<RootStackParams>
 >;
-
-const MOTIVATIONAL_QUOTES = [
-  "The only bad workout is the one that didn't happen. ⚡",
-  "Your body can stand almost anything. Convince your mind. 🧠",
-  "Success starts with self-discipline. 🎯",
-  "No pain, no gain. Shut up and train! 🦾",
-  "Energy flows where attention goes. Focus on your goals today. 🔥"
-];
 
 const daysRemaining = (endDate: string) => {
   const diff = new Date(endDate).getTime() - Date.now();
@@ -73,8 +68,8 @@ const QuickAction: React.FC<{
     <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={styles.quickActionWrap}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.quickActionBtn, pressed && { transform: [{ scale: 0.92 }], opacity: 0.8 }]}>
         <View style={[
-          styles.quickActionIconWrap, 
-          { 
+          styles.quickActionIconWrap,
+          {
             overflow: 'hidden',
             borderWidth: 1,
             borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)',
@@ -100,7 +95,7 @@ const QuickAction: React.FC<{
 
 const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onPress, delay = 0 }) => {
   const floatY = useSharedValue(0);
-  
+
   React.useEffect(() => {
     floatY.value = withRepeat(
       withSequence(
@@ -145,6 +140,16 @@ const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onP
   );
 };
 
+const calcTotalMinutes = (checkIns: CheckIn[]): number => {
+  return checkIns.reduce((total, ci) => {
+    if (!ci.checkedOutAt) return total + 45;
+    const diff = new Date(ci.checkedOutAt).getTime() - new Date(ci.checkedInAt).getTime();
+    return total + Math.round(diff / 60000);
+  }, 0);
+};
+
+const estimateCalories = (totalMinutes: number): number => Math.round(totalMinutes * 8);
+
 export const HomeScreen: React.FC = () => {
   const { user, refreshUser, gym, theme, toggleTheme } = useAuth();
   const nav = useNavigation<HomeNavProp>();
@@ -153,8 +158,31 @@ export const HomeScreen: React.FC = () => {
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const [refreshing, setRefreshing] = useState(false);
-  const [waterLogged, setWaterLogged] = useState(1250); // in ml
-  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [waterLogged, setWaterLogged] = useState(0); // in ml
+  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [summary, setSummary] = useState<ActivitySummary | null>(null);
+
+  const loadActivityData = useCallback(async () => {
+    try {
+      const [checkInRes, summaryRes] = await Promise.all([
+        getCheckIns(1, 15),
+        getActivitySummary(),
+      ]);
+      setCheckIns(checkInRes.checkIns || []);
+      setSummary(summaryRes);
+      if (summaryRes.metrics?.hydration?.consumedMl !== undefined) {
+        setWaterLogged(summaryRes.metrics.hydration.consumedMl);
+      }
+    } catch (e) {
+      console.log('Failed to fetch home activity data:', e);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadActivityData();
+    }, [loadActivityData])
+  );
 
   const sub = (user as User & { activeSubscription?: ActiveSubscription | null })?.activeSubscription;
   const activeDays = sub?.status === 'ACTIVE' ? daysRemaining(sub.endDate) : 0;
@@ -213,31 +241,54 @@ export const HomeScreen: React.FC = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshUser();
+    await Promise.all([refreshUser(), loadActivityData()]);
     setRefreshing(false);
-  }, [refreshUser]);
+  }, [refreshUser, loadActivityData]);
 
-  const handleWaterIncrement = (amount: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setWaterLogged((prev) => Math.max(0, Math.min(4000, prev + amount)));
+  const handleWaterIncrement = async (amount: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    const newTotal = Math.max(0, Math.min(2000, waterLogged + amount));
+    if (newTotal === waterLogged) return;
+    const diff = newTotal - waterLogged;
+    setWaterLogged(newTotal);
+
+    if (newTotal >= 2000 && diff > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+
+    try {
+      await logWater({ amountMl: diff });
+      loadActivityData();
+    } catch (e) {
+      console.log('Water log API error from home:', e);
+    }
   };
 
-  const handleQuoteCycle = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setQuoteIndex((prev) => (prev + 1) % MOTIVATIONAL_QUOTES.length);
-  };
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
+  const quoteIndex = dayOfYear % MOTIVATIONAL_QUOTES.length;
 
   const handleNotificationPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     nav.navigate('Notifications');
   };
 
   const handleProductsPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     nav.navigate('Products');
   };
 
-  const waterProgress = waterLogged / 3000;
+  const weeklyCheckIns = checkIns.filter(
+    (ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * 24 * 60 * 60 * 1000,
+  );
+  const weeklyVisits = weeklyCheckIns.length;
+  const totalMinutes = calcTotalMinutes(weeklyCheckIns);
+  const totalCalories = estimateCalories(totalMinutes);
+  const exerciseGoal = 300;
+  const calorieGoal = 2400;
+
+  const moveProgress = Math.min(1, totalCalories / calorieGoal);
+  const exerciseProgress = Math.min(1, totalMinutes / exerciseGoal);
+  const waterProgress = Math.min(1, waterLogged / 2000);
 
   return (
     <AnimatedScreen noBackground>
@@ -264,18 +315,18 @@ export const HomeScreen: React.FC = () => {
           pointerEvents="none"
         />
         <View style={styles.topBar}>
-          <Pressable onPress={() => nav.navigate('Profile')} style={styles.profileSummaryRow}>
-            <FitnessAvatar name={user?.name} uri={user?.avatarUrl} size={36} />
-            <View>
+          <View style={styles.profileSummaryRow}>
+            <GymLogo name={gym?.name} logo={gym?.logo} size={36} />
+            <View style={{ flexShrink: 1 }}>
               <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-                {user?.name?.split(' ')[0] ?? 'Member'}
+                {gym?.name ?? 'Clasendra'}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, alignSelf: 'flex-start' }}>
                 <Ionicons name="trophy" size={10} color="#FFD700" />
                 <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: '#FFD700', marginLeft: 4 }}>Gold Tier</Text>
               </View>
             </View>
-          </Pressable>
+          </View>
 
           <View style={styles.headerActions}>
             <Pressable style={styles.minimalButton} onPress={toggleTheme}>
@@ -283,7 +334,7 @@ export const HomeScreen: React.FC = () => {
             </Pressable>
             <Pressable style={styles.minimalButton} onPress={handleNotificationPress}>
               <Ionicons name="notifications-outline" size={22} color={colors.text} />
-              <View style={styles.badge} />
+              {/* Badge is hidden when there are no unread notifications */}
             </Pressable>
           </View>
         </View>
@@ -303,14 +354,14 @@ export const HomeScreen: React.FC = () => {
             <Text style={[styles.heroGreeting, { color: colors.textSecondary }]}>
               {greeting()} 👋
             </Text>
-            <View style={styles.heroBrandRow}>
-              <GymLogo name={gym?.name} logo={gym?.logo} size={34} />
+            <Pressable onPress={() => nav.navigate('Profile')} style={styles.heroBrandRow}>
+              <FitnessAvatar name={user?.name} uri={user?.avatarUrl} size={36} />
               <Text style={[styles.heroTitle, { color: colors.text }]} numberOfLines={1}>
-                {gym?.name ?? 'Clasendra'}
+                {user?.name ?? 'Member'}
               </Text>
-            </View>
+            </Pressable>
           </Animated.View>
-          
+
           <Animated.View entering={FadeInRight.duration(500).delay(200)} style={styles.heroFigureWrap}>
             <HeroFigure3D size={110} />
           </Animated.View>
@@ -318,21 +369,19 @@ export const HomeScreen: React.FC = () => {
 
         {/* Dynamic Island Motivation Banner (Compact) */}
         <Animated.View entering={FadeInUp.duration(400).delay(100)} style={styles.motivationWrap}>
-          <Pressable onPress={handleQuoteCycle}>
-            <LinearGradient
-              colors={isDark ? ['rgba(124,77,255,0.15)', 'rgba(124,77,255,0.05)'] : ['rgba(124,77,255,0.12)', 'rgba(124,77,255,0.03)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.motivationBanner}
-            >
-              <View style={[styles.motivationIconWrap, { backgroundColor: colors.accent }]}>
-                <Ionicons name="sparkles" size={12} color="#FFF" />
-              </View>
-              <Text style={[styles.motivationText, { color: colors.accent }]} numberOfLines={1}>
-                {MOTIVATIONAL_QUOTES[quoteIndex]}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+          <LinearGradient
+            colors={isDark ? ['rgba(124,77,255,0.15)', 'rgba(124,77,255,0.05)'] : ['rgba(124,77,255,0.12)', 'rgba(124,77,255,0.03)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.motivationBanner}
+          >
+            <View style={[styles.motivationIconWrap, { backgroundColor: colors.accent }]}>
+              <Ionicons name="sparkles" size={12} color="#FFF" />
+            </View>
+            <Text style={[styles.motivationText, { color: colors.accent }]}>
+              {MOTIVATIONAL_QUOTES[quoteIndex]}
+            </Text>
+          </LinearGradient>
         </Animated.View>
 
         <View style={styles.dashboardBody}>
@@ -341,23 +390,32 @@ export const HomeScreen: React.FC = () => {
             {/* Left: Activity Rings */}
             <Animated.View entering={FadeInUp.duration(320).delay(105)} style={styles.bentoLeft}>
               <Pressable style={{ flex: 1 }} onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
                 nav.navigate('Activity');
               }}>
                 <GlassCard glowColor={colors.accent} style={styles.bentoCard} innerStyle={{ flex: 1, padding: SPACING.md }}>
                   <Text style={[styles.bentoTitle, { color: colors.textSecondary }]}>ACTIVITY</Text>
                   <View style={styles.ringsWrap}>
                     <AppleActivityRings
-                      moveProgress={0.6}
-                      exerciseProgress={0.75}
+                      moveProgress={moveProgress}
+                      exerciseProgress={exerciseProgress}
                       standProgress={waterProgress}
                       size={100}
                     />
                   </View>
                   <View style={styles.bentoLegendRow}>
-                    <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color={colors.danger} /></View>
-                    <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color={colors.success} /></View>
-                    <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color={colors.info} /></View>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color={colors.danger} /></View>
+                      <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Move</Text>
+                    </View>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color={colors.success} /></View>
+                      <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Exercise</Text>
+                    </View>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color={colors.info} /></View>
+                      <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Hydrate</Text>
+                    </View>
                   </View>
                 </GlassCard>
               </Pressable>
@@ -368,36 +426,47 @@ export const HomeScreen: React.FC = () => {
               <GlassCard glowColor="#29B6F6" style={styles.bentoCard} innerStyle={{ flex: 1, padding: SPACING.md }}>
                 <View style={styles.bentoHeaderRow}>
                   <Text style={[styles.bentoTitle, { color: colors.textSecondary }]}>HYDRATION</Text>
-                  <Text style={[styles.bentoValue, { color: colors.text }]}>{waterLogged}ml</Text>
+                  <Text style={[styles.bentoValue, { color: '#29B6F6' }]}>{Math.min(2000, waterLogged)} ml</Text>
                 </View>
 
                 {/* Vertical Water Bar */}
                 <View style={styles.bentoWaterBody}>
                   <View style={[styles.verticalProgressBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-                    <Animated.View
-                      layout={Layout.springify()}
+                    <View
                       style={[
                         styles.verticalProgressBarFill,
                         {
                           height: waterProgress > 0 ? `${Math.max(8, Math.min(100, waterProgress * 100))}%` : '0%',
                         },
-                        waterProgress >= 1 && { backgroundColor: colors.success }
                       ]}
                     />
                   </View>
                   <View style={styles.bentoWaterControls}>
-                    <Pressable
-                      style={[styles.bentoWaterBtn, { backgroundColor: 'rgba(41,182,246,0.15)' }]}
-                      onPress={() => handleWaterIncrement(250)}
-                    >
-                      <Ionicons name="add" size={20} color="#29B6F6" />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.bentoWaterBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
-                      onPress={() => handleWaterIncrement(-250)}
-                    >
-                      <Ionicons name="remove" size={20} color={colors.textSecondary} />
-                    </Pressable>
+                    {waterLogged >= 2000 ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <View style={{ backgroundColor: 'rgba(41, 182, 246, 0.15)', padding: 6, borderRadius: 12, alignItems: 'center', width: '100%' }}>
+                          <Ionicons name="water" size={20} color="#29B6F6" />
+                          <Text style={{ color: '#29B6F6', fontSize: 10, fontFamily: FONTS.bodyBold, textAlign: 'center', marginTop: 2 }}>
+                            Wah! 🎉{'\n'}Goal Met
+                          </Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <Pressable
+                          style={[styles.bentoWaterBtn, { backgroundColor: 'rgba(41,182,246,0.15)' }]}
+                          onPress={() => handleWaterIncrement(250)}
+                        >
+                          <Ionicons name="add" size={20} color="#29B6F6" />
+                        </Pressable>
+                        <Pressable
+                          style={[styles.bentoWaterBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+                          onPress={() => handleWaterIncrement(-250)}
+                        >
+                          <Ionicons name="remove" size={20} color={colors.textSecondary} />
+                        </Pressable>
+                      </>
+                    )}
                   </View>
                 </View>
               </GlassCard>
@@ -414,23 +483,25 @@ export const HomeScreen: React.FC = () => {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                 {/* Metric 1 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>12.4k</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>KG LIFTED</Text>
-                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>↑ 12%</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>{weeklyVisits}</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>WORKOUTS</Text>
+                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>This Week</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', marginHorizontal: 8 }} />
                 {/* Metric 2 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>4/5</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>WORKOUTS</Text>
-                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>On Track</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>
+                    {totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : String(totalCalories)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>KCAL BURNED</Text>
+                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>Est. Total</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', marginHorizontal: 8 }} />
                 {/* Metric 3 */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>3,200</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>KCAL BURNED</Text>
-                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>↑ 5%</Text>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.bodyExtra, color: colors.text }}>{totalMinutes}m</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, fontFamily: FONTS.bodySemi }}>ACTIVE TIME</Text>
+                  <Text style={{ fontSize: 10, color: colors.success, marginTop: 4 }}>Gym Time</Text>
                 </View>
               </View>
             </GlassCard>
@@ -499,7 +570,9 @@ export const HomeScreen: React.FC = () => {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontFamily: FONTS.bodyBold, color: colors.accent, marginBottom: 4 }}>FitCoach AI Insight</Text>
-                  <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>You crushed leg day yesterday! Focus on active recovery and high protein today to maximize muscle growth.</Text>
+                  <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>
+                    {summary?.aiInsight || `You're on a roll! You've burned ${totalCalories} kcal this week across ${weeklyVisits} workouts. Keep pushing to hit your goal!`}
+                  </Text>
                 </View>
               </View>
             </GlassCard>
@@ -515,7 +588,7 @@ export const HomeScreen: React.FC = () => {
                     <Text style={[styles.bmiBadgeText, { color: bmiColor }]}>{bmiCategory}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.bmiDisplayRow}>
                   <Text style={[styles.bmiValue, { color: colors.text }]}>{bmi}</Text>
                   <View style={styles.bmiControlsWrap}>
@@ -553,9 +626,9 @@ export const HomeScreen: React.FC = () => {
                   <View style={[styles.bmiScaleSegment, { backgroundColor: colors.warning, flex: 0.5 }]} />
                   <View style={[styles.bmiScaleSegment, { backgroundColor: colors.danger, flex: 1 }]} />
                   {/* Indicator Pip */}
-                  <Animated.View 
-                    layout={Layout.springify()} 
-                    style={[styles.bmiIndicator, { left: `${Math.min(100, Math.max(0, (bmiValue - 10) / 30 * 100))}%`, backgroundColor: colors.text }]} 
+                  <Animated.View
+                    layout={Layout.springify()}
+                    style={[styles.bmiIndicator, { left: `${Math.min(100, Math.max(0, (bmiValue - 10) / 30 * 100))}%`, backgroundColor: colors.text }]}
                   />
                 </View>
               </View>
@@ -605,7 +678,7 @@ const styles = StyleSheet.create({
     marginTop: -20,
     marginRight: -10,
   },
-  
+
   // Floating Header
   floatingHeader: {
     position: 'absolute',
@@ -779,8 +852,9 @@ const styles = StyleSheet.create({
   // Bento Box
   bentoBox: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    height: 195,
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+    height: 170, // Fixed height to prevent child from expanding parent
   },
   bentoLeft: {
     flex: 1,
@@ -798,7 +872,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyExtra,
     letterSpacing: 0.8,
   },
-  
+
   // Rings
   ringsWrap: {
     flex: 1,
@@ -821,13 +895,12 @@ const styles = StyleSheet.create({
 
   // Vertical Water Tracker
   bentoHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    marginBottom: 4,
   },
   bentoValue: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: FONTS.displayBold,
+    marginTop: 1,
   },
   bentoWaterBody: {
     flex: 1,

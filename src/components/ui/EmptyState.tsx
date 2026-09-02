@@ -30,7 +30,6 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const floatY = useSharedValue(0);
-  const glowScale = useSharedValue(1);
 
   useEffect(() => {
     floatY.value = withRepeat(
@@ -42,37 +41,19 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
       false,
     );
 
-    glowScale.value = withRepeat(
-      withSequence(
-        withTiming(1.15, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, [floatY, glowScale]);
+
+  }, [floatY]);
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: floatY.value }],
   }));
 
-  const glowStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: glowScale.value }],
-  }));
 
   return (
     <Animated.View entering={FadeInUp.duration(400)} style={styles.container}>
       <View style={[styles.dashedBox, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
         
-        {/* Soft Glowing Aura Behind Icon */}
-        <Animated.View style={[styles.glowAura, glowStyle]}>
-          <LinearGradient
-            colors={[`${colors.primary}25`, `${colors.primary}00`]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0.5 }}
-            end={{ x: 1, y: 1 }}
-          />
-        </Animated.View>
+
 
         {/* Floating Icon Container */}
         <Animated.View style={[styles.iconWrap, { backgroundColor: `${colors.primary}15` }, iconStyle]}>
@@ -124,14 +105,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     overflow: 'hidden',
   },
-  glowAura: {
-    position: 'absolute',
-    top: '15%',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    opacity: 0.8,
-  },
+
   iconWrap: {
     width: 80,
     height: 80,

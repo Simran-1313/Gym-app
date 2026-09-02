@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
-
-const CLASENDRA_MARK = require('../../../assets/clasendra-logo.png');
+import { ClasendraLogo } from './ClasendraLogo';
 
 interface Props {
   name?: string | null;
@@ -61,12 +60,7 @@ export const GymLogo: React.FC<Props> = ({ name, logo, size = 80, style }) => {
           {initials}
         </Text>
       ) : (
-        <Image
-          source={CLASENDRA_MARK}
-          style={{ width: size * 0.82, height: size * 0.82 }}
-          resizeMode="contain"
-          accessibilityLabel="Clasendra"
-        />
+        <ClasendraLogo size={size * 0.7} />
       )}
     </View>
   );
