@@ -73,7 +73,7 @@ const ScheduleCard: React.FC<{
       <GlassCard glowColor={schedule.isBooked ? colors.success : colors.primary} style={s.card} noPadding>
         <View style={s.cardBody}>
           {/* Date block */}
-          <View style={[s.dateBlock, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)' }]}>
+          <View style={[s.dateBlock, { backgroundColor: colors.inset }]}>
             <Text style={[s.dateMonth, { color: colors.primary }]}>{safeFormatMonth(schedule.startTime)}</Text>
             <Text style={[s.dateNum, { color: colors.text }]}>{safeFormatDayNum(schedule.startTime)}</Text>
           </View>
@@ -97,10 +97,10 @@ const ScheduleCard: React.FC<{
         </View>
 
         {/* Capacity bar */}
-        <View style={[s.capacitySection, { borderTopColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
+        <View style={[s.capacitySection, { borderTopColor: colors.insetBorder }]}>
           <View style={s.capacityRow}>
             <View style={s.capacityInfo}>
-              <View style={[s.capacityBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+              <View style={[s.capacityBarBg, { backgroundColor: colors.inset }]}>
                 <View style={[s.capacityBarFill, {
                   width: `${fillPct}%`,
                   backgroundColor: isFull ? colors.danger : colors.primary,
@@ -273,7 +273,7 @@ export const ClassesScreen: React.FC = () => {
                   onPress={() => setSelectedDate(d.toDateString())}
                   style={[
                     s.dayBubble,
-                    { backgroundColor: isSelected ? colors.primary : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)') },
+                    { backgroundColor: isSelected ? colors.primary : (colors.inset) },
                     isSelected && s.dayBubbleActive
                   ]}
                 >
@@ -328,7 +328,7 @@ export const ClassesScreen: React.FC = () => {
       {/* Custom Booking Confirmation Modal */}
       <Modal transparent visible={!!confirmBookingId} animationType="fade">
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#FFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+          <View style={[s.modalContent, { backgroundColor: isDark ? '#121821' : '#FFFFFF', borderColor: colors.insetBorder }]}>
             <Text style={[s.modalTitle, { color: colors.text }]}>Confirm Booking</Text>
             <Text style={[s.modalText, { color: colors.textSecondary }]}>Are you sure you want to book this class?</Text>
             

@@ -102,7 +102,7 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPres
       <View style={[styles.roomCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
         {isGroup ? (
           <LinearGradient
-            colors={['#5856D6', '#007AFF']}
+            colors={['#2DD4BF', '#0F766E']}
             style={styles.avatarCircle}
           >
             <Ionicons name="people" size={22} color="#fff" />
@@ -255,13 +255,13 @@ export const ChatListScreen: React.FC = () => {
           style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}
         >
           <LinearGradient
-            colors={['#FF4F18', '#FF1744']}
+            colors={['#2DD4BF', '#14B8A6']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.aiCoachBanner}
           >
             <View style={styles.aiCoachIcon}>
-              <Ionicons name="fitness" size={22} color="#FF4F18" />
+              <Ionicons name="fitness" size={22} color="#2DD4BF" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.aiCoachTitle}>FitCoach AI</Text>

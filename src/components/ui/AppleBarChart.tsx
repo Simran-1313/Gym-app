@@ -78,9 +78,9 @@ const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[
 };
 
 const themeColors: Record<Props['metricType'], string[]> = {
-  CALORIES: ['#FF1243', '#FF5722'],
-  DURATION: ['#00E676', '#B3FF00'],
-  WATER: ['#00B0FF', '#00E5FF'],
+  CALORIES: ['#F0B36B', '#E08A3C'],
+  DURATION: ['#5EEAD4', '#2DD4BF'],
+  WATER: ['#6BB8F0', '#3B82C4'],
 };
 
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
@@ -89,7 +89,7 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
   const themeColorsDynamic = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const data = (customData && customData.length > 0) ? customData : (mockData[metricType]?.[viewMode] ?? []);
-  const colors = themeColors[metricType] ?? ['#FF5722', '#FF8A65'];
+  const colors = themeColors[metricType] ?? ['#2DD4BF', '#14B8A6'];
 
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

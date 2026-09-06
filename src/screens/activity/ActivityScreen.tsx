@@ -225,7 +225,7 @@ export const ActivityScreen: React.FC = () => {
   const exerciseProgress = Math.min(1, totalMinutes / exerciseGoal);
   const waterProgress = Math.min(1, waterLoggedMl / 2000);
 
-  const activeColor = activeMetric === 'CALORIES' ? '#FF1243' : activeMetric === 'DURATION' ? '#00E676' : '#00B0FF';
+  const activeColor = activeMetric === 'CALORIES' ? '#F0B36B' : activeMetric === 'DURATION' ? '#2DD4BF' : '#6BB8F0';
 
   return (
     <AnimatedScreen>
@@ -250,15 +250,15 @@ export const ActivityScreen: React.FC = () => {
               </View>
               <View style={styles.bentoLegendRow}>
                 <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color="#FF1243" /></View>
+                  <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color="#F0B36B" /></View>
                   <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Move</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color="#00E676" /></View>
+                  <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color="#2DD4BF" /></View>
                   <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Exercise</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color="#00B0FF" /></View>
+                  <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color="#6BB8F0" /></View>
                   <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Hydrate</Text>
                 </View>
               </View>
@@ -267,15 +267,15 @@ export const ActivityScreen: React.FC = () => {
 
           {/* Right: Water Tracker */}
           <Animated.View entering={FadeInUp.duration(320).delay(80)} style={styles.bentoRight}>
-            <GlassCard glowColor="#29B6F6" style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
+            <GlassCard glowColor="#6BB8F0" style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
               <View style={styles.bentoHeaderRow}>
                 <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>HYDRATION</Text>
-                <Text style={[styles.bentoValue, { color: '#29B6F6' }]}>{Math.min(2000, waterLoggedMl)} ml</Text>
+                <Text style={[styles.bentoValue, { color: '#6BB8F0' }]}>{Math.min(2000, waterLoggedMl)} ml</Text>
               </View>
 
               {/* Vertical Water Bar */}
               <View style={styles.bentoWaterBody}>
-                <View style={[styles.verticalProgressBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                <View style={[styles.verticalProgressBarBg, { backgroundColor: colors.inset }]}>
                   <View
                     style={[
                       styles.verticalProgressBarFill,
@@ -289,8 +289,8 @@ export const ActivityScreen: React.FC = () => {
                   {waterLoggedMl >= 2000 ? (
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                       <View style={{ backgroundColor: 'rgba(41, 182, 246, 0.15)', padding: 6, borderRadius: 12, alignItems: 'center', width: '100%' }}>
-                        <Ionicons name="water" size={20} color="#29B6F6" />
-                        <Text style={{ color: '#29B6F6', fontSize: 10, fontFamily: FONTS.bodyBold, textAlign: 'center', marginTop: 2 }}>
+                        <Ionicons name="water" size={20} color="#6BB8F0" />
+                        <Text style={{ color: '#6BB8F0', fontSize: 10, fontFamily: FONTS.bodyBold, textAlign: 'center', marginTop: 2 }}>
                           Wah! 🎉{'\n'}Goal Met
                         </Text>
                       </View>
@@ -301,10 +301,10 @@ export const ActivityScreen: React.FC = () => {
                         style={[styles.bentoWaterBtn, { backgroundColor: 'rgba(41,182,246,0.15)' }]}
                         onPress={() => handleAddWater(250)}
                       >
-                        <Ionicons name="add" size={20} color="#29B6F6" />
+                        <Ionicons name="add" size={20} color="#6BB8F0" />
                       </Pressable>
                       <Pressable
-                        style={[styles.bentoWaterBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+                        style={[styles.bentoWaterBtn, { backgroundColor: colors.inset }]}
                         onPress={() => handleAddWater(500)}
                       >
                         <Ionicons name="water" size={18} color={colors.textSecondary} />
@@ -329,14 +329,14 @@ export const ActivityScreen: React.FC = () => {
                 <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{weeklyVisits}</Text>
                 <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>WORKOUTS</Text>
               </View>
-              <View style={[styles.snapshotDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]} />
+              <View style={[styles.snapshotDivider, { backgroundColor: colors.inset }]} />
               <View style={styles.snapshotStat}>
                 <Text style={[styles.snapshotStatValue, { color: colors.text }]}>
                   {totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : totalCalories}
                 </Text>
                 <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>KCAL BURNED</Text>
               </View>
-              <View style={[styles.snapshotDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]} />
+              <View style={[styles.snapshotDivider, { backgroundColor: colors.inset }]} />
               <View style={styles.snapshotStat}>
                 <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{totalMinutes}m</Text>
                 <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>ACTIVE TIME</Text>
@@ -360,7 +360,7 @@ export const ActivityScreen: React.FC = () => {
               <View style={styles.workoutBannerGlow} />
               <View style={styles.workoutBannerContent}>
                 <View style={styles.workoutBannerIcon}>
-                  <Ionicons name="stopwatch" size={26} color="#FFF" />
+                  <Ionicons name="stopwatch" size={26} color="#07231F" />
                 </View>
                 <View style={styles.workoutBannerCopy}>
                   <Text style={styles.workoutBannerTitle}>Start Live Workout</Text>
@@ -378,7 +378,7 @@ export const ActivityScreen: React.FC = () => {
         <Animated.View entering={FadeInUp.duration(320).delay(140)}>
           <GlassCard glowColor={undefined}>
             <View style={styles.wearableRow}>
-              <View style={[styles.wearableIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+              <View style={[styles.wearableIcon, { backgroundColor: colors.inset }]}>
                 <Ionicons name="watch-outline" size={22} color={colors.textMuted} />
               </View>
               <View style={{ flex: 1 }}>
@@ -424,14 +424,14 @@ export const ActivityScreen: React.FC = () => {
             {/* Header */}
             <View style={styles.analyticsHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>ANALYTICS</Text>
-              <View style={[styles.periodSegment, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+              <View style={[styles.periodSegment, { backgroundColor: colors.inset }]}>
                 {(['DAILY', 'MONTHLY'] as const).map((mode) => (
                   <TouchableOpacity
                     key={mode}
                     onPress={() => handleSegmentSelect(mode)}
                     style={[
                       styles.periodBtn,
-                      viewMode === mode && { backgroundColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.1)' },
+                      viewMode === mode && { backgroundColor: colors.inset },
                     ]}
                   >
                     <Text style={[styles.periodText, { color: viewMode === mode ? colors.text : colors.textMuted }]}>
@@ -445,9 +445,9 @@ export const ActivityScreen: React.FC = () => {
             {/* Metric Selector — 3 tappable metric cards */}
             <View style={styles.metricCardsRow}>
               {([
-                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: '#FF1243' },
-                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'time' as const, color: '#00E676' },
-                { key: 'WATER' as const, label: 'Hydration', value: `${(waterLoggedMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#00B0FF' },
+                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: '#F0B36B' },
+                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'time' as const, color: '#2DD4BF' },
+                { key: 'WATER' as const, label: 'Hydration', value: `${(waterLoggedMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#6BB8F0' },
               ]).map((m) => {
                 const isActive = activeMetric === m.key;
                 return (
@@ -456,7 +456,7 @@ export const ActivityScreen: React.FC = () => {
                     onPress={() => handleMetricSelect(m.key)}
                     style={[
                       styles.metricCard,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' },
+                      { backgroundColor: colors.inset },
                       isActive && { backgroundColor: `${m.color}18`, borderColor: `${m.color}55` },
                     ]}
                   >
@@ -496,14 +496,14 @@ export const ActivityScreen: React.FC = () => {
                       style={[
                         styles.dayCircle,
                         {
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                          backgroundColor: colors.inset,
+                          borderColor: colors.insetBorder,
                         },
                         active && { backgroundColor: colors.primary, borderColor: colors.primary },
                       ]}
                     >
                       {active ? (
-                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                        <Ionicons name="checkmark" size={14} color="#07231F" />
                       ) : (
                         <Text style={[styles.dayCircleText, { color: colors.textMuted }]}>{day}</Text>
                       )}
@@ -520,7 +520,7 @@ export const ActivityScreen: React.FC = () => {
       {/* ═══ LIVE WORKOUT MODAL ═══ */}
       <Modal visible={isWorkoutModalOpen} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#12121E' : '#FFFFFF' }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#121821' : '#FFFFFF' }]}>
             {/* Modal Handle */}
             <View style={styles.modalHandle} />
 
@@ -543,7 +543,7 @@ export const ActivityScreen: React.FC = () => {
                     disabled={isWorkoutActive}
                     style={[
                       styles.typeChip,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                      { backgroundColor: colors.inset },
                       isSelected && { backgroundColor: `${colors.primary}25`, borderColor: colors.primary, borderWidth: 1 },
                     ]}
                   >
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   verticalProgressBarFill: {
     width: '100%',
     borderRadius: RADIUS.md,
-    backgroundColor: '#29B6F6',
+    backgroundColor: '#6BB8F0',
   },
   bentoWaterControls: {
     gap: 8,
@@ -739,12 +739,12 @@ const styles = StyleSheet.create({
   workoutBannerTitle: {
     fontSize: 16,
     fontFamily: FONTS.bodyBold,
-    color: '#FFF',
+    color: '#07231F',
   },
   workoutBannerSub: {
     fontSize: 12,
     fontFamily: FONTS.bodySemi,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(7,35,31,0.72)',
     marginTop: 2,
   },
   workoutBannerPlayBtn: {
@@ -788,7 +788,7 @@ const styles = StyleSheet.create({
   comingSoonPillText: {
     fontSize: 10,
     fontFamily: FONTS.bodyBold,
-    color: '#FF9E18',
+    color: '#FBBF24',
   },
 
   /* ── AI INSIGHT ── */

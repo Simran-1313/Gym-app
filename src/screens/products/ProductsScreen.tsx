@@ -44,7 +44,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, index, onPress }) =>
       <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(product.id)}>
         <GlassCard glowColor={colors.primary} style={styles.card} noPadding>
           <View style={styles.cardInner}>
-            <View style={[styles.imageWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
+            <View style={[styles.imageWrap, { backgroundColor: colors.inset }]}>
               {product.imageUrl ? (
                 <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" />
               ) : (
@@ -162,7 +162,7 @@ export const ProductsScreen: React.FC = () => {
         onEndReachedThreshold={0.3}
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: colors.surfaceBorder }]}>
+            <View style={[styles.searchBar, { backgroundColor: colors.inset, borderColor: colors.surfaceBorder }]}>
               <Ionicons name="search-outline" size={18} color={colors.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
@@ -186,7 +186,7 @@ export const ProductsScreen: React.FC = () => {
                   style={[
                     styles.categoryChip,
                     {
-                      backgroundColor: !selectedCategory ? `${colors.primary}22` : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                      backgroundColor: !selectedCategory ? `${colors.primary}22` : colors.inset,
                       borderColor: !selectedCategory ? colors.primary : colors.surfaceBorder,
                     },
                   ]}
@@ -200,7 +200,7 @@ export const ProductsScreen: React.FC = () => {
                     style={[
                       styles.categoryChip,
                       {
-                        backgroundColor: selectedCategory === cat ? `${colors.primary}22` : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        backgroundColor: selectedCategory === cat ? `${colors.primary}22` : colors.inset,
                         borderColor: selectedCategory === cat ? colors.primary : colors.surfaceBorder,
                       },
                     ]}

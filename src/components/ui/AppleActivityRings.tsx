@@ -69,16 +69,16 @@ export const AppleActivityRings: React.FC<Props> = ({
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#FF1243" />
-            <Stop offset="100%" stopColor="#FF5722" />
+            <Stop offset="0%" stopColor="#F0B36B" />
+            <Stop offset="100%" stopColor="#E08A3C" />
           </LinearGradient>
           <LinearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#00E676" />
-            <Stop offset="100%" stopColor="#B3FF00" />
+            <Stop offset="0%" stopColor="#5EEAD4" />
+            <Stop offset="100%" stopColor="#2DD4BF" />
           </LinearGradient>
           <LinearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#00B0FF" />
-            <Stop offset="100%" stopColor="#00E5FF" />
+            <Stop offset="0%" stopColor="#6BB8F0" />
+            <Stop offset="100%" stopColor="#3B82C4" />
           </LinearGradient>
         </Defs>
 
@@ -87,7 +87,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r1}
-          stroke="#FF124322"
+          stroke="#F0B36B22"
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -97,7 +97,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r2}
-          stroke="#00E67622"
+          stroke="#2DD4BF22"
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -107,7 +107,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r3}
-          stroke="#00B0FF22"
+          stroke="#6BB8F022"
           strokeWidth={strokeWidth}
           fill="transparent"
         />

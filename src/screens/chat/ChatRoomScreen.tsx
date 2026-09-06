@@ -46,7 +46,7 @@ interface TickProps {
 const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed }) => {
   if (senderId !== currentUserId) return null;
 
-  if (failed) return <Ionicons name="alert-circle" size={13} color="#FCA5A5" />;
+  if (failed) return <Ionicons name="alert-circle" size={13} color="#F0768B" />;
   if (pending) return <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.55)" />;
 
   const others = statuses.filter((s) => s.userId !== currentUserId);
@@ -57,7 +57,7 @@ const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, m
   const allRead = others.length > 0 && others.every((s) => s.status === 'READ');
   const allDelivered = others.length > 0 && others.every((s) => s.status !== 'SENT');
 
-  if (allRead) return <Ionicons name="checkmark-done" size={12} color="#60A5FA" />;
+  if (allRead) return <Ionicons name="checkmark-done" size={12} color="#5EEAD4" />;
   if (allDelivered) return <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.55)" />;
   return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.5)" />;
 };
@@ -106,7 +106,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
         styles.bubble,
         msg.type === 'IMAGE' ? styles.bubbleImage : null,
         isOwn && msg.type !== 'IMAGE'
-          ? [styles.bubbleOwn, { backgroundColor: '#007AFF', opacity: msg.pending ? 0.7 : 1 }]
+          ? [styles.bubbleOwn, { backgroundColor: colors.primary, opacity: msg.pending ? 0.7 : 1 }]
           : msg.type !== 'IMAGE'
             ? [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]
             : { opacity: msg.pending ? 0.7 : 1 },
@@ -119,7 +119,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
           resizeMode="cover"
         />
       ) : (
-        <Text style={[styles.msgText, { color: isOwn ? '#fff' : colors.text }]}>
+        <Text style={[styles.msgText, { color: isOwn ? '#07231F' : colors.text }]}>
           {msg.content}
         </Text>
       )}
@@ -694,11 +694,11 @@ export const ChatRoomScreen: React.FC = () => {
               disabled={!input.trim()}
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? '#007AFF' : colors.card },
+                { backgroundColor: input.trim() ? colors.primary : colors.card },
               ]}
               activeOpacity={0.7}
             >
-              <Ionicons name="send" size={16} color={input.trim() ? '#fff' : colors.textMuted} />
+              <Ionicons name="send" size={16} color={input.trim() ? '#07231F' : colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   },
   failedText: {
     fontSize: 10,
-    color: '#FCA5A5',
+    color: '#F0768B',
     marginRight: 2,
   },
   typingRow: {

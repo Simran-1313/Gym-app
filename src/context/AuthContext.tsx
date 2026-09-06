@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [cachedGym, setCachedGym] = useState<GymBrand | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
   // Remember the gym so the *next* launch is branded from the first frame.
   const rememberGym = useCallback((user: User | null) => {

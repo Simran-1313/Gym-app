@@ -186,7 +186,7 @@ export const AiCoachScreen: React.FC = () => {
         <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowAi]}>
           {!isUser && (
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Ionicons name="fitness" size={14} color="#fff" />
+              <Ionicons name="fitness" size={14} color="#07231F" />
             </View>
           )}
           <View
@@ -195,7 +195,7 @@ export const AiCoachScreen: React.FC = () => {
               isUser
                 ? { backgroundColor: colors.primary }
                 : {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: colors.inset,
                     borderWidth: 1,
                     borderColor: colors.surfaceBorder,
                   },
@@ -207,7 +207,7 @@ export const AiCoachScreen: React.FC = () => {
                 {(() => {
                   const baseStyle = [
                     styles.bubbleText,
-                    { color: isUser ? '#fff' : colors.text },
+                    { color: isUser ? '#07231F' : colors.text },
                     item.error && { color: colors.danger },
                   ];
                   const boldStyle = { fontFamily: FONTS.bodyBold };
@@ -292,7 +292,7 @@ export const AiCoachScreen: React.FC = () => {
           style={[
             styles.inputBar,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+              backgroundColor: colors.inset,
               borderTopColor: colors.surfaceBorder,
               paddingBottom: insets.bottom + SPACING.sm,
             },
@@ -303,7 +303,7 @@ export const AiCoachScreen: React.FC = () => {
               styles.input,
               {
                 color: colors.text,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                backgroundColor: colors.inset,
                 borderColor: colors.surfaceBorder,
               },
             ]}

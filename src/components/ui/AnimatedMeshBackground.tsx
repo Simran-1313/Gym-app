@@ -1,13 +1,15 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  withSequence,
   Easing,
 } from 'react-native-reanimated';
+
+import { DARK_COLORS, LIGHT_COLORS } from '../../config/theme';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -15,124 +17,128 @@ interface Props {
   isDark: boolean;
 }
 
-/* ─── Small bright circle that roams the entire screen ─── */
-const RoamingDot = ({
+/**
+ * A single large, very soft bloom that drifts on a long loop.
+ *
+ * Built from a stack of concentric gradient rings rather than a blurred circle:
+ * the `filter: blur()` style is inconsistent across Android versions, and a
+ * 200px blur on a full-screen view is expensive to composite every frame.
+ * Nested gradients cost nothing after layout.
+ */
+const Bloom = ({
   color,
   size,
-  // Waypoints: the dot travels through these [x,y] positions in order
-  waypoints,
-  durations,
+  origin,
+  drift,
+  duration,
 }: {
   color: string;
   size: number;
-  waypoints: { x: number; y: number }[];
-  durations: number[];
+  origin: { x: number; y: number };
+  drift: { x: number; y: number };
+  duration: number;
 }) => {
-  const translateX = useSharedValue(waypoints[0].x);
-  const translateY = useSharedValue(waypoints[0].y);
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    // Build X waypoint sequence
-    const xSteps = waypoints.slice(1).map((wp, i) =>
-      withTiming(wp.x, { duration: durations[i], easing: Easing.inOut(Easing.ease) })
+    progress.value = withRepeat(
+      withTiming(1, { duration, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
     );
-    // Build Y waypoint sequence
-    const ySteps = waypoints.slice(1).map((wp, i) =>
-      withTiming(wp.y, { duration: durations[i], easing: Easing.inOut(Easing.ease) })
-    );
-
-    translateX.value = withRepeat(withSequence(...xSteps), -1, true);
-    translateY.value = withRepeat(withSequence(...ySteps), -1, true);
-  }, [durations, translateX, translateY, waypoints]);
+  }, [duration, progress]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
+      { translateX: origin.x + drift.x * progress.value },
+      { translateY: origin.y + drift.y * progress.value },
     ],
+    opacity: 0.55 + 0.45 * progress.value,
   }));
 
   return (
     <Animated.View
       style={[
-        {
-          position: 'absolute',
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-        },
+        { position: 'absolute', width: size, height: size, borderRadius: size / 2 },
         animStyle,
       ]}
-    />
+      pointerEvents="none"
+    >
+      <LinearGradient
+        colors={[color, 'transparent']}
+        start={{ x: 0.5, y: 0.5 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+      />
+      <LinearGradient
+        colors={[color, 'transparent']}
+        start={{ x: 0.5, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+      />
+      <LinearGradient
+        colors={[color, 'transparent']}
+        start={{ x: 0.5, y: 0.5 }}
+        end={{ x: 0.5, y: 0 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+      />
+      <LinearGradient
+        colors={[color, 'transparent']}
+        start={{ x: 0.5, y: 0.5 }}
+        end={{ x: 0, y: 0.5 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+      />
+    </Animated.View>
   );
 };
 
-/* ─── Main Background ─── */
+/**
+ * App-wide ambient ground. Two slow teal blooms over near-black navy, then a
+ * vignette to pull focus to the centre. Deliberately quiet — cards and the
+ * teal accent must be the only things that draw the eye.
+ */
 export const AnimatedMeshBackground: React.FC<Props> = ({ isDark }) => {
-  const bg = isDark ? '#06060A' : '#EAECF2';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  const primaryBloom = isDark ? 'rgba(45,212,191,0.10)' : 'rgba(13,148,136,0.09)';
+  const secondaryBloom = isDark ? 'rgba(56,116,168,0.10)' : 'rgba(96,150,205,0.10)';
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Base */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: bg }]} />
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={colors.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.6, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
 
-      {/* ═══ 3 bright roaming dots, blurred ═══ */}
-      <View style={[StyleSheet.absoluteFill, { filter: [{ blur: 16 }] } as any]} pointerEvents="none">
-        {/* 🔴 Red dot — sweeps top-left → bottom-right → top-right → back */}
-        <RoamingDot
-          color="#FF3B30"
-          size={180}
-          waypoints={[
-            { x: W * 0.1, y: H * 0.05 },
-            { x: W * 0.7, y: H * 0.4 },
-            { x: W * 0.2, y: H * 0.8 },
-            { x: W * 0.8, y: H * 0.15 },
-            { x: W * 0.1, y: H * 0.05 },
-          ]}
-          durations={[3500, 4000, 3800, 3200]}
-        />
+      <Bloom
+        color={primaryBloom}
+        size={W * 1.5}
+        origin={{ x: -W * 0.45, y: -H * 0.14 }}
+        drift={{ x: W * 0.22, y: H * 0.08 }}
+        duration={22000}
+      />
+      <Bloom
+        color={secondaryBloom}
+        size={W * 1.3}
+        origin={{ x: W * 0.3, y: H * 0.6 }}
+        drift={{ x: -W * 0.18, y: -H * 0.1 }}
+        duration={28000}
+      />
 
-        {/* 🔵 Sky blue dot — sweeps right → center → bottom-left → top → back */}
-        <RoamingDot
-          color="#00BFFF"
-          size={160}
-          waypoints={[
-            { x: W * 0.8, y: H * 0.1 },
-            { x: W * 0.4, y: H * 0.35 },
-            { x: W * 0.05, y: H * 0.7 },
-            { x: W * 0.6, y: H * 0.85 },
-            { x: W * 0.8, y: H * 0.1 },
-          ]}
-          durations={[4000, 3500, 3800, 4200]}
-        />
-
-        {/* 🟢 Green dot — sweeps bottom → top-right → left → center → back */}
-        <RoamingDot
-          color="#34C759"
-          size={170}
-          waypoints={[
-            { x: W * 0.3, y: H * 0.9 },
-            { x: W * 0.75, y: H * 0.2 },
-            { x: W * 0.1, y: H * 0.45 },
-            { x: W * 0.5, y: H * 0.65 },
-            { x: W * 0.3, y: H * 0.9 },
-          ]}
-          durations={[3800, 4200, 3500, 3800]}
-        />
-      </View>
-
-      {/* ═══ Frosted tint overlay ═══ */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: isDark
-              ? 'rgba(6,6,10,0.55)'
-              : 'rgba(240,242,248,0.45)',
-          },
-        ]}
-        pointerEvents="none"
+      {/* Vignette: darkens the top and bottom so the header and floating tab
+          bar always have contrast, whatever the bloom is doing behind them. */}
+      <LinearGradient
+        colors={
+          isDark
+            ? ['rgba(8,11,17,0.85)', 'transparent', 'rgba(8,11,17,0.9)']
+            : ['rgba(245,247,250,0.8)', 'transparent', 'rgba(237,241,246,0.85)']
+        }
+        locations={[0, 0.45, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
     </View>
   );

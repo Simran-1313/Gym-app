@@ -7,7 +7,6 @@ import {
   View,
   ViewStyle,
   StyleProp,
-  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -15,13 +14,18 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, GRADIENTS } from '../../config/theme';
+import { DARK_COLORS, LIGHT_COLORS, FONTS, GRADIENTS, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
+
+/**
+ * Label colour on a teal fill. White on #2DD4BF is roughly 1.9:1 — well under
+ * AA — so the primary button uses a near-black teal instead.
+ */
+const ON_PRIMARY = '#07231F';
 
 interface Props {
   label: string;
@@ -87,7 +91,7 @@ export const AnimatedButton: React.FC<Props> = ({
           style={s.btnInner}
         >
           {loading ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color={ON_PRIMARY} />
           ) : (
             <View style={s.row}>
               {icon}
@@ -111,16 +115,14 @@ export const AnimatedButton: React.FC<Props> = ({
           animStyle,
           s.btn,
           s.glassBtnOuter,
-          { backgroundColor: isDark ? 'rgba(50,50,50,0.2)' : 'rgba(200,200,200,0.18)' },
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.primaryBorder,
+          },
           style,
           isDisabled && s.disabled
         ]}
       >
-        <BlurView
-          tint={isDark ? 'dark' : 'light'}
-          intensity={Platform.OS === 'ios' ? 50 : 80}
-          style={StyleSheet.absoluteFill}
-        />
         <View style={s.btnInner}>
           {loading ? (
             <ActivityIndicator color={colors.primary} />
@@ -158,7 +160,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
 const s = StyleSheet.create({
   btn: {
-    borderRadius: 14,
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
   },
   btnInner: {
@@ -175,13 +177,11 @@ const s = StyleSheet.create({
 
   // Glass
   glassBtnOuter: {
-    backgroundColor: 'rgba(200,200,200,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,79,24,0.30)',
   },
 
   // Labels
-  primaryLabel: { color: '#FFF', fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  primaryLabel: { color: ON_PRIMARY, fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
   glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
   ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },
