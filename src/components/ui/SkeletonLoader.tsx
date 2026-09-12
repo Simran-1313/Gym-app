@@ -36,7 +36,7 @@ export const SkeletonLoader: React.FC<Props> = ({ height = 72, style }) => {
     <View style={[styles.card, { height, backgroundColor: colors.surface, borderColor: colors.surfaceBorder }, style]}>
       <Animated.View style={[styles.shimmerWrap, shimmerStyle]}>
         <LinearGradient
-          colors={[colors.transparent, colors.surface2, colors.transparent]}
+          colors={[colors.transparent, colors.inset, colors.transparent]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.shimmer}

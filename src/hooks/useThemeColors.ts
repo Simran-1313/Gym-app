@@ -24,12 +24,17 @@ export const useThemeColors = (): ThemeColors => {
 
   return useMemo(() => {
     if (!isValidHex(tenantPrimary)) return base;
+    // DARK_COLORS/LIGHT_COLORS type every hex as its own literal so theme.ts's
+    // call sites get autocomplete — a computed tenant color is just `string`,
+    // so this cast is the one place that narrowing gets deliberately relaxed.
     return {
       ...base,
       primary: tenantPrimary,
       primaryDark: shade(tenantPrimary, -0.28),
       primaryLight: shade(tenantPrimary, 0.35),
       primaryGlow: shade(tenantPrimary, 0.35),
-    };
+      primarySoft: `${tenantPrimary}1F`,
+      primaryBorder: `${tenantPrimary}3D`,
+    } as unknown as ThemeColors;
   }, [base, tenantPrimary]);
 };

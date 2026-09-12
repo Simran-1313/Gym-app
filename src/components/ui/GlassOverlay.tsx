@@ -73,7 +73,7 @@ export const GlassOverlay: React.FC<Props> = ({
     >
       <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.35)' }]} />
       <Animated.View style={[styles.card, cardStyle, {
-        backgroundColor: colors.overlay,
+        backgroundColor: colors.surfaceElevated,
         borderColor: colors.surfaceBorder,
       }]}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>

@@ -125,7 +125,7 @@ export const MembershipScreen: React.FC = () => {
                 </View>
               </View>
 
-              <View style={[s.track, { backgroundColor: colors.surface3 }]}>
+              <View style={[s.track, { backgroundColor: colors.cardPressed }]}>
                 <View style={[s.trackFill, { backgroundColor: urgencyColor, width: `${cycleProgress * 100}%` }]} />
               </View>
               <View style={s.trackLabels}>
@@ -153,7 +153,7 @@ export const MembershipScreen: React.FC = () => {
         <StaggerItem index={1}>
           <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>PAYMENT METHOD</Text>
           <GlassCard style={s.row}>
-            <View style={[s.rowIcon, { backgroundColor: colors.surface2 }]}>
+            <View style={[s.rowIcon, { backgroundColor: colors.inset }]}>
               <Ionicons name="card-outline" size={18} color={colors.text} />
             </View>
             <View style={{ flex: 1 }}>
@@ -170,7 +170,7 @@ export const MembershipScreen: React.FC = () => {
         {invoices.map((inv, i) => (
           <StaggerItem index={3 + i} key={inv.id}>
             <GlassCard style={s.row}>
-              <View style={[s.rowIcon, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.surface2 }]}>
+              <View style={[s.rowIcon, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.inset }]}>
                 <Ionicons name="document-text-outline" size={18} color={i === 0 ? colors.primary : colors.textMuted} />
               </View>
               <View style={{ flex: 1 }}>
@@ -181,7 +181,7 @@ export const MembershipScreen: React.FC = () => {
                   Paid via {inv.paymentMethod ?? '—'} · {new Date(inv.issuedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                 </Text>
               </View>
-              <View style={[s.amountPill, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.surface2 }]}>
+              <View style={[s.amountPill, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.inset }]}>
                 <Text style={[s.amountText, { color: i === 0 ? colors.primary : colors.textMuted }]}>₹{inv.amount.toLocaleString('en-IN')}</Text>
               </View>
             </GlassCard>

@@ -17,7 +17,7 @@ import { ActiveSubscription, AiPlan } from '../types';
 // and consistent with every other surface in the app now being solid instead
 // of translucent-over-blur.
 const SleekHeaderBackground = ({ colors }: { colors: ThemeColors }) => (
-  <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}>
+  <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surfaceElevated }]}>
     <View
       style={{
         position: 'absolute',

@@ -134,7 +134,7 @@ export const ChallengesScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
-              <View style={[s.badgeTrack, { backgroundColor: colors.surface3 }]}>
+              <View style={[s.badgeTrack, { backgroundColor: colors.cardPressed }]}>
                 <View style={[s.badgeFill, { backgroundColor: colors.warning, width: `${Math.min(100, (current / nextMilestone.days) * 100)}%` }]} />
               </View>
             </GlassCard>
@@ -162,7 +162,7 @@ export const ChallengesScreen: React.FC = () => {
               {gridDays.map((d, i) => {
                 const count = visitsByDay[d.toDateString()] ?? 0;
                 const isToday = i === gridDays.length - 1;
-                const bg = count === 0 ? colors.surface2 : count === 1 ? `${colors.primary}40` : count === 2 ? `${colors.primary}90` : colors.primary;
+                const bg = count === 0 ? colors.inset : count === 1 ? `${colors.primary}40` : count === 2 ? `${colors.primary}90` : colors.primary;
                 return (
                   <View
                     key={d.toISOString()}
@@ -188,7 +188,7 @@ export const ChallengesScreen: React.FC = () => {
               <Text style={[s.challengeSub, { color: colors.textMuted }]}>
                 {sessionsThisMonth} of {MONTHLY_GOAL} sessions this month
               </Text>
-              <View style={[s.challengeTrack, { backgroundColor: colors.surface2 }]}>
+              <View style={[s.challengeTrack, { backgroundColor: colors.inset }]}>
                 <View style={[s.challengeFill, { backgroundColor: colors.primary, width: `${monthlyProgress * 100}%` }]} />
               </View>
             </View>

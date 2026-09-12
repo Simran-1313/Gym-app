@@ -61,7 +61,7 @@ export const ProgressRing: React.FC<Props> = ({
           r={radius}
           stroke={colors.surfaceBorder}
           strokeWidth={strokeWidth}
-          fill={colors.surface2}
+          fill={colors.inset}
         />
         <G rotation="-90" origin={`${cx}, ${cy}`}>
           <AnimatedCircle

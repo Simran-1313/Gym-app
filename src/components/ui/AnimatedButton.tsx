@@ -35,6 +35,8 @@ interface Props {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: React.ReactNode;
+  /** Renders the primary variant in the danger color — destructive confirms (e.g. "Log Out"). */
+  destructive?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -47,6 +49,7 @@ export const AnimatedButton: React.FC<Props> = ({
   disabled = false,
   style,
   icon,
+  destructive = false,
 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
@@ -76,6 +79,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
   // ── PRIMARY ──
   if (variant === 'primary') {
+    const gradient = destructive ? ([colors.danger, colors.danger] as const) : GRADIENTS.primary;
     return (
       <AnimatedPressable
         onPress={handlePress}
@@ -85,7 +89,7 @@ export const AnimatedButton: React.FC<Props> = ({
         style={[animStyle, s.btn, style, isDisabled && s.disabled]}
       >
         <LinearGradient
-          colors={[...GRADIENTS.primary]}
+          colors={[...gradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={s.btnInner}
