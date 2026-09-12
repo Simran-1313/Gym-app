@@ -18,12 +18,13 @@ import { getProducts } from '../../services/pos.service';
 import { Product } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StaggerItem } from '../../components/ui/StaggerItem';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 const formatPrice = (price: number) =>
   `₹${price.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -37,7 +38,7 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, index, onPress }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <StaggerItem index={index}>
@@ -86,7 +87,7 @@ export const ProductsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
