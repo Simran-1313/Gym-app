@@ -34,7 +34,7 @@ import {
   SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -43,6 +43,7 @@ import { AppleActivityRings } from '../../components/ui/AppleActivityRings';
 import { AppleBarChart } from '../../components/ui/AppleBarChart';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 const DAYS_OF_WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -79,7 +80,7 @@ export const ActivityScreen: React.FC = () => {
   const headerHeight = useHeaderHeight();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
@@ -352,7 +353,7 @@ export const ActivityScreen: React.FC = () => {
             style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
           >
             <LinearGradient
-              colors={[...GRADIENTS.accent]}
+              colors={[...GRADIENTS.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.workoutBanner}
@@ -360,14 +361,14 @@ export const ActivityScreen: React.FC = () => {
               <View style={styles.workoutBannerGlow} />
               <View style={styles.workoutBannerContent}>
                 <View style={styles.workoutBannerIcon}>
-                  <Ionicons name="stopwatch" size={26} color="#FFF" />
+                  <Ionicons name="stopwatch" size={26} color="#04211F" />
                 </View>
                 <View style={styles.workoutBannerCopy}>
                   <Text style={styles.workoutBannerTitle}>Start Live Workout</Text>
                   <Text style={styles.workoutBannerSub}>Track session with real-time calorie burn</Text>
                 </View>
                 <View style={styles.workoutBannerPlayBtn}>
-                  <Ionicons name="play" size={18} color={colors.accent} />
+                  <Ionicons name="play" size={18} color={colors.primary} />
                 </View>
               </View>
             </LinearGradient>
@@ -391,11 +392,11 @@ export const ActivityScreen: React.FC = () => {
                 onPress={handleWearableNotice}
                 style={({ pressed }) => [
                   styles.comingSoonPill,
-                  { backgroundColor: isDark ? 'rgba(255,158,24,0.18)' : 'rgba(255,158,24,0.12)' },
+                  { backgroundColor: `${colors.warning}22`, borderColor: `${colors.warning}55` },
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Text style={styles.comingSoonPillText}>Coming Soon</Text>
+                <Text style={[styles.comingSoonPillText, { color: colors.warning }]}>Coming Soon</Text>
               </Pressable>
             </View>
           </GlassCard>
@@ -567,13 +568,13 @@ export const ActivityScreen: React.FC = () => {
                 <AnimatedButton
                   label="Start Session"
                   onPress={handleStartWorkoutSession}
-                  icon={<Ionicons name="play" size={18} color={colors.white} />}
+                  icon={<Ionicons name="play" size={18} color="#04211F" />}
                 />
               ) : (
                 <AnimatedButton
                   label="Finish & Save"
                   onPress={handleFinishWorkoutSession}
-                  icon={<Ionicons name="checkmark-done" size={18} color={colors.white} />}
+                  icon={<Ionicons name="checkmark-done" size={18} color="#04211F" />}
                 />
               )}
             </View>
@@ -739,12 +740,12 @@ const styles = StyleSheet.create({
   workoutBannerTitle: {
     fontSize: 16,
     fontFamily: FONTS.bodyBold,
-    color: '#FFF',
+    color: '#04211F',
   },
   workoutBannerSub: {
     fontSize: 12,
     fontFamily: FONTS.bodySemi,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(4,33,31,0.65)',
     marginTop: 2,
   },
   workoutBannerPlayBtn: {
@@ -783,12 +784,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,158,24,0.35)',
   },
   comingSoonPillText: {
     fontSize: 10,
     fontFamily: FONTS.bodyBold,
-    color: '#FF9E18',
   },
 
   /* ── AI INSIGHT ── */

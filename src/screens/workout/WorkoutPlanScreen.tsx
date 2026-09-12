@@ -128,7 +128,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                 onPress={() => generatePlan('WORKOUT')}
                 loading={workout.generating}
                 disabled={workout.generating}
-                icon={<Ionicons name="sparkles" size={18} color={colors.white} />}
+                icon={<Ionicons name="sparkles" size={18} color="#04211F" />}
               />
               <AnimatedButton
                 label="Update Fitness Profile"

@@ -190,7 +190,7 @@ export const DietPlanScreen: React.FC = () => {
                 onPress={() => generatePlan('DIET')}
                 loading={diet.generating}
                 disabled={diet.generating}
-                icon={<Ionicons name="sparkles" size={18} color={colors.white} />}
+                icon={<Ionicons name="sparkles" size={18} color="#04211F" />}
               />
               <AnimatedButton
                 label="Update Fitness Profile"
@@ -275,7 +275,7 @@ export const DietPlanScreen: React.FC = () => {
               <Pressable key={day.day} onPress={() => setSelectedDay(i)}>
                 {active ? (
                   <LinearGradient colors={[...GRADIENTS.primary]} style={styles.dayTabActive}>
-                    <Text style={[styles.dayTabTextActive, { color: colors.white }]}>{day.day}</Text>
+                    <Text style={[styles.dayTabTextActive, { color: '#04211F' }]}>{day.day}</Text>
                   </LinearGradient>
                 ) : (
                   <View style={[styles.dayTab, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
