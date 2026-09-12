@@ -16,7 +16,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
 import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -211,6 +211,51 @@ const DayRing: React.FC<{
       {isToday && <Text style={[styles.dayToday, { color: colors.primary }]}>Today</Text>}
     </View>
   );
+};
+
+/** Small ring gauge behind the hero's bolt icon — the energy score drawn as an
+ *  arc, not just a static badge, so the number on the left has a visual echo. */
+const EnergyDial: React.FC<{ progress: number }> = ({ progress }) => {
+  const size = 44;
+  const r = size / 2 - 4;
+  const circumference = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size}>
+        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+          <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.18)" strokeWidth={3.5} fill="none" />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={HERO_ACCENT}
+            strokeWidth={3.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - Math.min(1, Math.max(0, progress)))}
+          />
+        </G>
+      </Svg>
+      <View style={StyleSheet.absoluteFill}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="flash" size={16} color={HERO_ACCENT} />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+/** Days to the next streak badge, matching ChallengesScreen's own milestone
+ *  thresholds — the streak pill and the Challenges screen must agree on when
+ *  "Bronze" unlocks, or the app is telling two different stories about it. */
+const STREAK_MILESTONES = [7, 14, 30, 60];
+const nextStreakBadge = (days: number): { label: string; remaining: number } | null => {
+  const names = ['Bronze', 'Silver', 'Gold', 'Platinum'];
+  for (let i = 0; i < STREAK_MILESTONES.length; i++) {
+    if (days < STREAK_MILESTONES[i]) return { label: names[i], remaining: STREAK_MILESTONES[i] - days };
+  }
+  return null;
 };
 
 /* ─────────────────────── Screen ─────────────────────── */
@@ -538,7 +583,7 @@ export const HomeScreen: React.FC = () => {
           <Pressable
             onPress={() => {
               tap();
-              nav.navigate('CheckIns');
+              nav.navigate('Challenges');
             }}
             style={({ pressed }) => [
               styles.streakPill,
@@ -554,7 +599,10 @@ export const HomeScreen: React.FC = () => {
                 {streak} Day{streak === 1 ? '' : 's'}
               </Text>
               <Text style={[styles.streakSub, { color: colors.textMuted }]}>
-                {sub?.status === 'ACTIVE' ? `${activeDays} days left` : 'Keep it up'}
+                {(() => {
+                  const next = nextStreakBadge(streak);
+                  return next ? `${next.remaining} day${next.remaining === 1 ? '' : 's'} to ${next.label}` : 'All badges unlocked';
+                })()}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
@@ -587,9 +635,7 @@ export const HomeScreen: React.FC = () => {
                 </Text>
               </View>
 
-              <View style={[styles.heroBadge, { borderColor: 'rgba(45,212,191,0.45)', backgroundColor: onPhotoFill }]}>
-                <Ionicons name="flash" size={17} color={HERO_ACCENT} />
-              </View>
+              <EnergyDial progress={energyScore / 100} />
             </View>
 
             <GlowLineChart
