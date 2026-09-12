@@ -14,7 +14,8 @@ import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import { clearCookie } from '../../services/api';
-import { COLORS, FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { SPACING, TYPOGRAPHY } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
@@ -24,6 +25,7 @@ import { GymLogo } from '../../components/ui/GymLogo';
 
 export const ChangePasswordScreen: React.FC = () => {
   const { logout, setFirstLoginDone, gym } = useAuth();
+  const colors = useThemeColors();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -80,12 +82,12 @@ export const ChangePasswordScreen: React.FC = () => {
           <Animated.View entering={ZoomIn.duration(400)} style={styles.iconBox}>
             <GymLogo name={gym?.name} logo={gym?.logo} size={64} />
           </Animated.View>
-          <Text style={styles.title}>Set Your Password</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: colors.text }]}>Set Your Password</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             This is your first login. Please change your temporary password to continue.
           </Text>
 
-          <GlassCard glowColor={COLORS.primary}>
+          <GlassCard glowColor={colors.primary}>
             {([
               { key: 'current', label: 'Current Password', value: current, onChange: setCurrent },
               { key: 'next', label: 'New Password', value: next, onChange: setNext },
@@ -102,7 +104,7 @@ export const ChangePasswordScreen: React.FC = () => {
                   autoCorrect={false}
                   textContentType={key === 'current' ? 'password' : 'newPassword'}
                   editable={!loading}
-                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} />}
+                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />}
                   rightIcon={
                     <TouchableOpacity
                       onPress={() => setRevealed((r) => ({ ...r, [key]: !r[key] }))}
@@ -113,7 +115,7 @@ export const ChangePasswordScreen: React.FC = () => {
                       <Ionicons
                         name={revealed[key] ? 'eye-off-outline' : 'eye-outline'}
                         size={20}
-                        color={COLORS.textSecondary}
+                        color={colors.textSecondary}
                       />
                     </TouchableOpacity>
                   }
@@ -139,10 +141,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.xl },
   iconBox: { alignItems: 'center', marginBottom: SPACING.md },
-  title: { ...TYPOGRAPHY.title, color: COLORS.text, textAlign: 'center' },
+  title: { ...TYPOGRAPHY.title, textAlign: 'center' },
   subtitle: {
     ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: SPACING.sm,
     marginBottom: SPACING.xl,

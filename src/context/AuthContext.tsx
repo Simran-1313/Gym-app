@@ -96,21 +96,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [rememberGym]);
 
   const login = useCallback(async (payload: LoginPayload) => {
-    console.log('[AuthContext] login function started with payload email:', payload.email);
-
     // Attach the native FCM/APNs device token + platform so the backend can register
     // it at login. Falls back to email/password only when no token is available.
     const tokenInfo = await getDeviceTokenInfo();
     const fullPayload: LoginPayload = tokenInfo
       ? { ...payload, deviceToken: tokenInfo.deviceToken, platform: tokenInfo.platform }
       : payload;
-    console.log('[AuthContext] device token attached to login payload:', !!tokenInfo);
 
     const data = await apiLogin(fullPayload);
-    console.log('[AuthContext] apiLogin completed. Response data:', data);
     rememberGym(data.user);
     setState((s) => ({ ...s, user: data.user, isFirstLogin: data.isFirstLogin }));
-    console.log('[AuthContext] AuthState updated. User ID:', data.user ? data.user.id : null, 'isFirstLogin:', data.isFirstLogin);
   }, [rememberGym]);
 
   const logout = useCallback(async () => {

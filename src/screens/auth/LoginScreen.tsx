@@ -20,7 +20,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
@@ -32,6 +33,7 @@ const BACKGROUND_IMAGE =
 
 export const LoginScreen: React.FC = () => {
   const { login, gym } = useAuth();
+  const colors = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,26 +55,19 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleLogin = async () => {
-    console.log('[LoginScreen] Sign In button clicked. Email:', email);
     if (!email.trim() || !password.trim()) {
-      console.log('[LoginScreen] Validation failed: Email or password field is empty.');
       Alert.alert('Missing Fields', 'Please enter your email and password.');
       triggerShake();
       return;
     }
-    console.log('[LoginScreen] Inputs validated. Starting loading state...');
     setLoading(true);
     try {
-      console.log('[LoginScreen] Calling authContext login function...');
       await login({ email: email.trim().toLowerCase(), password });
-      console.log('[LoginScreen] AuthContext login completed successfully!');
     } catch (err: unknown) {
-      console.error('[LoginScreen] Login process encountered an error:', err);
       const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
       triggerShake();
       Alert.alert('Login Failed', message);
     } finally {
-      console.log('[LoginScreen] Resetting loading state...');
       setLoading(false);
     }
   };
@@ -91,19 +86,19 @@ export const LoginScreen: React.FC = () => {
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
               <GymLogo name={gym?.name} logo={gym?.logo} size={80} style={styles.logoCard} />
-              <Text style={styles.brand} numberOfLines={2} adjustsFontSizeToFit>
+              <Text style={[styles.brand, { color: colors.text }]} numberOfLines={2} adjustsFontSizeToFit>
                 {gym?.name ?? 'Clasendra'}
               </Text>
-              <Text style={styles.tagline}>
+              <Text style={[styles.tagline, { color: colors.textSecondary }]}>
                 {gym ? 'Your gym, in your pocket.' : 'Sign in with the details your gym sent you.'}
               </Text>
             </Animated.View>
 
             <Animated.View style={shakeStyle}>
-              <GlassCard glowColor={COLORS.primaryGlow} innerStyle={styles.cardInner}>
+              <GlassCard glowColor={colors.primaryGlow} innerStyle={styles.cardInner}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>Member Login</Text>
-                  <Text style={styles.cardSubtitle}>Welcome back — let's get you training.</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Member Login</Text>
+                  <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Welcome back — let's get you training.</Text>
                 </View>
 
                 <GlassInput
@@ -115,7 +110,7 @@ export const LoginScreen: React.FC = () => {
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
-                  leftIcon={<Ionicons name="mail-outline" size={18} color={COLORS.textSecondary} />}
+                  leftIcon={<Ionicons name="mail-outline" size={18} color={colors.textSecondary} />}
                 />
 
                 <GlassInput
@@ -128,7 +123,7 @@ export const LoginScreen: React.FC = () => {
                   editable={!loading}
                   onSubmitEditing={handleLogin}
                   returnKeyType="done"
-                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.textSecondary} />}
+                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />}
                   rightIcon={
                     <TouchableOpacity
                       onPress={() => setShowPassword((v) => !v)}
@@ -139,7 +134,7 @@ export const LoginScreen: React.FC = () => {
                       <Ionicons
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                         size={20}
-                        color={COLORS.textSecondary}
+                        color={colors.textSecondary}
                       />
                     </TouchableOpacity>
                   }
@@ -147,12 +142,12 @@ export const LoginScreen: React.FC = () => {
 
                 <AnimatedButton label="Sign In" onPress={handleLogin} loading={loading} style={styles.btn} />
 
-                <Text style={styles.hint}>Use the email and password sent by your gym.</Text>
+                <Text style={[styles.hint, { color: colors.textMuted }]}>Use the email and password sent by your gym.</Text>
               </GlassCard>
             </Animated.View>
 
             {/* Platform credit stays small and out of the way — the gym owns this screen. */}
-            <Text style={styles.poweredBy}>Powered by Clasendra</Text>
+            <Text style={[styles.poweredBy, { color: colors.textMuted }]}>Powered by Clasendra</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </ImageBackground>
@@ -175,13 +170,11 @@ const styles = StyleSheet.create({
   logoCard: { marginBottom: SPACING.md },
   brand: {
     ...TYPOGRAPHY.hero,
-    color: COLORS.text,
     textAlign: 'center',
     paddingHorizontal: SPACING.md,
   },
   tagline: {
     ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
     marginTop: SPACING.sm,
     textAlign: 'center',
     paddingHorizontal: SPACING.md,
@@ -191,20 +184,18 @@ const styles = StyleSheet.create({
   // needs its own margin to stay clear of its neighbour.
   cardInner: { padding: SPACING.lg, gap: SPACING.md },
   cardHeader: { gap: SPACING.xs, marginBottom: SPACING.xs },
-  cardTitle: { ...TYPOGRAPHY.title, color: COLORS.text },
-  cardSubtitle: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontSize: FONT_SIZE.sm },
+  cardTitle: { ...TYPOGRAPHY.title },
+  cardSubtitle: { ...TYPOGRAPHY.caption, fontSize: FONT_SIZE.sm },
 
   // 8 on top of the card's 16 gap = 24 clear above the primary action.
   btn: { marginTop: SPACING.sm },
   hint: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 18,
   },
   poweredBy: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.xl,
     letterSpacing: 0.4,
