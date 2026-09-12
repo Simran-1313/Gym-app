@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { shade } from '../../utils/color';
 import { FONT_SIZE, FONTS, GRADIENTS, RADIUS, SPACING } from '../../config/theme';
 import { ActiveSubscription, User, ActivitySummary, CheckIn } from '../../types';
 import { getCheckIns } from '../../services/member.service';
@@ -95,6 +96,7 @@ const QuickAction: React.FC<{
 };
 
 const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onPress, delay = 0 }) => {
+  const colors = useThemeColors();
   const floatY = useSharedValue(0);
 
   React.useEffect(() => {
@@ -116,7 +118,7 @@ const ProductsBanner: React.FC<{ onPress: () => void; delay?: number }> = ({ onP
     <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={styles.productsBannerWrap}>
       <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] }]}>
         <LinearGradient
-          colors={['#5B21B6', '#7C3AED', '#9333EA']}
+          colors={[colors.accent, shade(colors.accent, -0.25), shade(colors.accent, -0.45)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.productsBanner}
@@ -371,10 +373,10 @@ export const HomeScreen: React.FC = () => {
         {/* Dynamic Island Motivation Banner (Compact) */}
         <Animated.View entering={FadeInUp.duration(400).delay(100)} style={styles.motivationWrap}>
           <LinearGradient
-            colors={isDark ? ['rgba(124,77,255,0.15)', 'rgba(124,77,255,0.05)'] : ['rgba(124,77,255,0.12)', 'rgba(124,77,255,0.03)']}
+            colors={isDark ? [`${colors.accent}26`, `${colors.accent}0D`] : [`${colors.accent}1F`, `${colors.accent}08`]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.motivationBanner}
+            style={[styles.motivationBanner, { borderColor: `${colors.accent}33` }]}
           >
             <View style={[styles.motivationIconWrap, { backgroundColor: colors.accent }]}>
               <Ionicons name="sparkles" size={12} color="#FFF" />
@@ -539,7 +541,7 @@ export const HomeScreen: React.FC = () => {
           <Animated.View entering={FadeInUp.duration(320).delay(120)}>
             <Pressable onPress={handleCreateWorkout} style={({ pressed }) => [pressed && { opacity: 0.9 }]}>
               <LinearGradient
-                colors={[...GRADIENTS.accent]}
+                colors={[...GRADIENTS.primary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.dailyWorkoutBanner}
@@ -752,7 +754,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FF4F18',
   },
 
   // Dynamic Island Motivation Banner
@@ -767,7 +768,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,79,24,0.2)',
   },
   motivationIconWrap: {
     width: 20,
@@ -810,7 +810,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     overflow: 'hidden',
-    shadowColor: '#FF4F18',
+    shadowColor: '#2DD4C8',
     shadowOpacity: 0.35,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -823,19 +823,19 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   dailyWorkoutCopy: {
     flex: 1,
   },
   dailyWorkoutTitle: {
-    color: '#FFF',
+    color: '#04211F',
     fontSize: FONT_SIZE.lg,
     fontFamily: FONTS.displayBold,
     letterSpacing: 0.5,
   },
   dailyWorkoutSub: {
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(4,33,31,0.7)',
     fontSize: FONT_SIZE.xs,
     fontFamily: FONTS.bodyMedium,
     marginTop: 2,
@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     minHeight: 96,
     justifyContent: 'center',
-    shadowColor: '#7C3AED',
+    shadowColor: '#7C8CFF',
     shadowOpacity: 0.35,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
