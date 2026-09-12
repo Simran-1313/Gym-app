@@ -7,7 +7,6 @@ import {
   View,
   ViewStyle,
   StyleProp,
-  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -15,11 +14,10 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, GRADIENTS } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONTS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
@@ -31,6 +29,8 @@ interface Props {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: React.ReactNode;
+  /** Renders the primary variant in the danger color — destructive confirms (e.g. "Log Out"). */
+  destructive?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -43,11 +43,9 @@ export const AnimatedButton: React.FC<Props> = ({
   disabled = false,
   style,
   icon,
+  destructive = false,
 }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
-
+  const colors = useThemeColors();
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -64,7 +62,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
   const handlePress = () => {
     if (disabled || loading) return;
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    Haptics.impactAsync(destructive ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onPress();
   };
 
@@ -72,6 +70,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
   // ── PRIMARY ──
   if (variant === 'primary') {
+    const gradient = destructive ? ([colors.danger, colors.danger] as const) : ([colors.primary, colors.primaryDark] as const);
     return (
       <AnimatedPressable
         onPress={handlePress}
@@ -80,14 +79,9 @@ export const AnimatedButton: React.FC<Props> = ({
         disabled={isDisabled}
         style={[animStyle, s.btn, style, isDisabled && s.disabled]}
       >
-        <LinearGradient
-          colors={[...GRADIENTS.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.btnInner}
-        >
+        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.btnInner}>
           {loading ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color="#04211F" />
           ) : (
             <View style={s.row}>
               {icon}
@@ -99,7 +93,7 @@ export const AnimatedButton: React.FC<Props> = ({
     );
   }
 
-  // ── SECONDARY: Clean iOS Frosted Glass ──
+  // ── SECONDARY: solid elevated surface, not a blur pass ──
   if (variant === 'secondary') {
     return (
       <AnimatedPressable
@@ -110,24 +104,19 @@ export const AnimatedButton: React.FC<Props> = ({
         style={[
           animStyle,
           s.btn,
-          s.glassBtnOuter,
-          { backgroundColor: isDark ? 'rgba(50,50,50,0.2)' : 'rgba(200,200,200,0.18)' },
+          s.secondaryBtn,
+          { backgroundColor: colors.surface2, borderColor: colors.surfaceBorder },
           style,
-          isDisabled && s.disabled
+          isDisabled && s.disabled,
         ]}
       >
-        <BlurView
-          tint={isDark ? 'dark' : 'light'}
-          intensity={Platform.OS === 'ios' ? 50 : 80}
-          style={StyleSheet.absoluteFill}
-        />
         <View style={s.btnInner}>
           {loading ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
             <View style={s.row}>
               {icon}
-              <Text style={[s.glassLabel, { color: colors.primary }]}>{label}</Text>
+              <Text style={[s.secondaryLabel, { color: colors.primary }]}>{label}</Text>
             </View>
           )}
         </View>
@@ -172,17 +161,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-
-  // Glass
-  glassBtnOuter: {
-    backgroundColor: 'rgba(200,200,200,0.18)',
+  secondaryBtn: {
     borderWidth: 1,
-    borderColor: 'rgba(255,79,24,0.30)',
   },
-
-  // Labels
-  primaryLabel: { color: '#FFF', fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
-  glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
+  primaryLabel: { color: '#04211F', fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  secondaryLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
   ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },
 });

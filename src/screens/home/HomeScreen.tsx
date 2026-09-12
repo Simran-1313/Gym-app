@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
-import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { FONT_SIZE, FONTS, GRADIENTS, RADIUS, SPACING } from '../../config/theme';
 import { ActiveSubscription, User, ActivitySummary, CheckIn } from '../../types';
 import { getCheckIns } from '../../services/member.service';
 import { getActivitySummary, logWater } from '../../services/activity.service';
@@ -62,7 +63,7 @@ const QuickAction: React.FC<{
 }> = ({ title, icon, onPress, accent, delay = 0 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={styles.quickActionWrap}>
@@ -155,7 +156,7 @@ export const HomeScreen: React.FC = () => {
   const nav = useNavigation<HomeNavProp>();
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [refreshing, setRefreshing] = useState(false);
   const [waterLogged, setWaterLogged] = useState(0); // in ml
@@ -385,6 +386,33 @@ export const HomeScreen: React.FC = () => {
         </Animated.View>
 
         <View style={styles.dashboardBody}>
+          {sub ? (
+            <Animated.View entering={FadeInUp.duration(320).delay(102)}>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); nav.navigate('Membership'); }}
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+              >
+                <GlassCard noPadding innerStyle={styles.subStatusInner}>
+                  <View
+                    style={[
+                      styles.subStatusDot,
+                      { backgroundColor: sub.status === 'ACTIVE' ? colors.success : sub.status === 'FROZEN' ? colors.warning : colors.danger },
+                    ]}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.subStatusTitle, { color: colors.text }]}>
+                      {sub.plan.name} · {sub.status === 'ACTIVE' ? 'Active' : sub.status.charAt(0) + sub.status.slice(1).toLowerCase()}
+                    </Text>
+                    <Text style={[styles.subStatusSub, { color: colors.textMuted }]}>
+                      {sub.status === 'ACTIVE' ? `Renews in ${activeDays} days` : 'Tap to manage your membership'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.subStatusCta, { color: colors.primary }]}>Manage</Text>
+                </GlassCard>
+              </Pressable>
+            </Animated.View>
+          ) : null}
+
           {/* Bento Box Dashboard: Rings + Water side by side */}
           <View style={[styles.bentoBox, { marginBottom: SPACING.sm }]}>
             {/* Left: Activity Rings */}
@@ -760,6 +788,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: SPACING.md,
   },
+
+  // Subscription status strip
+  subStatusInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 13,
+  },
+  subStatusDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  subStatusTitle: { fontSize: 12.5, fontFamily: FONTS.bodyBold },
+  subStatusSub: { fontSize: 11, marginTop: 2 },
+  subStatusCta: { fontSize: 11, fontFamily: FONTS.bodyBold, flexShrink: 0 },
 
   // Daily Workout Banner
   dailyWorkoutBanner: {

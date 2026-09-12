@@ -14,8 +14,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props extends TextInputProps {
   label?: string;
@@ -34,9 +34,7 @@ export const GlassInput: React.FC<Props> = ({
   style,
   ...rest
 }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const focused = useSharedValue(0);
   const [isFocused, setIsFocused] = useState(false);

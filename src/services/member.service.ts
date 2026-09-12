@@ -31,6 +31,15 @@ export const bookClass = async (scheduleId: string): Promise<ClassBooking> => {
   return res.data.data.booking;
 };
 
+/** Joins the waitlist for a full class — same endpoint shape as `bookClass`, distinguished by the `/waitlist` suffix per §4.6 of the mobile app spec. */
+export const joinWaitlist = async (scheduleId: string): Promise<ClassBooking> => {
+  const res = await api.post<ApiResponse<{ booking: ClassBooking }>>(
+    `/member/classes/${scheduleId}/waitlist`,
+  );
+  if (!res.data.success || !res.data.data) throw new Error(res.data.message ?? 'Could not join the waitlist');
+  return res.data.data.booking;
+};
+
 export const cancelBooking = async (bookingId: string): Promise<void> => {
   const res = await api.delete<ApiResponse<null>>(`/member/classes/bookings/${bookingId}`);
   if (!res.data.success) throw new Error(res.data.message ?? 'Cancel failed');

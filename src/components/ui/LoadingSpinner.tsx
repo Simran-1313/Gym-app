@@ -10,8 +10,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { ScreenBackground } from './ScreenBackground';
-import { DARK_COLORS, LIGHT_COLORS } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   size?: 'small' | 'large';
@@ -19,9 +18,7 @@ interface Props {
 }
 
 export const LoadingSpinner: React.FC<Props> = ({ size = 'large', fullScreen = false }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.6);

@@ -8,7 +8,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { COLORS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   visible: boolean;
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export const SuccessBurst: React.FC<Props> = ({ visible, onDone }) => {
+  const colors = useThemeColors();
   const scale = useSharedValue(0);
   const opacity = useSharedValue(0);
 
@@ -46,7 +47,7 @@ export const SuccessBurst: React.FC<Props> = ({ visible, onDone }) => {
   return (
     <View style={styles.overlay} pointerEvents="none">
       <Animated.View style={[styles.burst, style]}>
-        <Ionicons name="checkmark-circle" size={72} color={COLORS.success} />
+        <Ionicons name="checkmark-circle" size={72} color={colors.success} />
       </Animated.View>
     </View>
   );

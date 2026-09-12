@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { COLORS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -20,6 +20,7 @@ export const AiLoadingPulse: React.FC<Props> = ({
   icon = 'nutrition-outline',
   size = 32,
 }) => {
+  const colors = useThemeColors();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.7);
 
@@ -50,7 +51,7 @@ export const AiLoadingPulse: React.FC<Props> = ({
   return (
     <View style={styles.wrap}>
       <Animated.View style={animStyle}>
-        <Ionicons name={icon} size={size} color={COLORS.primary} />
+        <Ionicons name={icon} size={size} color={colors.primary} />
       </Animated.View>
     </View>
   );

@@ -3,45 +3,31 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet, View, ImageBackground, Text } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { FloatingTabBar } from '../components/ui/FloatingTabBar';
-import { AnimatedMeshBackground } from '../components/ui/AnimatedMeshBackground';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS } from '../config/theme';
-import { AiPlan } from '../types';
+import { FONT_SIZE, FONTS, ThemeColors } from '../config/theme';
+import { useThemeColors } from '../hooks/useThemeColors';
+import { ActiveSubscription, AiPlan } from '../types';
 
-// Sleek minimal header — no heavy bar, just a clean frosted strip
-const SleekHeaderBackground = ({ isDark }: { isDark: boolean }) => (
-  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(10,10,18,0.65)' : 'rgba(250,250,255,0.7)' }]}>
-    <BlurView
-      tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
-      intensity={isDark ? 60 : 70}
-      style={StyleSheet.absoluteFill}
+// A flat, solid header — one elevation tier above the screen body, separated
+// by a single hairline. Replaces a blurred/gradient strip: cheaper to render,
+// and consistent with every other surface in the app now being solid instead
+// of translucent-over-blur.
+const SleekHeaderBackground = ({ colors }: { colors: ThemeColors }) => (
+  <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}>
+    <View
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: colors.surfaceBorder,
+      }}
     />
-    <LinearGradient
-      colors={
-        isDark
-          ? ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.005)']
-          : ['rgba(255,255,255,0.45)', 'rgba(248,249,252,0.15)']
-      }
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-    />
-    {/* Subtle bottom separator */}
-    <View style={{
-      position: 'absolute',
-      bottom: 0,
-      left: 20,
-      right: 20,
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-    }} />
   </View>
 );
 
@@ -62,6 +48,9 @@ import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
 import { ChatRoomScreen } from '../screens/chat/ChatRoomScreen';
 import { AiCoachScreen } from '../screens/chat/AiCoachScreen';
+import { MembershipScreen } from '../screens/membership/MembershipScreen';
+import { CheckoutScreen } from '../screens/membership/CheckoutScreen';
+import { ChallengesScreen } from '../screens/challenges/ChallengesScreen';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export type AuthStackParams = {
@@ -101,6 +90,9 @@ export type RootStackParams = {
   Notifications: undefined;
   Activity: undefined;
   Products: undefined;
+  Membership: undefined;
+  Checkout: { subscription: ActiveSubscription };
+  Challenges: undefined;
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
@@ -113,7 +105,7 @@ const Tab = createBottomTabNavigator<TabParams>();
 const stackAnimation = Platform.OS === 'ios' ? 'fade_from_bottom' : 'slide_from_right';
 
 // Sleek screen options — modern minimal header with reduced height feel
-const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS | typeof LIGHT_COLORS) => ({
+const makeScreenOptions = (colors: ThemeColors) => ({
   headerStyle: { backgroundColor: 'transparent' },
   headerTransparent: true,
   contentStyle: { backgroundColor: 'transparent' },
@@ -126,17 +118,15 @@ const makeScreenOptions = (isDark: boolean, colors: typeof DARK_COLORS | typeof 
     letterSpacing: -0.3,
   },
   headerShadowVisible: false,
-  headerBackground: () => <SleekHeaderBackground isDark={isDark} />,
+  headerBackground: () => <SleekHeaderBackground colors={colors} />,
   headerBackTitleVisible: false,
 });
 
 const ProductsNavigator: React.FC = () => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
-    <ProductsStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
+    <ProductsStack.Navigator screenOptions={makeScreenOptions(colors)}>
       <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ title: 'Products' }} />
       <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: 'Product Details' }} />
     </ProductsStack.Navigator>
@@ -144,12 +134,10 @@ const ProductsNavigator: React.FC = () => {
 };
 
 const ChatNavigator: React.FC = () => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
-    <ChatStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
+    <ChatStack.Navigator screenOptions={makeScreenOptions(colors)}>
       <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Messages' }} />
       <ChatStack.Screen
         name="ChatRoom"
@@ -166,12 +154,10 @@ const ChatNavigator: React.FC = () => {
 };
 
 const ClassesNavigator: React.FC = () => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
-    <ClassesStack.Navigator screenOptions={makeScreenOptions(isDark, colors)}>
+    <ClassesStack.Navigator screenOptions={makeScreenOptions(colors)}>
       <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ headerShown: false }} />
       <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ title: 'My Bookings' }} />
     </ClassesStack.Navigator>
@@ -179,9 +165,7 @@ const ClassesNavigator: React.FC = () => {
 };
 
 const MainTabs: React.FC = () => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <Tab.Navigator
@@ -197,8 +181,8 @@ const MainTabs: React.FC = () => {
           letterSpacing: -0.3,
         },
         headerShadowVisible: false,
-        headerBackground: () => <SleekHeaderBackground isDark={isDark} />,
-        sceneStyle: styles.tabScene,
+        headerBackground: () => <SleekHeaderBackground colors={colors} />,
+        sceneStyle: [styles.tabScene, { backgroundColor: colors.background }],
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home', headerShown: false }} />
@@ -225,8 +209,8 @@ export const AppNavigator: React.FC = () => {
   usePushNotifications(!!user);
 
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const dynamicScreenOptions = makeScreenOptions(isDark, colors);
+  const colors = useThemeColors();
+  const dynamicScreenOptions = makeScreenOptions(colors);
 
   if (isLoading) return <LoadingSpinner fullScreen />;
 
@@ -278,16 +262,21 @@ export const AppNavigator: React.FC = () => {
         <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <RootStack.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity Dashboard' }} />
         <RootStack.Screen name="Products" component={ProductsNavigator} options={{ headerShown: false }} />
+        <RootStack.Screen name="Membership" component={MembershipScreen} options={{ title: 'Membership & Billing' }} />
+        <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirm & Pay' }} />
+        <RootStack.Screen name="Challenges" component={ChallengesScreen} options={{ title: 'Challenges' }} />
       </RootStack.Navigator>
     );
   }
 
-  const navigationTheme = isDark ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } } : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } };
+  const navigationTheme = isDark
+    ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.background } }
+    : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.background } };
 
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
-      <AnimatedMeshBackground isDark={isDark} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
       <NavigationContainer theme={navigationTheme}>{content}</NavigationContainer>
     </>
   );

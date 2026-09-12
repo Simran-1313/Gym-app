@@ -7,7 +7,8 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { COLORS, FONT_SIZE, FONTS } from '../../config/theme';
+import { FONT_SIZE, FONTS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -26,6 +27,7 @@ export const ProgressRing: React.FC<Props> = ({
   value,
   strokeWidth = 6,
 }) => {
+  const colors = useThemeColors();
   const clamped = Math.min(1, Math.max(0, progress));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -49,17 +51,17 @@ export const ProgressRing: React.FC<Props> = ({
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={COLORS.primary} />
-            <Stop offset="100%" stopColor={COLORS.secondary} />
+            <Stop offset="0%" stopColor={colors.primary} />
+            <Stop offset="100%" stopColor={colors.secondary} />
           </LinearGradient>
         </Defs>
         <Circle
           cx={cx}
           cy={cy}
           r={radius}
-          stroke={COLORS.surfaceBorder}
+          stroke={colors.surfaceBorder}
           strokeWidth={strokeWidth}
-          fill="rgba(255,255,255,0.04)"
+          fill={colors.surface2}
         />
         <G rotation="-90" origin={`${cx}, ${cy}`}>
           <AnimatedCircle
@@ -76,8 +78,8 @@ export const ProgressRing: React.FC<Props> = ({
         </G>
       </Svg>
       <View style={styles.center}>
-        {value ? <Text style={styles.value}>{value}</Text> : null}
-        {label ? <Text style={styles.label}>{label}</Text> : null}
+        {value ? <Text style={[styles.value, { color: colors.text }]}>{value}</Text> : null}
+        {label ? <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text> : null}
       </View>
     </View>
   );
@@ -86,6 +88,6 @@ export const ProgressRing: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: { alignItems: 'center', justifyContent: 'center' },
   center: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  value: { color: COLORS.text, fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyExtra },
-  label: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginTop: 2 },
+  value: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyExtra },
+  label: { fontSize: FONT_SIZE.xs, marginTop: 2 },
 });

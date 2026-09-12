@@ -8,7 +8,8 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, RADIUS, SPACING } from '../../config/theme';
+import { RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   height?: number;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const SkeletonLoader: React.FC<Props> = ({ height = 72, style }) => {
+  const colors = useThemeColors();
   const translateX = useSharedValue(-200);
 
   useEffect(() => {
@@ -31,10 +33,10 @@ export const SkeletonLoader: React.FC<Props> = ({ height = 72, style }) => {
   }));
 
   return (
-    <View style={[styles.card, { height }, style]}>
+    <View style={[styles.card, { height, backgroundColor: colors.surface, borderColor: colors.surfaceBorder }, style]}>
       <Animated.View style={[styles.shimmerWrap, shimmerStyle]}>
         <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.08)', 'transparent']}
+          colors={[colors.transparent, colors.surface2, colors.transparent]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.shimmer}
@@ -47,9 +49,7 @@ export const SkeletonLoader: React.FC<Props> = ({ height = 72, style }) => {
 const styles = StyleSheet.create({
   card: {
     borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
     overflow: 'hidden',
     marginBottom: SPACING.sm,
   },

@@ -20,7 +20,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
 import { getProfile } from '../../services/member.service';
-import { DARK_COLORS, FONT_SIZE, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -35,9 +36,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = ({
   icon, label, value,
 }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <View style={s.infoRow}>
@@ -59,9 +58,7 @@ const MenuRow: React.FC<{
   accent?: string;
   rightElement?: React.ReactNode;
 }> = ({ icon, label, onPress, accent, rightElement }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const color = accent ?? colors.primary;
 
   return (
@@ -88,7 +85,7 @@ const MetricTile: React.FC<{
 }> = ({ icon, label, value, delay = 0 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInUp.duration(300).delay(delay)} style={[s.metricTile, {
@@ -111,7 +108,7 @@ export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user, logout, refreshUser, theme, toggleTheme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
@@ -325,6 +322,10 @@ export const ProfileScreen: React.FC = () => {
         <View style={s.section}>
           <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>QUICK LINKS</Text>
           <GlassCard style={s.menuCard}>
+            <MenuRow icon="card-outline" label="Membership & Billing" onPress={() => navigation.navigate('Membership')} />
+            <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
+            <MenuRow icon="trophy-outline" label="Challenges & Badges" onPress={() => navigation.navigate('Challenges')} />
+            <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
             <MenuRow icon="nutrition-outline" label="My Diet Plan" onPress={() => navigation.navigate('DietPlan')} />
             <View style={[s.sep, { backgroundColor: colors.surfaceBorder }]} />
             <MenuRow icon="barbell-outline" label="My Workout Plan" onPress={() => navigation.navigate('WorkoutPlan')} />
@@ -364,6 +365,8 @@ export const ProfileScreen: React.FC = () => {
             icon={<Ionicons name="log-out-outline" size={20} color={colors.danger} />}
           />
         </View>
+
+        <Text style={[s.poweredBy, { color: colors.textMuted }]}>Powered by Clasendra</Text>
       </ScrollView>
     </AnimatedScreen>
   );
@@ -439,4 +442,6 @@ const s = StyleSheet.create({
   menuLabel: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyMedium, flex: 1 },
   menuRight: {},
   sep: { height: StyleSheet.hairlineWidth },
+
+  poweredBy: { fontSize: 10.5, textAlign: 'center', marginTop: SPACING.sm, letterSpacing: 0.3 },
 });

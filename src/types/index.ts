@@ -23,6 +23,26 @@ export interface ActiveSubscription {
   };
 }
 
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
+  planName: string;
+  issuedAt: string;
+  paymentMethod: string | null;
+}
+
+export interface PaymentOrder {
+  orderId: string;
+  amount: number;
+  currency: string;
+  key: string;
+  gstAmount: number;
+  baseAmount: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -117,6 +137,8 @@ export interface ClassSchedule {
   capacity: number;
   bookedCount: number;
   isBooked: boolean;
+  /** True once the member has joined the waitlist for a full class (§4.6/§4.7 of the mobile app spec). */
+  isWaitlisted?: boolean;
   class: {
     id: string;
     name: string;
@@ -132,7 +154,7 @@ export interface ClassSchedule {
 export interface ClassBooking {
   id: string;
   scheduleId: string;
-  status: 'CONFIRMED' | 'ATTENDED' | 'NO_SHOW' | 'CANCELLED';
+  status: 'CONFIRMED' | 'ATTENDED' | 'NO_SHOW' | 'CANCELLED' | 'WAITLISTED';
   createdAt: string;
   schedule: {
     id: string;

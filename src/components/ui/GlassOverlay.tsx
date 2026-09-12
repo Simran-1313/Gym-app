@@ -17,8 +17,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { AnimatedButton } from './AnimatedButton';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, GLASS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   visible: boolean;
@@ -46,7 +47,7 @@ export const GlassOverlay: React.FC<Props> = ({
 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const scale = useSharedValue(0.92);
 
@@ -70,9 +71,9 @@ export const GlassOverlay: React.FC<Props> = ({
       exiting={FadeOut.duration(150)}
       style={styles.backdrop}
     >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.7)' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.35)' }]} />
       <Animated.View style={[styles.card, cardStyle, {
-        backgroundColor: isDark ? 'rgba(30,30,38,1)' : 'rgba(255,255,255,1)',
+        backgroundColor: colors.overlay,
         borderColor: colors.surfaceBorder,
       }]}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -87,7 +88,8 @@ export const GlassOverlay: React.FC<Props> = ({
           />
           <AnimatedButton
             label={confirmLabel}
-            variant={destructive ? 'primary' : 'primary'}
+            variant="primary"
+            destructive={destructive}
             onPress={onConfirm}
             loading={loading}
             style={styles.actionBtn}
