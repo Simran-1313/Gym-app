@@ -24,8 +24,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import {
   ActivityLevel,
   DietPreference,
@@ -83,6 +82,10 @@ function OptionSelector<T extends string>({
   onSelect: (v: T) => void;
   disabled?: boolean;
 }) {
+  const { theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.optionsRow}>
       {options.map((opt, i) => (
@@ -99,7 +102,11 @@ function OptionSelector<T extends string>({
   );
 }
 
-const FormProgress: React.FC<{ progress: number; colors: ReturnType<typeof useThemeColors> }> = ({ progress, colors }) => {
+const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
+  const { theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const width = useSharedValue(0);
 
   useEffect(() => {
@@ -112,7 +119,7 @@ const FormProgress: React.FC<{ progress: number; colors: ReturnType<typeof useTh
   }));
 
   return (
-    <View style={[styles.progressTrack, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+    <View style={styles.progressTrack}>
       <Animated.View style={[styles.progressFillWrap, barStyle]}>
         <LinearGradient
           colors={[...GRADIENTS.primary]}
@@ -131,21 +138,29 @@ const SectionHeader: React.FC<{
   title: string;
   color: string;
   tint: string;
-}> = ({ icon, title, color, tint }) => (
+}> = ({ icon, title, color, tint }) => {
+  const { theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  return (
   <View style={styles.sectionHeader}>
     <View style={[styles.sectionIcon, { backgroundColor: `${tint}1F` }]}>
       <Ionicons name={icon} size={16} color={tint} />
     </View>
     <Text style={[styles.sectionTitle, { color }]}>{title}</Text>
   </View>
-);
+  );
+};
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
-  const { refreshUser } = useAuth();
+  const { refreshUser, theme } = useAuth();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const colors = useThemeColors();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
@@ -277,7 +292,7 @@ export const OnboardingScreen: React.FC = () => {
             </Text>
 
             <View style={styles.progressBlock}>
-              <FormProgress progress={completion} colors={colors} />
+              <FormProgress progress={completion} />
               <View style={styles.progressMeta}>
                 <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
                   {Math.round(completion * 100)}% complete
@@ -358,7 +373,7 @@ export const OnboardingScreen: React.FC = () => {
 
 // One spacing scale: 8 inside a label/control pair, 16 between groups in a
 // card, 24 between cards, 32 before and after the page's edges.
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -383,9 +398,11 @@ const styles = StyleSheet.create({
   progressTrack: {
     width: '100%',
     height: 8,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.full,
     overflow: 'hidden' as const,
     borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
   progressFillWrap: { height: '100%', borderRadius: RADIUS.full, overflow: 'hidden' as const },
   progressFill: { flex: 1, borderRadius: RADIUS.full },

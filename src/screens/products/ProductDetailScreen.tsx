@@ -76,7 +76,7 @@ export const ProductDetailScreen: React.FC = () => {
         automaticallyAdjustContentInsets={false}
       >
         <GlassCard glowColor={colors.primary} noPadding>
-          <View style={[styles.imageSection, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }]}>
+          <View style={[styles.imageSection, { backgroundColor: colors.inset }]}>
             {product.imageUrl ? (
               <Image source={{ uri: product.imageUrl }} style={styles.heroImage} resizeMode="cover" />
             ) : (

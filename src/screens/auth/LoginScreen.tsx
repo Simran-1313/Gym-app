@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,7 +17,6 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -27,9 +25,9 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { GymLogo } from '../../components/ui/GymLogo';
+import { SceneryBackdrop } from '../../components/ui/SceneryBackdrop';
 
-const BACKGROUND_IMAGE =
-  'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=1000&auto=format&fit=crop';
+
 
 export const LoginScreen: React.FC = () => {
   const { login, gym } = useAuth();
@@ -74,11 +72,8 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <AnimatedScreen noBackground style={styles.flex}>
-      <ImageBackground source={{ uri: BACKGROUND_IMAGE }} style={styles.backgroundImage}>
-        <LinearGradient
-          colors={['rgba(4,4,7,0.7)', 'rgba(4,4,7,0.92)', '#040407']}
-          style={StyleSheet.absoluteFill}
-        />
+      <View style={styles.backgroundImage}>
+        <SceneryBackdrop variant="mountains" isDark scrimStrength={1.05} />
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -150,7 +145,7 @@ export const LoginScreen: React.FC = () => {
             <Text style={[styles.poweredBy, { color: colors.textMuted }]}>Powered by Clasendra</Text>
           </ScrollView>
         </KeyboardAvoidingView>
-      </ImageBackground>
+      </View>
     </AnimatedScreen>
   );
 };

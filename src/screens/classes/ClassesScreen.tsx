@@ -16,12 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { getClassSchedules, bookClass, joinWaitlist } from '../../services/member.service';
+import { getClassSchedules, bookClass } from '../../services/member.service';
 import { ClassSchedule } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -57,17 +56,16 @@ const safeFormatDayNum = (iso: string): string => {
 const ScheduleCard: React.FC<{
   schedule: ClassSchedule;
   onBook: (id: string) => void;
-  onJoinWaitlist: (id: string) => void;
   booking: boolean;
   index: number;
-}> = ({ schedule, onBook, onJoinWaitlist, booking, index }) => {
+}> = ({ schedule, onBook, booking, index }) => {
   const capacity = schedule.capacity ?? 0;
   const bookedCount = schedule.bookedCount ?? 0;
   const spotsLeft = Math.max(0, capacity - bookedCount);
   const isFull = spotsLeft <= 0;
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = useThemeColors();
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   const fillPct = capacity > 0 ? Math.min(100, (bookedCount / capacity) * 100) : 0;
 
   return (
@@ -75,7 +73,7 @@ const ScheduleCard: React.FC<{
       <GlassCard glowColor={schedule.isBooked ? colors.success : colors.primary} style={s.card} noPadding>
         <View style={s.cardBody}>
           {/* Date block */}
-          <View style={[s.dateBlock, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)' }]}>
+          <View style={[s.dateBlock, { backgroundColor: colors.inset }]}>
             <Text style={[s.dateMonth, { color: colors.primary }]}>{safeFormatMonth(schedule.startTime)}</Text>
             <Text style={[s.dateNum, { color: colors.text }]}>{safeFormatDayNum(schedule.startTime)}</Text>
           </View>
@@ -99,10 +97,10 @@ const ScheduleCard: React.FC<{
         </View>
 
         {/* Capacity bar */}
-        <View style={[s.capacitySection, { borderTopColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
+        <View style={[s.capacitySection, { borderTopColor: colors.insetBorder }]}>
           <View style={s.capacityRow}>
             <View style={s.capacityInfo}>
-              <View style={[s.capacityBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+              <View style={[s.capacityBarBg, { backgroundColor: colors.inset }]}>
                 <View style={[s.capacityBarFill, {
                   width: `${fillPct}%`,
                   backgroundColor: isFull ? colors.danger : colors.primary,
@@ -118,27 +116,12 @@ const ScheduleCard: React.FC<{
                 <Ionicons name="checkmark-circle" size={18} color={colors.success} />
                 <Text style={[s.bookedText, { color: colors.success }]}>Booked</Text>
               </View>
-            ) : schedule.isWaitlisted ? (
-              <View style={[s.bookedBadge, { backgroundColor: `${colors.accent}15`, borderColor: `${colors.accent}30` }]}>
-                <Ionicons name="hourglass-outline" size={18} color={colors.accent} />
-                <Text style={[s.bookedText, { color: colors.accent }]}>Waitlisted</Text>
-              </View>
-            ) : isFull ? (
-              <AnimatedButton
-                label="Join Waitlist"
-                variant="secondary"
-                onPress={() => onJoinWaitlist(schedule.id)}
-                disabled={booking}
-                loading={booking}
-                icon={<Ionicons name="hourglass-outline" size={16} color={colors.accent} />}
-                style={s.bookBtn}
-              />
             ) : (
               <AnimatedButton
-                label="Book Now"
-                variant="primary"
+                label={isFull ? 'Class Full' : 'Book Now'}
+                variant={isFull ? "secondary" : "primary"}
                 onPress={() => onBook(schedule.id)}
-                disabled={booking}
+                disabled={isFull || booking}
                 loading={booking}
                 style={s.bookBtn}
               />
@@ -157,14 +140,13 @@ export const ClassesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = useThemeColors();
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [confirmBookingId, setConfirmBookingId] = useState<string | null>(null);
-  const [confirmMode, setConfirmMode] = useState<'book' | 'waitlist'>('book');
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -215,40 +197,24 @@ export const ClassesScreen: React.FC = () => {
   }, [load]);
 
   const handleBook = useCallback(async (scheduleId: string) => {
-    setConfirmMode('book');
     setConfirmBookingId(scheduleId);
   }, []);
 
-  const handleJoinWaitlist = useCallback(async (scheduleId: string) => {
-    setConfirmMode('waitlist');
-    setConfirmBookingId(scheduleId);
-  }, []);
-
-  const confirmAction = async () => {
+  const confirmBookClass = async () => {
     if (!confirmBookingId) return;
     const scheduleId = confirmBookingId;
-    const mode = confirmMode;
     setConfirmBookingId(null);
     setBookingId(scheduleId);
-    try {
-      if (mode === 'waitlist') {
-        await joinWaitlist(scheduleId);
-        if (scheduleId.startsWith('d')) {
-          setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, isWaitlisted: true } : s));
-        } else {
-          await load();
-        }
+    try { 
+      await bookClass(scheduleId); 
+      if (scheduleId.startsWith('d')) {
+        setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, isBooked: true, bookedCount: s.bookedCount + 1 } : s));
       } else {
-        await bookClass(scheduleId);
-        if (scheduleId.startsWith('d')) {
-          setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, isBooked: true, bookedCount: s.bookedCount + 1 } : s));
-        } else {
-          await load();
-        }
+        await load(); 
       }
-      setShowSuccess(true);
+      setShowSuccess(true); 
     }
-    catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : (mode === 'waitlist' ? 'Could not join the waitlist' : 'Booking failed')); }
+    catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Booking failed'); }
     finally { setBookingId(null); }
   };
 
@@ -307,7 +273,7 @@ export const ClassesScreen: React.FC = () => {
                   onPress={() => setSelectedDate(d.toDateString())}
                   style={[
                     s.dayBubble,
-                    { backgroundColor: isSelected ? colors.primary : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)') },
+                    { backgroundColor: isSelected ? colors.primary : (colors.inset) },
                     isSelected && s.dayBubbleActive
                   ]}
                 >
@@ -351,7 +317,6 @@ export const ClassesScreen: React.FC = () => {
                 key={sc.id}
                 schedule={sc}
                 onBook={handleBook}
-                onJoinWaitlist={handleJoinWaitlist}
                 booking={bookingId === sc.id}
                 index={i}
               />
@@ -363,16 +328,10 @@ export const ClassesScreen: React.FC = () => {
       {/* Custom Booking Confirmation Modal */}
       <Modal transparent visible={!!confirmBookingId} animationType="fade">
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: colors.overlay, borderColor: colors.surfaceBorder }]}>
-            <Text style={[s.modalTitle, { color: colors.text }]}>
-              {confirmMode === 'waitlist' ? 'Join Waitlist' : 'Confirm Booking'}
-            </Text>
-            <Text style={[s.modalText, { color: colors.textSecondary }]}>
-              {confirmMode === 'waitlist'
-                ? "This class is full. Join the waitlist and we'll notify you if a spot opens up."
-                : 'Are you sure you want to book this class?'}
-            </Text>
-
+          <View style={[s.modalContent, { backgroundColor: isDark ? '#121821' : '#FFFFFF', borderColor: colors.insetBorder }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>Confirm Booking</Text>
+            <Text style={[s.modalText, { color: colors.textSecondary }]}>Are you sure you want to book this class?</Text>
+            
             <View style={s.modalActions}>
               <AnimatedButton
                 label="Cancel"
@@ -381,9 +340,9 @@ export const ClassesScreen: React.FC = () => {
                 style={{ flex: 1 }}
               />
               <AnimatedButton
-                label={confirmMode === 'waitlist' ? 'Join Waitlist' : 'Book'}
+                label="Book"
                 variant="primary"
-                onPress={confirmAction}
+                onPress={confirmBookClass}
                 style={{ flex: 1 }}
               />
             </View>

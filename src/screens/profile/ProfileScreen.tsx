@@ -237,7 +237,7 @@ export const ProfileScreen: React.FC = () => {
             </View>
             
             {/* Status pill */}
-            <View style={[s.statusStrip, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
+            <View style={[s.statusStrip, { backgroundColor: colors.inset }]}>
               <View style={s.statusLeft}>
                 <View style={[s.statusDot, { backgroundColor: user?.isActive ? colors.success : colors.danger }]} />
                 <Text style={[s.statusText, { color: colors.textSecondary }]}>

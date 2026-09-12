@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState , useMemo} from 'react';
 import {
   Alert,
   Pressable,
@@ -16,8 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../context/AuthContext';
 import { usePlans } from '../../context/PlansContext';
-import { FONT_SIZE, FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, FONTS, FONT_SIZE, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import { DietPlanDay } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { normalizeDietPlanContent } from '../../utils/dietPlan';
@@ -36,20 +35,23 @@ const formatUpdated = (iso?: string): string => {
 };
 
 const MealCard: React.FC<{ meal: DietPlanDay['meals'][0] }> = ({ meal }) => {
-  const colors = useThemeColors();
+  const { theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
-    <GlassCard glowColor={colors.accent} style={styles.mealCard}>
-      <View style={styles.mealHeader}>
-        <Text style={[styles.mealName, { color: colors.text }]}>{meal.name}</Text>
-        <StatBadge icon="flame-outline" label="Cal" value={`${meal.calories}`} color={colors.warning} />
+  <GlassCard glowColor={colors.accent} style={styles.mealCard}>
+    <View style={styles.mealHeader}>
+      <Text style={styles.mealName}>{meal.name}</Text>
+      <StatBadge icon="flame-outline" label="Cal" value={`${meal.calories}`} color={colors.warning} />
+    </View>
+    {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
+      <View key={i} style={styles.mealItemRow}>
+        <View style={styles.bullet} />
+        <Text style={styles.mealItem}>{item}</Text>
       </View>
-      {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
-        <View key={i} style={styles.mealItemRow}>
-          <View style={[styles.bullet, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.mealItem, { color: colors.textSecondary }]}>{item}</Text>
-        </View>
-      ))}
-    </GlassCard>
+    ))}
+  </GlassCard>
   );
 };
 
@@ -57,8 +59,9 @@ export const DietPlanScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const route = useRoute<RouteProp<RootStackParams, 'DietPlan'>>();
   const insets = useSafeAreaInsets();
-  const { user, refreshUser } = useAuth();
-  const colors = useThemeColors();
+  const { user, refreshUser, theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { diet, loadPlan, generatePlan, setPlan } = usePlans();
 
   const [selectedDay, setSelectedDay] = useState(0);
@@ -155,14 +158,14 @@ export const DietPlanScreen: React.FC = () => {
       return (
         <View style={styles.center}>
           <AiLoadingPulse icon="nutrition-outline" size={48} />
-          <Text style={[styles.loadingTitle, { color: colors.text }]}>
+          <Text style={styles.loadingTitle}>
             {diet.generating
               ? 'Crafting your diet plan'
               : awaitingBackground
               ? 'Preparing your plan…'
               : 'Loading your diet plan'}
           </Text>
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <Text style={styles.loadingText}>
             {diet.generating || awaitingBackground
               ? 'Our AI nutritionist is balancing your meals and macros. This usually takes under a minute.'
               : 'Fetching your saved plan…'}
@@ -174,11 +177,11 @@ export const DietPlanScreen: React.FC = () => {
     if (!content) {
       return (
         <View style={styles.center}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }, diet.error && { borderColor: `${colors.danger}40`, backgroundColor: `${colors.danger}10` }]}>
+          <View style={[styles.emptyIconWrap, diet.error && { borderColor: `${colors.danger}40`, backgroundColor: `${colors.danger}10` }]}>
             <Ionicons name={diet.error ? "warning-outline" : "nutrition-outline"} size={42} color={diet.error ? colors.danger : colors.accent} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{diet.error ? "Oops, something went wrong!" : "No diet plan yet"}</Text>
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+          <Text style={styles.emptyTitle}>{diet.error ? "Oops, something went wrong!" : "No diet plan yet"}</Text>
+          <Text style={styles.errorText}>
             {diet.error ?? 'Generate a personalised 7-day diet plan from your fitness profile.'}
           </Text>
           {diet.error ? (
@@ -190,7 +193,7 @@ export const DietPlanScreen: React.FC = () => {
                 onPress={() => generatePlan('DIET')}
                 loading={diet.generating}
                 disabled={diet.generating}
-                icon={<Ionicons name="sparkles" size={18} color="#04211F" />}
+                icon={<Ionicons name="sparkles" size={18} color={colors.white} />}
               />
               <AnimatedButton
                 label="Update Fitness Profile"
@@ -221,29 +224,29 @@ export const DietPlanScreen: React.FC = () => {
         }
       >
         {diet.generating && (
-          <View style={[styles.banner, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          <View style={styles.banner}>
             <AiLoadingPulse icon="sparkles" size={18} />
-            <Text style={[styles.bannerText, { color: colors.textSecondary }]}>Generating a fresh plan…</Text>
+            <Text style={styles.bannerText}>Generating a fresh plan…</Text>
           </View>
         )}
 
         <GlassCard glowColor={colors.primary} style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="sparkles" size={20} color={colors.accent} />
-            <Text style={[styles.summaryTitle, { color: colors.text }]}>Your Diet Plan</Text>
+            <Text style={styles.summaryTitle}>Your Diet Plan</Text>
           </View>
-          <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{content.summary}</Text>
+          <Text style={styles.summaryText}>{content.summary}</Text>
           {!!updatedLabel && (
             <View style={styles.updatedRow}>
               <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-              <Text style={[styles.updatedText, { color: colors.textMuted }]}>Updated {updatedLabel}</Text>
+              <Text style={styles.updatedText}>Updated {updatedLabel}</Text>
             </View>
           )}
 
           <View style={styles.caloriesRow}>
             <Ionicons name="flame" size={22} color={colors.warning} />
-            <Text style={[styles.caloriesValue, { color: colors.text }]}>{content.calories}</Text>
-            <Text style={[styles.caloriesUnit, { color: colors.textMuted }]}>kcal / day</Text>
+            <Text style={styles.caloriesValue}>{content.calories}</Text>
+            <Text style={styles.caloriesUnit}>kcal / day</Text>
           </View>
 
           <View style={styles.macrosRow}>
@@ -275,11 +278,11 @@ export const DietPlanScreen: React.FC = () => {
               <Pressable key={day.day} onPress={() => setSelectedDay(i)}>
                 {active ? (
                   <LinearGradient colors={[...GRADIENTS.primary]} style={styles.dayTabActive}>
-                    <Text style={[styles.dayTabTextActive, { color: '#04211F' }]}>{day.day}</Text>
+                    <Text style={styles.dayTabTextActive}>{day.day}</Text>
                   </LinearGradient>
                 ) : (
-                  <View style={[styles.dayTab, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-                    <Text style={[styles.dayTabText, { color: colors.textSecondary }]}>{day.day}</Text>
+                  <View style={styles.dayTab}>
+                    <Text style={styles.dayTabText}>{day.day}</Text>
                   </View>
                 )}
               </Pressable>
@@ -316,7 +319,7 @@ export const DietPlanScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   shell: { flex: 1 },
   root: { flex: 1 },
   scroll: { padding: SPACING.lg, gap: SPACING.md },
@@ -328,9 +331,9 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     gap: SPACING.md,
   },
-  loadingTitle: { ...TYPOGRAPHY.title, fontSize: FONT_SIZE.lg, textAlign: 'center' },
-  loadingText: { fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
-  errorText: { fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
+  loadingTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.lg, textAlign: 'center' },
+  loadingText: { color: colors.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
+  errorText: { color: colors.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
 
   emptyIconWrap: {
     width: 84,
@@ -338,9 +341,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
     borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
-  emptyTitle: { ...TYPOGRAPHY.title, fontSize: FONT_SIZE.xl, textAlign: 'center' },
+  emptyTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.xl, textAlign: 'center' },
 
   banner: {
     flexDirection: 'row',
@@ -349,20 +354,22 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
-  bannerText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
+  bannerText: { color: colors.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
 
   summaryCard: { gap: SPACING.md },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  summaryTitle: { ...TYPOGRAPHY.title, fontSize: FONT_SIZE.xl },
-  summaryText: { ...TYPOGRAPHY.body, lineHeight: 21 },
+  summaryTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.xl },
+  summaryText: { ...TYPOGRAPHY.body, color: colors.textSecondary, lineHeight: 21 },
   updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  updatedText: { fontSize: FONT_SIZE.xs },
+  updatedText: { color: colors.textMuted, fontSize: FONT_SIZE.xs },
 
   caloriesRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xs },
-  caloriesValue: { fontSize: FONT_SIZE.hero, fontFamily: FONTS.bodyExtra },
-  caloriesUnit: { fontSize: FONT_SIZE.sm },
+  caloriesValue: { color: colors.text, fontSize: FONT_SIZE.hero, fontFamily: FONTS.bodyExtra },
+  caloriesUnit: { color: colors.textMuted, fontSize: FONT_SIZE.sm },
 
   macrosRow: { flexDirection: 'row', justifyContent: 'space-around' },
 
@@ -372,19 +379,21 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
   },
   dayTabActive: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
   },
-  dayTabText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
-  dayTabTextActive: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
+  dayTabText: { color: colors.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
+  dayTabTextActive: { color: '#07231F', fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
 
   mealCard: { gap: SPACING.sm, marginBottom: SPACING.sm },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  mealName: { ...TYPOGRAPHY.heading },
+  mealName: { ...TYPOGRAPHY.heading, color: colors.text },
   mealItemRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  bullet: { width: 5, height: 5, borderRadius: RADIUS.full },
-  mealItem: { fontSize: FONT_SIZE.sm, flex: 1, lineHeight: 19 },
+  bullet: { width: 5, height: 5, borderRadius: RADIUS.full, backgroundColor: colors.primary },
+  mealItem: { color: colors.textSecondary, fontSize: FONT_SIZE.sm, flex: 1, lineHeight: 19 },
 });

@@ -19,12 +19,9 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 
 import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
-import { useThemeColors } from '../../hooks/useThemeColors';
-import { shade } from '../../utils/color';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { StaggerItem } from '../../components/ui/StaggerItem';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import type { TabParams } from '../../navigation/AppNavigator';
 
@@ -75,7 +72,7 @@ function getInitials(name: string) {
 interface RoomItemProps {
   room: ChatRoom;
   currentUserId: string;
-  colors: ReturnType<typeof useThemeColors>;
+  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
   onPress: () => void;
 }
 
@@ -105,7 +102,7 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPres
       <View style={[styles.roomCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
         {isGroup ? (
           <LinearGradient
-            colors={[colors.accent, shade(colors.accent, -0.3)]}
+            colors={['#2DD4BF', '#0F766E']}
             style={styles.avatarCircle}
           >
             <Ionicons name="people" size={22} color="#fff" />
@@ -151,8 +148,9 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPres
 };
 
 export const ChatListScreen: React.FC = () => {
-  const { user } = useAuth();
-  const colors = useThemeColors();
+  const { user, theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ChatListNav>();
 
@@ -257,13 +255,13 @@ export const ChatListScreen: React.FC = () => {
           style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}
         >
           <LinearGradient
-            colors={[colors.accent, shade(colors.accent, -0.3)]}
+            colors={['#2DD4BF', '#14B8A6']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.aiCoachBanner}
           >
             <View style={styles.aiCoachIcon}>
-              <Ionicons name="sparkles" size={22} color={colors.accent} />
+              <Ionicons name="fitness" size={22} color="#2DD4BF" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.aiCoachTitle}>FitCoach AI</Text>
@@ -329,15 +327,13 @@ export const ChatListScreen: React.FC = () => {
             renderSectionHeader={({ section: { title } }) => (
               <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>{title}</Text>
             )}
-            renderItem={({ item, index }) => (
-              <StaggerItem index={index}>
-                <RoomItem
-                  room={item}
-                  currentUserId={user?.id || ''}
-                  colors={colors}
-                  onPress={() => openRoom(item)}
-                />
-              </StaggerItem>
+            renderItem={({ item }) => (
+              <RoomItem
+                room={item}
+                currentUserId={user?.id || ''}
+                colors={colors}
+                onPress={() => openRoom(item)}
+              />
             )}
             ItemSeparatorComponent={() => <View style={{ height: SPACING.sm }} />}
           />

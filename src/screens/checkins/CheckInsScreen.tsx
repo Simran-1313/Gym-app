@@ -131,7 +131,7 @@ const CheckInCard: React.FC<{ item: CheckIn; index: number }> = ({ item, index }
         </View>
 
         {/* Bottom bar: method pill */}
-        <View style={[s.cardBottom, { borderTopColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
+        <View style={[s.cardBottom, { borderTopColor: colors.insetBorder }]}>
           <View style={[s.methodPill, { backgroundColor: `${color}10`, borderColor: `${color}20` }]}>
             <Ionicons name={methodIcon[item.method] ?? 'enter-outline'} size={12} color={color} />
             <Text style={[s.methodText, { color }]}>{item.method}</Text>

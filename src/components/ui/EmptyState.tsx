@@ -10,10 +10,9 @@ import Animated, {
   Easing,
   FadeInUp,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 
 interface Props {
@@ -51,7 +50,7 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
 
   return (
     <Animated.View entering={FadeInUp.duration(400)} style={styles.container}>
-      <View style={[styles.dashedBox, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+      <View style={[styles.dashedBox, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
         
 
 
@@ -78,7 +77,7 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
             ]}
           >
             <Text style={styles.actionText}>{actionLabel}</Text>
-            <Ionicons name="arrow-forward" size={14} color="#FFF" style={{ marginLeft: 4 }} />
+            <Ionicons name="arrow-forward" size={14} color="#07231F" style={{ marginLeft: 4 }} />
           </Pressable>
         )}
 
@@ -100,29 +99,24 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 40,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
+    borderRadius: RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
     overflow: 'hidden',
   },
 
   iconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
+    borderColor: 'transparent',
   },
   title: {
     fontSize: 18,
-    fontFamily: FONTS.bodyExtra,
+    fontFamily: FONTS.displaySemi,
     letterSpacing: -0.3,
     textAlign: 'center',
     marginBottom: 8,
@@ -147,7 +141,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
   actionText: {
-    color: '#FFF',
+    color: '#07231F',
     fontSize: 13,
     fontFamily: FONTS.bodyBold,
     letterSpacing: 0.3,

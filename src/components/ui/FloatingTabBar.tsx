@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -12,23 +13,22 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { FONTS, RADIUS } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, shadow } from '../../config/theme';
+import { useAuth } from '../../context/AuthContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const AnimatedView = Animated.View;
 
 const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Home: ['home', 'home-outline'],
   Classes: ['barbell', 'barbell-outline'],
-  Chat: ['chatbubbles', 'chatbubbles-outline'],
-  CheckIns: ['time', 'time-outline'],
+  Chat: ['chatbubble-ellipses', 'chatbubble-ellipses-outline'],
+  CheckIns: ['trophy', 'trophy-outline'],
   Profile: ['person', 'person-outline'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   Home: 'Home',
-  Classes: 'Classes',
+  Classes: 'Workouts',
   Chat: 'Chat',
   CheckIns: 'Check-In',
   Profile: 'Profile',
@@ -43,68 +43,82 @@ function TabIcon({
   focused: boolean;
   onPress: () => void;
 }) {
-  const iconScale = useSharedValue(focused ? 1.1 : 1);
-  const labelOpacity = useSharedValue(focused ? 1 : 0);
-  const labelTranslateY = useSharedValue(focused ? 0 : 6);
-  const pillScale = useSharedValue(focused ? 1 : 0);
+  const iconScale = useSharedValue(1);
+  const activeProgress = useSharedValue(focused ? 1 : 0);
 
   const [active, inactive] = TAB_ICONS[name] ?? ['ellipse', 'ellipse-outline'];
   const label = TAB_LABELS[name] ?? name;
-  const colors = useThemeColors();
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   useEffect(() => {
-    iconScale.value = withSpring(focused ? 1.1 : 1, { damping: 14, stiffness: 220 });
-    labelOpacity.value = withTiming(focused ? 1 : 0, { duration: 180 });
-    labelTranslateY.value = withSpring(focused ? 0 : 6, { damping: 16, stiffness: 180 });
-    pillScale.value = withSpring(focused ? 1 : 0, { damping: 16, stiffness: 200 });
-  }, [focused, iconScale, labelOpacity, labelTranslateY, pillScale]);
+    activeProgress.value = withTiming(focused ? 1 : 0, { duration: 220 });
+  }, [focused, activeProgress]);
 
-  const iconAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
-  const labelAnimStyle = useAnimatedStyle(() => ({
-    opacity: labelOpacity.value,
-    transform: [{ translateY: labelTranslateY.value }],
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
   }));
-  const pillAnimStyle = useAnimatedStyle(() => ({
+
+  // The active tab gets a soft teal disc behind the glyph rather than a full
+  // pill — the mockup keeps the bar's silhouette unbroken.
+  const discStyle = useAnimatedStyle(() => ({
+    opacity: activeProgress.value,
     transform: [
-      { scaleX: pillScale.value },
-      { scaleY: interpolate(pillScale.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
+      { scale: interpolate(activeProgress.value, [0, 1], [0.6, 1], Extrapolation.CLAMP) },
     ],
-    opacity: pillScale.value,
   }));
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    iconScale.value = withSpring(0.85, { damping: 10, stiffness: 400 }, () => {
-      iconScale.value = withSpring(focused ? 1.1 : 1, { damping: 12, stiffness: 200 });
+    iconScale.value = withSpring(0.86, { damping: 10, stiffness: 420 }, () => {
+      iconScale.value = withSpring(1, { damping: 13, stiffness: 220 });
     });
     onPress();
   };
 
   return (
-    <AnimatedPressable onPress={handlePress} style={styles.tabBtn} accessibilityRole="tab" accessibilityState={{ selected: focused }}>
-      <AnimatedView
+    <AnimatedPressable onPress={handlePress} style={styles.tabBtn}>
+      <View style={styles.iconSlot}>
+        <Animated.View
+          style={[styles.activeDisc, discStyle, { backgroundColor: colors.primarySoft }]}
+        />
+        <Animated.View style={iconAnimStyle}>
+          <Ionicons
+            name={focused ? active : inactive}
+            size={22}
+            color={focused ? colors.primary : colors.textMuted}
+          />
+        </Animated.View>
+      </View>
+
+      <Text
         style={[
-          styles.activePill,
-          pillAnimStyle,
-          { backgroundColor: `${colors.primary}17`, borderColor: `${colors.primary}30` },
+          styles.tabLabel,
+          {
+            color: focused ? colors.primary : colors.textMuted,
+            fontFamily: focused ? FONTS.bodySemi : FONTS.bodyMedium,
+          },
         ]}
-      />
-      <AnimatedView style={[styles.iconWrap, iconAnimStyle]}>
-        <Ionicons name={focused ? active : inactive} size={22} color={focused ? colors.primary : colors.textMuted} />
-      </AnimatedView>
-      <AnimatedView style={[styles.labelWrap, labelAnimStyle]}>
-        <Text style={[styles.tabLabel, { color: colors.primary }]} numberOfLines={1}>
-          {label}
-        </Text>
-      </AnimatedView>
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </AnimatedPressable>
   );
 }
 
-export const FloatingTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
+export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
+  state,
+  navigation,
+}) => {
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
+  // Hide the bar once a tab's nested stack has pushed a detail screen, so a
+  // chat room or product page gets the full height.
   const focusedRoute = state.routes[state.index];
   const nestedState = focusedRoute.state as { index?: number } | undefined;
   if (nestedState && typeof nestedState.index === 'number' && nestedState.index > 0) {
@@ -112,25 +126,46 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({ state, navigation 
   }
 
   return (
-    <View style={[styles.container, { bottom: Math.max(insets.bottom, 12) + 4 }]}>
-      <View
-        style={[
-          styles.bar,
-          {
-            backgroundColor: colors.overlay,
-            borderColor: colors.surfaceBorder,
-            shadowColor: '#000',
-          },
-        ]}
-      >
+    <View style={[styles.container, { bottom: Math.max(insets.bottom, 10) + 2 }]}>
+      <View style={[styles.bar, shadow(isDark, 'lg'), { borderColor: colors.cardBorder }]}>
+        <BlurView
+          tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+          intensity={isDark ? 60 : 70}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Blur alone is too transparent over the moving ambient bloom; this
+            near-opaque wash keeps the inactive glyphs legible. */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDark ? 'rgba(16,22,30,0.88)' : 'rgba(255,255,255,0.9)' },
+          ]}
+          pointerEvents="none"
+        />
+
         <View style={styles.inner}>
           {state.routes.map((route, index) => {
             const focused = state.index === index;
+
             const onPress = () => {
-              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
             };
-            return <TabIcon key={route.key} name={route.name} focused={focused} onPress={onPress} />;
+
+            return (
+              <TabIcon
+                key={route.key}
+                name={route.name}
+                focused={focused}
+                onPress={onPress}
+              />
+            );
           })}
         </View>
       </View>
@@ -139,26 +174,48 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({ state, navigation 
 };
 
 const styles = StyleSheet.create({
-  container: { position: 'absolute', left: 12, right: 12, alignItems: 'center' },
+  container: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    alignItems: 'center',
+  },
   bar: {
     width: '100%',
     borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
   },
   inner: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 66,
-    paddingHorizontal: 6,
+    height: 64,
+    paddingHorizontal: 4,
+    paddingTop: 6,
   },
-  tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', position: 'relative' },
-  activePill: { position: 'absolute', width: '80%', height: 50, borderRadius: RADIUS.lg, borderWidth: 1 },
-  iconWrap: { alignItems: 'center', justifyContent: 'center' },
-  labelWrap: { marginTop: 2, height: 14 },
-  tabLabel: { fontSize: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.3, textAlign: 'center' },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    height: '100%',
+  },
+  iconSlot: {
+    width: 40,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeDisc: {
+    position: 'absolute',
+    width: 40,
+    height: 28,
+    borderRadius: RADIUS.full,
+  },
+  tabLabel: {
+    fontSize: 10.5,
+    letterSpacing: 0.1,
+    textAlign: 'center',
+    marginTop: 3,
+  },
 });

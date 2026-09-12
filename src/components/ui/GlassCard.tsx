@@ -1,77 +1,91 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, LIGHT_COLORS, RADIUS, SPACING, shadow } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
-import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   glowColor?: string;
   noPadding?: boolean;
-  /** @deprecated kept for backward-compat call sites; the new elevation-surface card has no tilt. */
+  /** Retained so existing call sites keep compiling; tilt is gone by design. */
   noTilt?: boolean;
   innerStyle?: StyleProp<ViewStyle>;
-  /** Renders on the surface-2 tier instead of surface-1 — a nested chip/tile inside another card. */
+  /** Raises the surface a step for cards that sit on top of other cards. */
   elevated?: boolean;
 }
 
 /**
- * A solid, layered card — the base building block of the redesign. Depth comes
- * from stepping up one elevation tier plus a soft ambient shadow, not from a
- * blur pass and a translucent tint. Cheaper to render than the previous glass
- * treatment, and reads calmer at a glance, which matters on screens (Home,
- * Activity) that stack half a dozen of these at once.
+ * The one card surface in the app.
+ *
+ * Previously this stacked a blur, three gradients and a perspective tilt. All
+ * of it is gone: over an animated ground, translucent cards let the moving
+ * bloom show through and the text swims. A near-opaque surface with a hairline
+ * border reads cleaner, holds contrast regardless of what is behind it, and
+ * composites far cheaper in a scrolling list.
  */
-export const GlassCard: React.FC<Props> = ({ children, style, glowColor, noPadding, innerStyle, elevated }) => {
+export const GlassCard: React.FC<Props> = ({
+  children,
+  style,
+  glowColor,
+  noPadding,
+  innerStyle,
+  elevated,
+}) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = useThemeColors();
-
-  const cardStyle: ViewStyle = {
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    backgroundColor: elevated ? colors.surface2 : colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  };
-
-  const shadowStyle: ViewStyle = isDark
-    ? {
-        shadowColor: '#000',
-        shadowOpacity: 0.45,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 6,
-      }
-    : {
-        shadowColor: '#1E293B',
-        shadowOpacity: 0.1,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 10 },
-        elevation: 6,
-      };
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   return (
-    <View style={[cardStyle, shadowStyle, style]}>
-      {/* Optional accent wash — a hint of brand color top-down, used sparingly for a card that needs to stand out (e.g. the daily insight card). */}
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: elevated ? colors.surfaceElevated : colors.surface,
+          borderColor: colors.cardBorder,
+        },
+        shadow(isDark, elevated ? 'lg' : 'md'),
+        style,
+      ]}
+    >
+      {/* Top-edge sheen. One gradient, low opacity — enough to stop the surface
+          reading as a flat rectangle, not enough to look glassy. */}
+      <LinearGradient
+        colors={
+          isDark
+            ? ['rgba(255,255,255,0.045)', 'transparent']
+            : ['rgba(255,255,255,0.9)', 'transparent']
+        }
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.55 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
       {glowColor ? (
         <LinearGradient
-          colors={[`${glowColor}14`, 'transparent']}
+          colors={[glowColor, 'transparent']}
           start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 0.6 }}
-          style={StyleSheet.absoluteFill}
+          end={{ x: 0.5, y: 0.8 }}
+          style={[StyleSheet.absoluteFill, { opacity: 0.14 }]}
           pointerEvents="none"
         />
       ) : null}
 
-      <View style={[styles.inner, noPadding && styles.noPadding, innerStyle]}>{children}</View>
+      <View style={[styles.inner, noPadding && styles.noPadding, innerStyle]}>
+        {children}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  inner: { padding: SPACING.md },
+  card: {
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+  },
+  inner: { padding: SPACING.md + 2 },
   noPadding: { padding: 0 },
 });

@@ -16,9 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
-import { useThemeColors } from '../../hooks/useThemeColors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,11 +70,7 @@ export const AiCoachScreen: React.FC = () => {
   const { theme } = useAuth();
   const headerHeight = useHeaderHeight();
   const isDark = theme === 'dark';
-  // FitCoach AI is deliberately on the lavender accent, not the brand teal —
-  // it's the one place in Chat that should read as a distinct "AI" moment,
-  // separate from the teal human-coach threads in ChatRoomScreen.
-  const colors = useThemeColors();
-  const aiColor = colors.accent;
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -190,17 +185,17 @@ export const AiCoachScreen: React.FC = () => {
       return (
         <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowAi]}>
           {!isUser && (
-            <View style={[styles.avatar, { backgroundColor: aiColor }]}>
-              <Ionicons name="fitness" size={14} color="#fff" />
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <Ionicons name="fitness" size={14} color="#07231F" />
             </View>
           )}
           <View
             style={[
               styles.bubble,
               isUser
-                ? { backgroundColor: aiColor }
+                ? { backgroundColor: colors.primary }
                 : {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: colors.inset,
                     borderWidth: 1,
                     borderColor: colors.surfaceBorder,
                   },
@@ -212,7 +207,7 @@ export const AiCoachScreen: React.FC = () => {
                 {(() => {
                   const baseStyle = [
                     styles.bubbleText,
-                    { color: isUser ? '#fff' : colors.text },
+                    { color: isUser ? '#07231F' : colors.text },
                     item.error && { color: colors.danger },
                   ];
                   const boldStyle = { fontFamily: FONTS.bodyBold };
@@ -268,8 +263,8 @@ export const AiCoachScreen: React.FC = () => {
           ListHeaderComponent={
             isEmpty ? (
               <View style={styles.emptyState}>
-                <View style={[styles.emptyIcon, { backgroundColor: aiColor + '22' }]}>
-                  <Ionicons name="fitness" size={36} color={aiColor} />
+                <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '22' }]}>
+                  <Ionicons name="fitness" size={36} color={colors.primary} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>FitCoach AI</Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
@@ -279,10 +274,10 @@ export const AiCoachScreen: React.FC = () => {
                   {SUGGESTIONS.map((s) => (
                     <TouchableOpacity
                       key={s}
-                      style={[styles.chip, { borderColor: aiColor, backgroundColor: aiColor + '15' }]}
+                      style={[styles.chip, { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
                       onPress={() => send(s)}
                     >
-                      <Text style={[styles.chipText, { color: aiColor }]}>{s}</Text>
+                      <Text style={[styles.chipText, { color: colors.primary }]}>{s}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -297,7 +292,7 @@ export const AiCoachScreen: React.FC = () => {
           style={[
             styles.inputBar,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+              backgroundColor: colors.inset,
               borderTopColor: colors.surfaceBorder,
               paddingBottom: insets.bottom + SPACING.sm,
             },
@@ -308,7 +303,7 @@ export const AiCoachScreen: React.FC = () => {
               styles.input,
               {
                 color: colors.text,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                backgroundColor: colors.inset,
                 borderColor: colors.surfaceBorder,
               },
             ]}
@@ -344,7 +339,7 @@ export const AiCoachScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? aiColor : colors.surfaceBorder },
+                { backgroundColor: input.trim() ? colors.primary : colors.surfaceBorder },
               ]}
               onPress={() => send(input)}
               disabled={!input.trim()}

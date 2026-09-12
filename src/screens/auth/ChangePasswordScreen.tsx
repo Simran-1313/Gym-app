@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,8 +14,7 @@ import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import { clearCookie } from '../../services/api';
-import { SPACING, TYPOGRAPHY } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, FONT_SIZE, LIGHT_COLORS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
@@ -24,8 +23,9 @@ import { SuccessBurst } from '../../components/ui/SuccessBurst';
 import { GymLogo } from '../../components/ui/GymLogo';
 
 export const ChangePasswordScreen: React.FC = () => {
-  const { logout, setFirstLoginDone, gym } = useAuth();
-  const colors = useThemeColors();
+  const { logout, setFirstLoginDone, gym, theme } = useAuth();
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -82,8 +82,8 @@ export const ChangePasswordScreen: React.FC = () => {
           <Animated.View entering={ZoomIn.duration(400)} style={styles.iconBox}>
             <GymLogo name={gym?.name} logo={gym?.logo} size={64} />
           </Animated.View>
-          <Text style={[styles.title, { color: colors.text }]}>Set Your Password</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={styles.title}>Set Your Password</Text>
+          <Text style={styles.subtitle}>
             This is your first login. Please change your temporary password to continue.
           </Text>
 
@@ -137,13 +137,14 @@ export const ChangePasswordScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.xl },
   iconBox: { alignItems: 'center', marginBottom: SPACING.md },
-  title: { ...TYPOGRAPHY.title, textAlign: 'center' },
+  title: { ...TYPOGRAPHY.title, color: colors.text, textAlign: 'center' },
   subtitle: {
     ...TYPOGRAPHY.body,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: SPACING.sm,
     marginBottom: SPACING.xl,

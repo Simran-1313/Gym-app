@@ -16,10 +16,16 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { FONTS } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
+import { DARK_COLORS, LIGHT_COLORS, FONTS, GRADIENTS, RADIUS } from '../../config/theme';
+import { useAuth } from '../../context/AuthContext';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
+
+/**
+ * Label colour on a teal fill. White on #2DD4BF is roughly 1.9:1 — well under
+ * AA — so the primary button uses a near-black teal instead.
+ */
+const ON_PRIMARY = '#07231F';
 
 interface Props {
   label: string;
@@ -29,8 +35,6 @@ interface Props {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: React.ReactNode;
-  /** Renders the primary variant in the danger color — destructive confirms (e.g. "Log Out"). */
-  destructive?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -43,9 +47,11 @@ export const AnimatedButton: React.FC<Props> = ({
   disabled = false,
   style,
   icon,
-  destructive = false,
 }) => {
-  const colors = useThemeColors();
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -62,7 +68,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
   const handlePress = () => {
     if (disabled || loading) return;
-    Haptics.impactAsync(destructive ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     onPress();
   };
 
@@ -70,7 +76,6 @@ export const AnimatedButton: React.FC<Props> = ({
 
   // ── PRIMARY ──
   if (variant === 'primary') {
-    const gradient = destructive ? ([colors.danger, colors.danger] as const) : ([colors.primary, colors.primaryDark] as const);
     return (
       <AnimatedPressable
         onPress={handlePress}
@@ -79,9 +84,14 @@ export const AnimatedButton: React.FC<Props> = ({
         disabled={isDisabled}
         style={[animStyle, s.btn, style, isDisabled && s.disabled]}
       >
-        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.btnInner}>
+        <LinearGradient
+          colors={[...GRADIENTS.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.btnInner}
+        >
           {loading ? (
-            <ActivityIndicator color="#04211F" />
+            <ActivityIndicator color={ON_PRIMARY} />
           ) : (
             <View style={s.row}>
               {icon}
@@ -93,7 +103,7 @@ export const AnimatedButton: React.FC<Props> = ({
     );
   }
 
-  // ── SECONDARY: solid elevated surface, not a blur pass ──
+  // ── SECONDARY: Clean iOS Frosted Glass ──
   if (variant === 'secondary') {
     return (
       <AnimatedPressable
@@ -104,10 +114,13 @@ export const AnimatedButton: React.FC<Props> = ({
         style={[
           animStyle,
           s.btn,
-          s.secondaryBtn,
-          { backgroundColor: colors.surface2, borderColor: colors.surfaceBorder },
+          s.glassBtnOuter,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.primaryBorder,
+          },
           style,
-          isDisabled && s.disabled,
+          isDisabled && s.disabled
         ]}
       >
         <View style={s.btnInner}>
@@ -116,7 +129,7 @@ export const AnimatedButton: React.FC<Props> = ({
           ) : (
             <View style={s.row}>
               {icon}
-              <Text style={[s.secondaryLabel, { color: colors.primary }]}>{label}</Text>
+              <Text style={[s.glassLabel, { color: colors.primary }]}>{label}</Text>
             </View>
           )}
         </View>
@@ -147,7 +160,7 @@ export const AnimatedButton: React.FC<Props> = ({
 
 const s = StyleSheet.create({
   btn: {
-    borderRadius: 14,
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
   },
   btnInner: {
@@ -161,11 +174,15 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  secondaryBtn: {
+
+  // Glass
+  glassBtnOuter: {
     borderWidth: 1,
   },
-  primaryLabel: { color: '#04211F', fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
-  secondaryLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
+
+  // Labels
+  primaryLabel: { color: ON_PRIMARY, fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
   ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },
 });

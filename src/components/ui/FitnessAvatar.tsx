@@ -107,8 +107,8 @@ const DefaultAvatarSvg: React.FC<{ size: number }> = ({ size }) => (
   <Svg width={size} height={size} viewBox="0 0 120 120">
     <Defs>
       <LinearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <Stop offset="0" stopColor="#343A46" />
-        <Stop offset="1" stopColor="#15161B" />
+        <Stop offset="0" stopColor="#1B2A33" />
+        <Stop offset="1" stopColor="#0C151B" />
       </LinearGradient>
       <LinearGradient id="skin" x1="0.2" y1="0" x2="0.8" y2="1">
         <Stop offset="0" stopColor="#FFD0B3" />
@@ -120,8 +120,8 @@ const DefaultAvatarSvg: React.FC<{ size: number }> = ({ size }) => (
         <Stop offset="1" stopColor="#2B1714" />
       </LinearGradient>
       <LinearGradient id="shirt" x1="0" y1="0" x2="1" y2="1">
-        <Stop offset="0" stopColor="#FF7A45" />
-        <Stop offset="1" stopColor="#E6451A" />
+        <Stop offset="0" stopColor="#2DD4BF" />
+        <Stop offset="1" stopColor="#0F766E" />
       </LinearGradient>
     </Defs>
     <Circle cx="60" cy="60" r="60" fill="url(#bg)" />
@@ -162,7 +162,7 @@ const DefaultAvatarSvg: React.FC<{ size: number }> = ({ size }) => (
     <Circle cx="80" cy="64" r="7" fill="#F0A17D" opacity="0.7" />
     <Path
       d="M36 108c4-14 13-22 24-22s20 8 24 22H36Z"
-      fill="#111318"
+      fill="#0C151B"
       opacity="0.35"
     />
   </Svg>

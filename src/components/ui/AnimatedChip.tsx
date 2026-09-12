@@ -104,6 +104,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   text: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium },
-  textSelected: { color: '#FFFFFF', fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
+  textSelected: { color: '#07231F', fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
   disabled: { opacity: 0.5 },
 });
