@@ -24,7 +24,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { COLORS, DARK_COLORS, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import {
   ActivityLevel,
   DietPreference,
@@ -98,7 +99,7 @@ function OptionSelector<T extends string>({
   );
 }
 
-const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
+const FormProgress: React.FC<{ progress: number; colors: ReturnType<typeof useThemeColors> }> = ({ progress, colors }) => {
   const width = useSharedValue(0);
 
   useEffect(() => {
@@ -111,7 +112,7 @@ const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
   }));
 
   return (
-    <View style={styles.progressTrack}>
+    <View style={[styles.progressTrack, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
       <Animated.View style={[styles.progressFillWrap, barStyle]}>
         <LinearGradient
           colors={[...GRADIENTS.primary]}
@@ -141,11 +142,10 @@ const SectionHeader: React.FC<{
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
-  const { refreshUser, theme } = useAuth();
+  const { refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
@@ -277,7 +277,7 @@ export const OnboardingScreen: React.FC = () => {
             </Text>
 
             <View style={styles.progressBlock}>
-              <FormProgress progress={completion} />
+              <FormProgress progress={completion} colors={colors} />
               <View style={styles.progressMeta}>
                 <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
                   {Math.round(completion * 100)}% complete
@@ -289,8 +289,8 @@ export const OnboardingScreen: React.FC = () => {
             </View>
           </Animated.View>
 
-          <GlassCard glowColor={COLORS.accent} innerStyle={styles.section}>
-            <SectionHeader icon="person-outline" title="Personal info" color={colors.text} tint={COLORS.accent} />
+          <GlassCard glowColor={colors.accent} innerStyle={styles.section}>
+            <SectionHeader icon="person-outline" title="Personal info" color={colors.text} tint={colors.accent} />
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <GlassInput label="Age" placeholder="25" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} editable={!loading} />
@@ -308,16 +308,16 @@ export const OnboardingScreen: React.FC = () => {
             </View>
           </GlassCard>
 
-          <GlassCard glowColor={COLORS.primary} innerStyle={styles.section}>
-            <SectionHeader icon="trophy-outline" title="Goals" color={colors.text} tint={COLORS.primary} />
+          <GlassCard glowColor={colors.primary} innerStyle={styles.section}>
+            <SectionHeader icon="trophy-outline" title="Goals" color={colors.text} tint={colors.primary} />
             <View style={styles.group}>
               <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>What are you training for?</Text>
               <OptionSelector options={GOAL_OPTIONS} selected={goal} onSelect={setGoal} disabled={loading} />
             </View>
           </GlassCard>
 
-          <GlassCard glowColor={COLORS.primaryGlow} innerStyle={styles.section}>
-            <SectionHeader icon="restaurant-outline" title="Preferences" color={colors.text} tint={COLORS.primaryGlow} />
+          <GlassCard glowColor={colors.primaryGlow} innerStyle={styles.section}>
+            <SectionHeader icon="restaurant-outline" title="Preferences" color={colors.text} tint={colors.primaryGlow} />
             <View style={styles.group}>
               <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Diet preference</Text>
               <OptionSelector options={DIET_OPTIONS} selected={diet} onSelect={setDiet} disabled={loading} />
@@ -383,11 +383,9 @@ const styles = StyleSheet.create({
   progressTrack: {
     width: '100%',
     height: 8,
-    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.full,
     overflow: 'hidden' as const,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
   },
   progressFillWrap: { height: '100%', borderRadius: RADIUS.full, overflow: 'hidden' as const },
   progressFill: { flex: 1, borderRadius: RADIUS.full },
