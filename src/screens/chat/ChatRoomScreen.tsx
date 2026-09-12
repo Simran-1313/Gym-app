@@ -22,13 +22,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import { EmojiPicker } from '../../components/chat/EmojiPicker';
 import { EmptyState } from '../../components/ui/EmptyState';
 
 type ChatRoomRoute = RouteProp<ChatStackParams, 'ChatRoom'>;
+
+// The "own message" bubble now sits on the brand teal (colors.primary), which
+// is a bright, mid-tone color — the same reason AnimatedButton's primary
+// variant uses dark text rather than white. Ticks/time inside that bubble
+// follow the same rule instead of the old white-on-iOS-blue treatment.
+const ON_PRIMARY = '#04211F';
 
 // ── Tick ─────────────────────────────────────────────────────────────────────
 
@@ -41,25 +48,26 @@ interface TickProps {
   memberCount: number;
   pending?: boolean;
   failed?: boolean;
+  colors: ReturnType<typeof useThemeColors>;
 }
 
-const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed }) => {
+const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed, colors }) => {
   if (senderId !== currentUserId) return null;
 
-  if (failed) return <Ionicons name="alert-circle" size={13} color="#FCA5A5" />;
-  if (pending) return <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.55)" />;
+  if (failed) return <Ionicons name="alert-circle" size={13} color={colors.danger} />;
+  if (pending) return <Ionicons name="time-outline" size={12} color={`${ON_PRIMARY}99`} />;
 
   const others = statuses.filter((s) => s.userId !== currentUserId);
   const expectedOthers = memberCount - 1; // exclude sender
 
-  if (expectedOthers === 0) return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.5)" />;
+  if (expectedOthers === 0) return <Ionicons name="checkmark" size={12} color={`${ON_PRIMARY}90`} />;
 
   const allRead = others.length > 0 && others.every((s) => s.status === 'READ');
   const allDelivered = others.length > 0 && others.every((s) => s.status !== 'SENT');
 
-  if (allRead) return <Ionicons name="checkmark-done" size={12} color="#60A5FA" />;
-  if (allDelivered) return <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.55)" />;
-  return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.5)" />;
+  if (allRead) return <Ionicons name="checkmark-done" size={12} color={ON_PRIMARY} />;
+  if (allDelivered) return <Ionicons name="checkmark-done" size={12} color={`${ON_PRIMARY}99`} />;
+  return <Ionicons name="checkmark" size={12} color={`${ON_PRIMARY}90`} />;
 };
 
 // ── Message Bubble ────────────────────────────────────────────────────────────
@@ -71,7 +79,7 @@ interface BubbleProps {
   isGroupChat: boolean;
   memberCount: number;
   currentUserId: string;
-  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
+  colors: ReturnType<typeof useThemeColors>;
   onRetry: (msg: ChatMessage) => void;
 }
 
@@ -106,7 +114,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
         styles.bubble,
         msg.type === 'IMAGE' ? styles.bubbleImage : null,
         isOwn && msg.type !== 'IMAGE'
-          ? [styles.bubbleOwn, { backgroundColor: '#007AFF', opacity: msg.pending ? 0.7 : 1 }]
+          ? [styles.bubbleOwn, { backgroundColor: colors.primary, opacity: msg.pending ? 0.7 : 1 }]
           : msg.type !== 'IMAGE'
             ? [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]
             : { opacity: msg.pending ? 0.7 : 1 },
@@ -119,15 +127,15 @@ const MessageBubble: React.FC<BubbleProps> = ({
           resizeMode="cover"
         />
       ) : (
-        <Text style={[styles.msgText, { color: isOwn ? '#fff' : colors.text }]}>
+        <Text style={[styles.msgText, { color: isOwn ? ON_PRIMARY : colors.text }]}>
           {msg.content}
         </Text>
       )}
       <View style={styles.msgFooter}>
         {msg.failed && (
-          <Text style={styles.failedText}>Failed · tap to retry</Text>
+          <Text style={[styles.failedText, { color: colors.danger }]}>Failed · tap to retry</Text>
         )}
-        <Text style={[styles.msgTime, { color: isOwn ? 'rgba(255,255,255,0.55)' : colors.textMuted }]}>
+        <Text style={[styles.msgTime, { color: isOwn ? `${ON_PRIMARY}99` : colors.textMuted }]}>
           {time}
         </Text>
         {isOwn && (
@@ -138,6 +146,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
             memberCount={memberCount}
             pending={msg.pending}
             failed={msg.failed}
+            colors={colors}
           />
         )}
       </View>
@@ -176,7 +185,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 
-const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS | typeof LIGHT_COLORS }> = ({ names, colors }) => {
+const TypingIndicator: React.FC<{ names: string[]; colors: ReturnType<typeof useThemeColors> }> = ({ names, colors }) => {
   if (!names.length) return null;
   const label = names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
   return (
@@ -191,7 +200,7 @@ const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS | 
 export const ChatRoomScreen: React.FC = () => {
   const { user, theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const route = useRoute<ChatRoomRoute>();
   const { roomId } = route.params;
@@ -816,7 +825,6 @@ const styles = StyleSheet.create({
   },
   failedText: {
     fontSize: 10,
-    color: '#FCA5A5',
     marginRight: 2,
   },
   typingRow: {
