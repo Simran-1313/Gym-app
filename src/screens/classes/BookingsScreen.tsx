@@ -14,14 +14,15 @@ import { getMyBookings, cancelBooking } from '../../services/member.service';
 import { ClassBooking } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { FONT_SIZE, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import type { ThemeColors } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StatBadge } from '../../components/ui/StatBadge';
 import { StaggerItem } from '../../components/ui/StaggerItem';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
-import { useAuth } from '../../context/AuthContext';
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -29,18 +30,17 @@ const formatTime = (iso: string) =>
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
-const getStatusConfig = (colors: { primary: string; success: string; danger: string; textMuted: string }) => ({
+const getStatusConfig = (colors: ThemeColors) => ({
   CONFIRMED: { color: colors.primary, icon: 'checkmark-circle-outline' as const },
   ATTENDED: { color: colors.success, icon: 'checkmark-done-circle' as const },
   NO_SHOW: { color: colors.danger, icon: 'close-circle-outline' as const },
   CANCELLED: { color: colors.textMuted, icon: 'ban-outline' as const },
+  WAITLISTED: { color: colors.accent, icon: 'hourglass-outline' as const },
 });
 
 export const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
   const [loading, setLoading] = useState(true);

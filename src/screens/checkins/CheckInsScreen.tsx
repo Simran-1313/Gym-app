@@ -15,7 +15,9 @@ import { getCheckIns } from '../../services/member.service';
 import { CheckIn, Meta } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import type { ThemeColors } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StatBadge } from '../../components/ui/StatBadge';
@@ -58,7 +60,7 @@ const methodIcon: Record<string, keyof typeof Ionicons.glyphMap> = {
   BIOMETRIC: 'finger-print-outline',
 };
 
-const getMethodColor = (colors: typeof DARK_COLORS | typeof LIGHT_COLORS) => ({
+const getMethodColor = (colors: ThemeColors) => ({
   MANUAL: colors.accent,
   QR: colors.primary,
   BIOMETRIC: colors.success,
@@ -82,7 +84,7 @@ const duration = (inTime: string, outTime: string | null): string => {
 const CheckInCard: React.FC<{ item: CheckIn; index: number }> = ({ item, index }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const mColors = getMethodColor(colors);
   const color = mColors[item.method] ?? colors.primary;
   const isActive = !item.checkedOutAt;
@@ -143,9 +145,7 @@ const CheckInCard: React.FC<{ item: CheckIn; index: number }> = ({ item, index }
 /* ─── Summary Header ─── */
 
 const SummaryHeader: React.FC<{ total: number }> = ({ total }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInUp.duration(350)}>
@@ -171,9 +171,7 @@ const SummaryHeader: React.FC<{ total: number }> = ({ total }) => {
 
 export const CheckInsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
