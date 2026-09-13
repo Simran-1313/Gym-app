@@ -34,7 +34,8 @@ import {
   SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
-import { DARK_COLORS, LIGHT_COLORS, FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -79,7 +80,7 @@ export const ActivityScreen: React.FC = () => {
   const headerHeight = useHeaderHeight();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);

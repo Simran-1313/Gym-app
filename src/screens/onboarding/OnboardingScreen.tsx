@@ -24,7 +24,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { DARK_COLORS, FONTS, GRADIENTS, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
+import { FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import {
   ActivityLevel,
   DietPreference,
@@ -83,7 +84,7 @@ function OptionSelector<T extends string>({
   disabled?: boolean;
 }) {
   const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
@@ -104,7 +105,7 @@ function OptionSelector<T extends string>({
 
 const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
   const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const width = useSharedValue(0);
@@ -140,7 +141,7 @@ const SectionHeader: React.FC<{
   tint: string;
 }> = ({ icon, title, color, tint }) => {
   const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
@@ -159,7 +160,7 @@ export const OnboardingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [age, setAge] = useState('');
