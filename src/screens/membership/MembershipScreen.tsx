@@ -109,7 +109,7 @@ export const MembershipScreen: React.FC = () => {
 
         {subscription ? (
           <StaggerItem index={0}>
-            <GlassCard elevated style={s.planCard}>
+            <GlassCard elevated innerStyle={s.planCard}>
               <View style={s.planTop}>
                 <View>
                   <View style={[s.tierBadge, { backgroundColor: `${colors.primary}1F` }]}>
@@ -152,7 +152,7 @@ export const MembershipScreen: React.FC = () => {
 
         <StaggerItem index={1}>
           <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>PAYMENT METHOD</Text>
-          <GlassCard style={s.row}>
+          <GlassCard innerStyle={s.row}>
             <View style={[s.rowIcon, { backgroundColor: colors.inset }]}>
               <Ionicons name="card-outline" size={18} color={colors.text} />
             </View>
@@ -169,7 +169,7 @@ export const MembershipScreen: React.FC = () => {
         </StaggerItem>
         {invoices.map((inv, i) => (
           <StaggerItem index={3 + i} key={inv.id}>
-            <GlassCard style={s.row}>
+            <GlassCard innerStyle={s.row}>
               <View style={[s.rowIcon, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.inset }]}>
                 <Ionicons name="document-text-outline" size={18} color={i === 0 ? colors.primary : colors.textMuted} />
               </View>

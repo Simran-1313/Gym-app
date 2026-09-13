@@ -40,7 +40,7 @@ const MealCard: React.FC<{ meal: DietPlanDay['meals'][0] }> = ({ meal }) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
-  <GlassCard glowColor={colors.accent} style={styles.mealCard}>
+  <GlassCard glowColor={colors.accent} style={styles.mealCard} innerStyle={styles.mealCardInner}>
     <View style={styles.mealHeader}>
       <Text style={styles.mealName}>{meal.name}</Text>
       <StatBadge icon="flame-outline" label="Cal" value={`${meal.calories}`} color={colors.warning} />
@@ -230,7 +230,7 @@ export const DietPlanScreen: React.FC = () => {
           </View>
         )}
 
-        <GlassCard glowColor={colors.primary} style={styles.summaryCard}>
+        <GlassCard glowColor={colors.primary} innerStyle={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="sparkles" size={20} color={colors.accent} />
             <Text style={styles.summaryTitle}>Your Diet Plan</Text>
@@ -390,7 +390,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   dayTabText: { color: colors.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
   dayTabTextActive: { color: '#07231F', fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },
 
-  mealCard: { gap: SPACING.sm, marginBottom: SPACING.sm },
+  // Spacing between the card's rows belongs on the inner wrapper; the margin
+  // between cards belongs on the shell.
+  mealCard: { marginBottom: SPACING.sm },
+  mealCardInner: { gap: SPACING.sm },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   mealName: { ...TYPOGRAPHY.heading, color: colors.text },
   mealItemRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },

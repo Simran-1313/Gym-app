@@ -91,7 +91,7 @@ const CheckInCard: React.FC<{ item: CheckIn; index: number }> = ({ item, index }
 
   return (
     <StaggerItem index={index}>
-      <GlassCard glowColor={isActive ? colors.success : color} style={s.card}>
+      <GlassCard glowColor={isActive ? colors.success : color} innerStyle={s.card}>
         <View style={s.cardTop}>
           {/* Icon */}
           <View style={[s.iconBox, { backgroundColor: `${color}15` }]}>

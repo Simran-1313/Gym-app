@@ -36,7 +36,7 @@ const DayCard: React.FC<{ day: WorkoutDay }> = ({ day }) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
-  <GlassCard glowColor={colors.primary} style={styles.dayCard}>
+  <GlassCard glowColor={colors.primary} innerStyle={styles.dayCard}>
     <View style={styles.dayHeader}>
       <Ionicons name="barbell-outline" size={16} color={colors.primary} />
       <View style={styles.dayTitleWrap}>
@@ -169,7 +169,7 @@ export const WorkoutPlanScreen: React.FC = () => {
           </View>
         )}
 
-        <GlassCard glowColor={colors.accent} style={styles.summaryCard}>
+        <GlassCard glowColor={colors.accent} innerStyle={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="fitness" size={20} color={colors.accent} />
             <Text style={styles.summaryTitle}>Your Workout Plan</Text>

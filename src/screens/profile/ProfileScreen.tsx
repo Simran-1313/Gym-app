@@ -218,7 +218,7 @@ export const ProfileScreen: React.FC = () => {
 
         {/* ── Hero Profile Card (Centered Avatar Redesign) ── */}
         <Animated.View entering={FadeInUp.duration(400).delay(80)}>
-          <GlassCard glowColor={colors.primary} style={s.heroCardCenter}>
+          <GlassCard glowColor={colors.primary} innerStyle={s.heroCardCenter}>
             <View style={s.heroCenterWrap}>
               <FitnessAvatar 
                 name={user?.name} 
@@ -264,7 +264,7 @@ export const ProfileScreen: React.FC = () => {
         {/* ── Edit Mode ── */}
         {editing && (
           <Animated.View entering={FadeInUp.duration(300)}>
-            <GlassCard style={s.editCard}>
+            <GlassCard innerStyle={s.editCard}>
               <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>EDIT DETAILS</Text>
               <GlassInput label="Full Name" value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" editable={!saving} />
               <GlassInput label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" editable={!saving} />

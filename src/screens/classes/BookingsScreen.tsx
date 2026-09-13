@@ -127,7 +127,7 @@ export const BookingsScreen: React.FC = () => {
             const canCancel = b.status === 'CONFIRMED';
             return (
               <StaggerItem key={b.id} index={i}>
-                <GlassCard glowColor={cfg.color} style={styles.card}>
+                <GlassCard glowColor={cfg.color} innerStyle={styles.card}>
                   <View style={styles.cardTop}>
                     <View style={styles.classBlock}>
                       <Text style={[styles.className, { color: colors.text }]}>{b.schedule.class.name}</Text>

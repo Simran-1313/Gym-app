@@ -6,193 +6,373 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
+  Easing,
   FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
+
 import { useAuth } from '../../context/AuthContext';
-import { FONT_SIZE, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { useThemeColors } from '../../hooks/useThemeColors';
-import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
-import { GlassCard } from '../../components/ui/GlassCard';
-import { GlassInput } from '../../components/ui/GlassInput';
+import { FONTS, SPACING } from '../../config/theme';
+import { isValidHex } from '../../utils/color';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
-import { GymLogo } from '../../components/ui/GymLogo';
-import { SceneryBackdrop } from '../../components/ui/SceneryBackdrop';
 
+/**
+ * Auth is a fixed dark surface in both themes, matching docs/UI_PROTOTYPE.html
+ * (#screen-login). The theme toggle lives behind the login wall, so there is no
+ * preference to honour yet — and the scene is artwork, which cannot recolour.
+ */
+const SCENE = {
+  glow: 'rgba(45,212,200,0.22)',
+  skyTop: '#0D1A22',
+  skyMid: '#0A141C',
+  skyBottom: '#08090C',
+  ridgeNear: '#101F28',
+  ridgeMid: '#172933',
+  ridgeFar: '#0D1C24',
+};
 
+/** Dark-mode tokens, lifted verbatim from the prototype's `:root`. */
+const INK = {
+  bg: '#08090C',
+  surface: '#0F1319',
+  hairline: 'rgba(255,255,255,0.13)',
+  teal: '#2DD4C8',
+  text: '#F5F7F9',
+  muted: 'rgba(245,247,249,0.64)',
+  dim: 'rgba(245,247,249,0.4)',
+  danger: '#FF5A5F',
+};
+
+const SCENE_H = 280;
+/** The prototype's ridge geometry is authored against a 390pt-wide frame. */
+const BASE_W = 390;
+
+const MountainScene: React.FC<{ width: number }> = ({ width }) => {
+  const k = width / BASE_W;
+  const pt = (x: number, y: number) => `${x * k},${y}`;
+  /** [left edge, apex, right edge] — CSS `left` + border-widths of each .mtn. */
+  const ridge = (left: number, halfBase: number, height: number) =>
+    [
+      pt(left, SCENE_H),
+      pt(left + halfBase, SCENE_H - height),
+      pt(left + halfBase * 2, SCENE_H),
+    ].join(' ');
+
+  return (
+    <Svg width={width} height={SCENE_H} style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={SCENE.skyTop} />
+          <Stop offset="0.45" stopColor={SCENE.skyMid} />
+          <Stop offset="1" stopColor={SCENE.skyBottom} />
+        </SvgLinearGradient>
+        <RadialGradient id="glow" cx="70%" cy="20%" rx="87%" ry="79%">
+          <Stop offset="0" stopColor={SCENE.glow} />
+          <Stop offset="0.65" stopColor={SCENE.glow} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect x={0} y={0} width={width} height={SCENE_H} fill="url(#sky)" />
+      <Rect x={0} y={0} width={width} height={SCENE_H} fill="url(#glow)" />
+      {/* Paint order is mtn2 → mtn1 → mtn3, as in the prototype's markup:
+          the tall translucent ridge sits behind the two solid ones. */}
+      <Polygon points={ridge(90, 170, 170)} fill={SCENE.ridgeMid} opacity={0.45} />
+      <Polygon points={ridge(-30, 140, 130)} fill={SCENE.ridgeNear} opacity={0.9} />
+      <Polygon points={ridge(260, 120, 100)} fill={SCENE.ridgeFar} opacity={0.9} />
+    </Svg>
+  );
+};
+
+/** "Ironworks Gym" → "IG"; a single word falls back to its first two letters. */
+const initialsOf = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words.slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+  }
+  return (words[0] ?? '').slice(0, 2).toUpperCase();
+};
 
 export const LoginScreen: React.FC = () => {
   const { login, gym } = useAuth();
-  const colors = useThemeColors();
+  const { width } = useWindowDimensions();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState<'email' | 'password' | null>(null);
+
+  // Tenant branding still applies pre-login — the gym is resolved before the
+  // member signs in, so its accent should already be on the login screen.
+  const accent = isValidHex(gym?.primaryColor) ? (gym!.primaryColor as string) : INK.teal;
+  // The mark and the wordmark must agree, so both read from one resolved name.
+  const gymName = gym?.name?.trim() || 'Clasendra';
+
   const shakeX = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
 
-  const shakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shakeX.value }],
-  }));
-
+  /** Mirrors the prototype's `@keyframes shakeX`: 0.4s linear, -9/8/-5/4. */
   const triggerShake = () => {
+    const step = { duration: 80, easing: Easing.linear };
     shakeX.value = withSequence(
-      withTiming(-10, { duration: 50 }),
-      withTiming(10, { duration: 50 }),
-      withTiming(-8, { duration: 50 }),
-      withTiming(8, { duration: 50 }),
-      withTiming(0, { duration: 50 }),
+      withTiming(-9, step),
+      withTiming(8, step),
+      withTiming(-5, step),
+      withTiming(4, step),
+      withTiming(0, step),
     );
   };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing Fields', 'Please enter your email and password.');
+      setError('Enter both your email and password to continue.');
       triggerShake();
       return;
     }
+    setError(null);
     setLoading(true);
     try {
       await login({ email: email.trim().toLowerCase(), password });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
       triggerShake();
-      Alert.alert('Login Failed', message);
     } finally {
       setLoading(false);
     }
   };
 
+  // No self-serve reset exists on the backend; the gym resets member passwords.
+  const handleForgot = () =>
+    Alert.alert(
+      'Forgot password?',
+      'Ask your gym’s front desk to reset it — they’ll send you a new temporary password.',
+    );
+
+  const handleFirstTime = () =>
+    Alert.alert(
+      'First time here?',
+      'Sign in with the temporary email and password your gym sent you. You’ll set your own password and build your profile straight after.',
+    );
+
+  const fieldBorder = (name: 'email' | 'password') =>
+    focused === name ? accent : INK.hairline;
+
   return (
-    <AnimatedScreen noBackground style={styles.flex}>
-      <View style={styles.backgroundImage}>
-        <SceneryBackdrop variant="mountains" isDark scrimStrength={1.05} />
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-              <GymLogo name={gym?.name} logo={gym?.logo} size={80} style={styles.logoCard} />
-              <Text style={[styles.brand, { color: colors.text }]} numberOfLines={2} adjustsFontSizeToFit>
-                {gym?.name ?? 'Clasendra'}
+          {/* ── Scene ── */}
+          <View style={styles.scene}>
+            <MountainScene width={width} />
+            <Animated.View entering={FadeIn.duration(500)} style={styles.brand}>
+              <View
+                style={[
+                  styles.tenantMark,
+                  { backgroundColor: `${accent}24`, borderColor: `${accent}4D` },
+                ]}
+              >
+                <Text style={[styles.tenantMarkText, { color: accent }]}>
+                  {initialsOf(gymName)}
+                </Text>
+              </View>
+              <Text style={styles.wordmark} numberOfLines={1} adjustsFontSizeToFit>
+                {gymName.toUpperCase()}
               </Text>
-              <Text style={[styles.tagline, { color: colors.textSecondary }]}>
-                {gym ? 'Your gym, in your pocket.' : 'Sign in with the details your gym sent you.'}
-              </Text>
+              <Text style={styles.tagline}>Progress. Not perfection.</Text>
             </Animated.View>
+          </View>
 
-            <Animated.View style={shakeStyle}>
-              <GlassCard glowColor={colors.primaryGlow} innerStyle={styles.cardInner}>
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Member Login</Text>
-                  <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Welcome back — let's get you training.</Text>
-                </View>
+          {/* ── Body sheet, overlapping the scene ── */}
+          <Animated.View style={[styles.body, shakeStyle]}>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.sub}>Sign in to continue your training</Text>
 
-                <GlassInput
-                  label="Email"
-                  placeholder="you@example.com"
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>EMAIL</Text>
+              <View style={[styles.inputWrap, { borderColor: fieldBorder('email') }]}>
+                <Ionicons name="mail-outline" size={16} color={INK.dim} />
+                <TextInput
+                  style={styles.input}
                   value={email}
                   onChangeText={setEmail}
+                  onFocus={() => setFocused('email')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="you@example.com"
+                  placeholderTextColor={INK.dim}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
-                  leftIcon={<Ionicons name="mail-outline" size={18} color={colors.textSecondary} />}
                 />
+              </View>
+            </View>
 
-                <GlassInput
-                  label="Password"
-                  placeholder="Enter password"
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>PASSWORD</Text>
+              <View style={[styles.inputWrap, { borderColor: fieldBorder('password') }]}>
+                <Ionicons name="lock-closed-outline" size={16} color={INK.dim} />
+                <TextInput
+                  style={styles.input}
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={() => setFocused('password')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="••••••••"
+                  placeholderTextColor={INK.dim}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  editable={!loading}
                   onSubmitEditing={handleLogin}
                   returnKeyType="done"
-                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />}
-                  rightIcon={
-                    <TouchableOpacity
-                      onPress={() => setShowPassword((v) => !v)}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      <Ionicons
-                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  }
+                  editable={!loading}
                 />
+                <TouchableOpacity
+                  onPress={() => setShowPassword((v) => !v)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={INK.dim}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-                <AnimatedButton label="Sign In" onPress={handleLogin} loading={loading} style={styles.btn} />
+            <TouchableOpacity onPress={handleForgot} style={styles.links} hitSlop={8}>
+              <Text style={[styles.linkText, { color: accent }]}>Forgot password?</Text>
+            </TouchableOpacity>
 
-                <Text style={[styles.hint, { color: colors.textMuted }]}>Use the email and password sent by your gym.</Text>
-              </GlassCard>
-            </Animated.View>
+            {error ? (
+              <Animated.View entering={FadeIn.duration(180)} style={styles.errorBox}>
+                <Ionicons name="alert-circle-outline" size={15} color={INK.danger} />
+                <Text style={styles.errorText}>{error}</Text>
+              </Animated.View>
+            ) : null}
 
-            {/* Platform credit stays small and out of the way — the gym owns this screen. */}
-            <Text style={[styles.poweredBy, { color: colors.textMuted }]}>Powered by Clasendra</Text>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    </AnimatedScreen>
+            <AnimatedButton label="Log In" onPress={handleLogin} loading={loading} />
+
+            <Text style={styles.foot}>
+              First time here?{' '}
+              <Text style={[styles.footLink, { color: accent }]} onPress={handleFirstTime}>
+                Set up your profile
+              </Text>
+            </Text>
+
+            <Text style={styles.poweredBy}>Powered by Clasendra</Text>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
-// Vertical rhythm is one scale, applied consistently: 8 inside a pair (label to
-// field), 16 between fields, 24 before an action, 32 between sections.
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: INK.bg },
   flex: { flex: 1 },
-  backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  scroll: {
-    flexGrow: 1,
+  scroll: { flexGrow: 1 },
+
+  scene: { height: SCENE_H, overflow: 'hidden' },
+  brand: { position: 'absolute', top: 54, left: 0, right: 0, alignItems: 'center', gap: 10 },
+  tenantMark: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(45,212,191,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(45,212,191,0.3)',
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  tenantMarkText: { fontFamily: FONTS.bodyExtra, fontSize: 16, color: INK.teal },
+  wordmark: {
+    fontFamily: FONTS.bodyExtra,
+    fontSize: 17,
+    letterSpacing: 3,
+    color: INK.text,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xxl,
-  },
-  header: { alignItems: 'center', marginBottom: SPACING.xl },
-  logoCard: { marginBottom: SPACING.md },
-  brand: {
-    ...TYPOGRAPHY.hero,
     textAlign: 'center',
-    paddingHorizontal: SPACING.md,
   },
-  tagline: {
-    ...TYPOGRAPHY.body,
-    marginTop: SPACING.sm,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.md,
-  },
+  tagline: { fontFamily: FONTS.body, fontSize: 12, color: INK.muted },
 
-  // `gap` sets the base spacing between every child of the card, so no element
-  // needs its own margin to stay clear of its neighbour.
-  cardInner: { padding: SPACING.lg, gap: SPACING.md },
-  cardHeader: { gap: SPACING.xs, marginBottom: SPACING.xs },
-  cardTitle: { ...TYPOGRAPHY.title },
-  cardSubtitle: { ...TYPOGRAPHY.caption, fontSize: FONT_SIZE.sm },
-
-  // 8 on top of the card's 16 gap = 24 clear above the primary action.
-  btn: { marginTop: SPACING.sm },
-  hint: {
-    ...TYPOGRAPHY.caption,
-    textAlign: 'center',
-    lineHeight: 18,
+  // Pulled up over the scene with a large top radius, per .login-body.
+  body: {
+    flex: 1,
+    marginTop: -24,
+    backgroundColor: INK.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 20,
   },
+  title: { fontFamily: FONTS.bodyExtra, fontSize: 20, color: INK.text, marginBottom: 4 },
+  sub: { fontFamily: FONTS.body, fontSize: 12.5, color: INK.muted, marginBottom: 22 },
+
+  field: { marginBottom: 14 },
+  fieldLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11.5,
+    color: INK.muted,
+    marginBottom: 7,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: INK.surface,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 15,
+    paddingVertical: Platform.OS === 'ios' ? 13 : 4,
+  },
+  input: { flex: 1, fontFamily: FONTS.body, fontSize: 13.5, color: INK.text, padding: 0 },
+
+  links: { alignSelf: 'flex-end', marginTop: -4, marginBottom: 20 },
+  linkText: { fontFamily: FONTS.bodySemi, fontSize: 11.5, color: INK.teal },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,90,95,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,95,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginBottom: 16,
+  },
+  errorText: { flex: 1, fontFamily: FONTS.body, fontSize: 12, color: INK.danger },
+
+  foot: { textAlign: 'center', fontFamily: FONTS.body, fontSize: 11.5, color: INK.muted, marginTop: 20 },
+  footLink: { fontFamily: FONTS.bodySemi, color: INK.teal },
   poweredBy: {
-    ...TYPOGRAPHY.caption,
     textAlign: 'center',
-    marginTop: SPACING.xl,
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    color: INK.dim,
+    marginTop: 14,
     letterSpacing: 0.4,
   },
 });
