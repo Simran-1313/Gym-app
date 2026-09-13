@@ -100,12 +100,11 @@ export const MembershipScreen: React.FC = () => {
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 110, paddingHorizontal: 16, gap: 14 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        <Animated.View entering={FadeInUp.duration(350)}>
-          <Text style={[s.pageTitle, { color: colors.text }]}>Membership & Billing</Text>
-          {isSample ? (
+        {isSample ? (
+          <Animated.View entering={FadeInUp.duration(300)}>
             <Text style={[s.sampleNote, { color: colors.textMuted }]}>Showing sample billing data — live billing is coming soon.</Text>
-          ) : null}
-        </Animated.View>
+          </Animated.View>
+        ) : null}
 
         {subscription ? (
           <StaggerItem index={0}>
@@ -151,10 +150,10 @@ export const MembershipScreen: React.FC = () => {
         )}
 
         <StaggerItem index={1}>
-          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>PAYMENT METHOD</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>Payment Method</Text>
           <GlassCard innerStyle={s.row}>
             <View style={[s.rowIcon, { backgroundColor: colors.inset }]}>
-              <Ionicons name="card-outline" size={18} color={colors.text} />
+              <Ionicons name="card-outline" size={17} color={colors.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.rowTitle, { color: colors.text }]}>UPI · you@okaxis</Text>
@@ -165,13 +164,13 @@ export const MembershipScreen: React.FC = () => {
         </StaggerItem>
 
         <StaggerItem index={2}>
-          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>INVOICE HISTORY</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>Invoice History</Text>
         </StaggerItem>
         {invoices.map((inv, i) => (
           <StaggerItem index={3 + i} key={inv.id}>
             <GlassCard innerStyle={s.row}>
               <View style={[s.rowIcon, { backgroundColor: i === 0 ? `${colors.primary}1F` : colors.inset }]}>
-                <Ionicons name="document-text-outline" size={18} color={i === 0 ? colors.primary : colors.textMuted} />
+                <Ionicons name="document-text-outline" size={17} color={i === 0 ? colors.primary : colors.textMuted} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.rowTitle, { color: colors.text }]}>
@@ -211,7 +210,6 @@ export const MembershipScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  pageTitle: { fontSize: 26, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5, marginBottom: 4 },
   sampleNote: { fontSize: FONT_SIZE.xs, marginBottom: 4 },
 
   planCard: { gap: 0, padding: SPACING.lg },
@@ -230,13 +228,16 @@ const s = StyleSheet.create({
 
   planActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
 
-  sectionTitle: { fontSize: 11, fontFamily: FONTS.displayBold, letterSpacing: 0.8, marginBottom: SPACING.sm, marginTop: 4 },
+  // `.section-row .st { font-size:14px; font-weight:700 }`
+  sectionTitle: { fontSize: 14, fontFamily: FONTS.bodyBold, marginBottom: SPACING.sm, marginTop: 10 },
 
+  // `.checkin-icon { 40x40; radius 12 }` / `.checkin-name` / `.checkin-meta`
   row: { flexDirection: 'row', alignItems: 'center', gap: 13 },
-  rowIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  rowIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { fontSize: 13.5, fontFamily: FONTS.bodySemi },
   rowSub: { fontSize: 11.5, marginTop: 2 },
-  rowAction: { fontSize: 12, fontFamily: FONTS.bodyBold },
-  amountPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.full },
-  amountText: { fontSize: 12, fontFamily: FONTS.bodyBold },
+  rowAction: { fontSize: 11.5, fontFamily: FONTS.bodyBold },
+  // `.checkin-badge { 9.5/700; padding 4px 9px; radius 100; uppercase; .02em }`
+  amountPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.full },
+  amountText: { fontSize: 9.5, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', letterSpacing: 0.19 },
 });

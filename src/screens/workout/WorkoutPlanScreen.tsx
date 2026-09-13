@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect , useMemo} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,15 +14,26 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePlans } from '../../context/PlansContext';
-import { useAuth } from '../../context/AuthContext';
-import { DARK_COLORS, FONTS, FONT_SIZE, LIGHT_COLORS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
-import { WorkoutDay, WorkoutPlanContent } from '../../types';
+import { FONTS, RADIUS, SPACING } from '../../config/theme';
+import { WorkoutDay, WorkoutExercise } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { ScreenBackground } from '../../components/ui/ScreenBackground';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
-import { StatBadge } from '../../components/ui/StatBadge';
+
+/**
+ * Ported from `#screen-workout-plan` in docs/UI_PROTOTYPE.html: a 3-stat pill
+ * row, a 7-day tab strip that highlights today and marks rest days, and one
+ * `.wi-row` per exercise for the selected day.
+ *
+ * The prototype's exercise rows also carry a Done/Next/Pending status pill —
+ * that requires per-set completion history the backend has no endpoint for
+ * (`POST /member/activity/workouts` only logs a session-level summary, not
+ * individual sets), so it isn't rendered here rather than faked with numbers
+ * that would look real but aren't backed by anything.
+ */
 
 const formatUpdated = (iso?: string): string => {
   if (!iso) return '';
@@ -30,29 +42,34 @@ const formatUpdated = (iso?: string): string => {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const DayCard: React.FC<{ day: WorkoutDay }> = ({ day }) => {
-  const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+const WEEKDAY_MATCH = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
+/** True when `day.day` names the same weekday as `now` — plans are generated
+ * with weekday-named days (or a rest day) rather than calendar dates. */
+const isToday = (day: string, now: Date): boolean => {
+  const key = day.trim().toLowerCase().slice(0, 3);
+  return WEEKDAY_MATCH[now.getDay()] === key;
+};
+
+const isRestDay = (day: WorkoutDay): boolean =>
+  (day.exercises?.length ?? 0) === 0 || /\brest\b/i.test(day.focus ?? '');
+
+const ExerciseRow: React.FC<{ exercise: WorkoutExercise }> = ({ exercise }) => {
+  const colors = useThemeColors();
   return (
-  <GlassCard glowColor={colors.primary} innerStyle={styles.dayCard}>
-    <View style={styles.dayHeader}>
-      <Ionicons name="barbell-outline" size={16} color={colors.primary} />
-      <View style={styles.dayTitleWrap}>
-        <Text style={styles.dayTitle}>{day.day}</Text>
-        <StatBadge icon="fitness-outline" label="Focus" value={day.focus} color={colors.accent} />
+    <GlassCard style={s.wiRow} innerStyle={s.wiRowInner}>
+      <View style={[s.wiIcon, { backgroundColor: colors.inset }]}>
+        <Ionicons name="barbell-outline" size={17} color={colors.text} />
       </View>
-    </View>
-    {(day.exercises ?? []).map((ex, idx) => (
-      <View key={`${ex.name}-${idx}`} style={styles.exerciseRow}>
-        <Text style={styles.exerciseName}>{ex.name}</Text>
-        <Text style={styles.exerciseMeta}>
-          {ex.sets} sets × {ex.reps} · rest {ex.rest}
+      <View style={s.flex1}>
+        <Text style={[s.wiName, { color: colors.text }]} numberOfLines={1}>
+          {exercise.name}
+        </Text>
+        <Text style={[s.wiMeta, { color: colors.textMuted }]}>
+          {exercise.sets} sets × {exercise.reps} · rest {exercise.rest}
         </Text>
       </View>
-    ))}
-  </GlassCard>
+    </GlassCard>
   );
 };
 
@@ -61,9 +78,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParams, 'WorkoutPlan'>>();
   const insets = useSafeAreaInsets();
   const { workout, loadPlan, generatePlan, setPlan } = usePlans();
-  const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const colors = useThemeColors();
+
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   useEffect(() => {
     const paramPlan = route.params?.plan ?? null;
@@ -82,9 +99,18 @@ export const WorkoutPlanScreen: React.FC = () => {
   }, []);
 
   const plan = workout.plan;
-  const content = plan ? (plan.content as WorkoutPlanContent) : null;
+  const content = plan ? (plan.content as { weeklyPlan: WorkoutDay[] }) : null;
   const days = content?.weeklyPlan ?? [];
   const showBlockingLoader = (workout.generating || workout.loading) && days.length === 0;
+
+  const now = useMemo(() => new Date(), []);
+  const todayIndex = useMemo(() => {
+    const idx = days.findIndex((d) => isToday(d.day, now));
+    return idx >= 0 ? idx : 0;
+  }, [days, now]);
+
+  const activeIndex = selectedDay ?? todayIndex;
+  const activeDay = days[activeIndex];
 
   const handleGenerateNew = useCallback(() => {
     Alert.alert(
@@ -92,7 +118,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       'This builds a new weekly workout split from your current fitness profile. It can take up to a minute.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Generate', onPress: () => generatePlan('WORKOUT') },
+        { text: 'Generate', onPress: () => { setSelectedDay(null); generatePlan('WORKOUT'); } },
       ],
     );
   }, [generatePlan]);
@@ -100,12 +126,12 @@ export const WorkoutPlanScreen: React.FC = () => {
   const renderBody = () => {
     if (showBlockingLoader) {
       return (
-        <View style={styles.center}>
+        <View style={s.center}>
           <AiLoadingPulse icon="barbell-outline" size={48} />
-          <Text style={styles.loadingTitle}>
+          <Text style={[s.loadingTitle, { color: colors.text }]}>
             {workout.generating ? 'Building your workout split' : 'Loading your workout plan'}
           </Text>
-          <Text style={styles.loadingText}>
+          <Text style={[s.loadingText, { color: colors.textSecondary }]}>
             {workout.generating
               ? 'Our AI coach is structuring your training week. This may take up to a minute.'
               : 'Fetching your saved plan…'}
@@ -116,12 +142,24 @@ export const WorkoutPlanScreen: React.FC = () => {
 
     if (days.length === 0) {
       return (
-        <View style={styles.center}>
-          <View style={[styles.emptyIconWrap, workout.error && { borderColor: `${colors.danger}40`, backgroundColor: `${colors.danger}10` }]}>
-            <Ionicons name={workout.error ? "warning-outline" : "barbell-outline"} size={42} color={workout.error ? colors.danger : colors.primary} />
+        <View style={s.center}>
+          <View
+            style={[
+              s.emptyIconWrap,
+              { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+              workout.error && { borderColor: `${colors.danger}40`, backgroundColor: `${colors.danger}10` },
+            ]}
+          >
+            <Ionicons
+              name={workout.error ? 'warning-outline' : 'barbell-outline'}
+              size={42}
+              color={workout.error ? colors.danger : colors.primary}
+            />
           </View>
-          <Text style={styles.emptyTitle}>{workout.error ? "Oops, something went wrong!" : "No workout plan yet"}</Text>
-          <Text style={styles.errorText}>
+          <Text style={[s.emptyTitle, { color: colors.text }]}>
+            {workout.error ? 'Oops, something went wrong!' : 'No workout plan yet'}
+          </Text>
+          <Text style={[s.loadingText, { color: colors.textSecondary }]}>
             {workout.error ?? 'Generate a personalised training split from your fitness profile.'}
           </Text>
           {workout.error ? (
@@ -147,51 +185,113 @@ export const WorkoutPlanScreen: React.FC = () => {
       );
     }
 
-    const totalExercises = days.reduce((sum, d) => sum + (d.exercises?.length ?? 0), 0);
+    const trainingDays = days.filter((d) => !isRestDay(d));
+    const totalExercises = trainingDays.reduce((sum, d) => sum + (d.exercises?.length ?? 0), 0);
+    const totalSets = trainingDays.reduce(
+      (sum, d) => sum + (d.exercises ?? []).reduce((s2, ex) => s2 + (ex.sets || 0), 0),
+      0,
+    );
     const updatedLabel = formatUpdated(plan?.createdAt);
+    const activeIsRest = activeDay ? isRestDay(activeDay) : false;
+    const activeIsToday = activeIndex === todayIndex;
 
     return (
       <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+        style={s.root}
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]}
         refreshControl={
-          <RefreshControl
-            refreshing={workout.loading}
-            onRefresh={() => loadPlan('WORKOUT', true)}
-            tintColor={colors.primary}
-          />
+          <RefreshControl refreshing={workout.loading} onRefresh={() => loadPlan('WORKOUT', true)} tintColor={colors.primary} />
         }
       >
         {workout.generating && (
-          <View style={styles.banner}>
+          <View style={[s.banner, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <AiLoadingPulse icon="sparkles" size={18} />
-            <Text style={styles.bannerText}>Generating a fresh plan…</Text>
+            <Text style={[s.bannerText, { color: colors.textSecondary }]}>Generating a fresh plan…</Text>
           </View>
         )}
 
-        <GlassCard glowColor={colors.accent} innerStyle={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <Ionicons name="fitness" size={20} color={colors.accent} />
-            <Text style={styles.summaryTitle}>Your Workout Plan</Text>
+        {/* ── Stat pills (`.stat-row` / `.stat-pill`) — every value is real ── */}
+        <View style={s.statRow}>
+          <View style={[s.statPill, { backgroundColor: colors.surfaceElevated }]}>
+            <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            <Text style={[s.spV, { color: colors.text }]}>{trainingDays.length}</Text>
+            <Text style={[s.spL, { color: colors.textMuted }]}>Days/Wk</Text>
           </View>
-          <Text style={styles.summaryText}>
-            {days.length}-day personalised split based on your fitness profile.
-          </Text>
-          <View style={styles.statsRow}>
-            <StatBadge icon="calendar-outline" label="Days" value={`${days.length}`} color={colors.primary} />
-            <StatBadge icon="barbell-outline" label="Exercises" value={`${totalExercises}`} color={colors.info} />
+          <View style={[s.statPill, { backgroundColor: colors.surfaceElevated }]}>
+            <Ionicons name="barbell-outline" size={16} color={colors.warning} />
+            <Text style={[s.spV, { color: colors.text }]}>{totalExercises}</Text>
+            <Text style={[s.spL, { color: colors.textMuted }]}>Exercises</Text>
           </View>
-          {!!updatedLabel && (
-            <View style={styles.updatedRow}>
-              <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-              <Text style={styles.updatedText}>Updated {updatedLabel}</Text>
-            </View>
-          )}
-        </GlassCard>
+          <View style={[s.statPill, { backgroundColor: colors.surfaceElevated }]}>
+            <Ionicons name="repeat-outline" size={16} color={colors.info} />
+            <Text style={[s.spV, { color: colors.text }]}>{totalSets}</Text>
+            <Text style={[s.spL, { color: colors.textMuted }]}>Total Sets</Text>
+          </View>
+        </View>
 
-        {days.map((day, i) => (
-          <DayCard key={`${day.day}-${i}`} day={day} />
-        ))}
+        {/* ── Day tabs (`.daytabs`) ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dayTabs}>
+          {days.map((day, i) => {
+            const active = i === activeIndex;
+            const rest = isRestDay(day);
+            const today = i === todayIndex;
+            return (
+              <Pressable
+                key={`${day.day}-${i}`}
+                onPress={() => setSelectedDay(i)}
+                disabled={rest}
+                style={[
+                  s.dayTab,
+                  rest && s.dayTabRest,
+                  active
+                    ? { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder }
+                    : { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                ]}
+              >
+                <Text style={[s.dayTabD, { color: active ? colors.primary : colors.textMuted }]}>
+                  {day.day.slice(0, 3)}
+                </Text>
+                <Text style={[s.dayTabN, { color: colors.text }]} numberOfLines={1}>
+                  {rest ? 'Rest' : day.focus}
+                </Text>
+                {today && !rest ? <View style={[s.dayTabDot, { backgroundColor: colors.primary }]} /> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* ── Today card ── */}
+        {activeDay ? (
+          <GlassCard elevated style={s.todayCard} innerStyle={s.todayCardInner}>
+            <Text style={[s.eyebrow, { color: colors.textMuted }]}>
+              {activeIsToday ? 'TODAY' : activeDay.day.toUpperCase()}
+              {activeIsToday ? ` · ${activeDay.day}` : ''}
+            </Text>
+            <Text style={[s.todayTitle, { color: colors.text }]}>
+              {activeIsRest ? 'Rest Day' : activeDay.focus}
+            </Text>
+            {!activeIsRest && (
+              <Text style={[s.todaySub, { color: colors.textMuted }]}>
+                {(activeDay.exercises ?? []).length} exercises planned
+              </Text>
+            )}
+          </GlassCard>
+        ) : null}
+
+        {!!updatedLabel && (
+          <View style={s.updatedRow}>
+            <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+            <Text style={[s.updatedText, { color: colors.textMuted }]}>Updated {updatedLabel}</Text>
+          </View>
+        )}
+
+        {activeDay && !activeIsRest ? (
+          <View>
+            {(activeDay.exercises ?? []).map((ex, idx) => (
+              <ExerciseRow key={`${ex.name}-${idx}`} exercise={ex} />
+            ))}
+          </View>
+        ) : null}
 
         <AnimatedButton
           label={workout.generating ? 'Generating…' : 'Generate New Plan'}
@@ -207,75 +307,54 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   return (
     <ScreenBackground>
-      <View style={[styles.shell, { paddingTop: insets.top + 56 }]}>
-        {renderBody()}
-      </View>
+      <View style={[s.shell, { paddingTop: insets.top + 56 }]}>{renderBody()}</View>
     </ScreenBackground>
   );
 };
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const s = StyleSheet.create({
   shell: { flex: 1 },
   root: { flex: 1 },
+  flex1: { flex: 1 },
   scroll: { padding: SPACING.lg, gap: SPACING.md },
 
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  loadingTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.lg, textAlign: 'center' },
-  loadingText: { color: colors.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
-  errorText: { color: colors.textSecondary, fontSize: FONT_SIZE.md, textAlign: 'center', lineHeight: 22 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg, gap: SPACING.md },
+  loadingTitle: { fontSize: 18, fontFamily: FONTS.bodyExtra, textAlign: 'center' },
+  loadingText: { fontSize: 13.5, textAlign: 'center', lineHeight: 20 },
+  emptyIconWrap: { width: 84, height: 84, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  emptyTitle: { fontSize: 18, fontFamily: FONTS.bodyExtra, textAlign: 'center' },
 
-  emptyIconWrap: {
-    width: 84,
-    height: 84,
-    borderRadius: RADIUS.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  emptyTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.xl, textAlign: 'center' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1 },
+  bannerText: { fontSize: 12.5, fontFamily: FONTS.bodySemi },
 
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  bannerText: { color: colors.textSecondary, fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
+  // `.stat-row { gap:10 }` / `.stat-pill { flex:1; gap:4; padding:12px 6px; radius:16 }`
+  statRow: { flexDirection: 'row', gap: 10 },
+  statPill: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12, paddingHorizontal: 6, borderRadius: 16 },
+  spV: { fontSize: 15, fontFamily: FONTS.bodyExtra },
+  spL: { fontSize: 9.5, fontFamily: FONTS.bodySemi, textTransform: 'uppercase', letterSpacing: 0.3 },
 
-  summaryCard: { gap: SPACING.sm },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  summaryTitle: { ...TYPOGRAPHY.title, color: colors.text, fontSize: FONT_SIZE.xl },
-  summaryText: { ...TYPOGRAPHY.body, color: colors.textSecondary, lineHeight: 21 },
-  statsRow: { flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap' },
+  // `.daytabs`
+  dayTabs: { gap: 8, paddingVertical: 2 },
+  dayTab: { minWidth: 56, paddingHorizontal: 8, paddingVertical: 10, borderRadius: 16, alignItems: 'center', borderWidth: 1 },
+  dayTabRest: { opacity: 0.5 },
+  dayTabD: { fontSize: 9.5, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dayTabN: { fontSize: 12, fontFamily: FONTS.bodyExtra, marginTop: 3, maxWidth: 64 },
+  dayTabDot: { width: 4, height: 4, borderRadius: 2, marginTop: 4 },
+
+  // `.card.card-elevated { padding:18px; margin-bottom:14px }`
+  todayCard: { marginBottom: 2 },
+  todayCardInner: { padding: 18 },
+  eyebrow: { fontSize: 10.5, fontFamily: FONTS.bodyBold, letterSpacing: 0.8 },
+  todayTitle: { fontSize: 16, fontFamily: FONTS.bodyExtra, marginTop: 5 },
+  todaySub: { fontSize: 12, marginTop: 2 },
+
   updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  updatedText: { color: colors.textMuted, fontSize: FONT_SIZE.xs },
+  updatedText: { fontSize: 11 },
 
-  dayCard: { gap: SPACING.sm },
-  dayHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },
-  dayTitleWrap: { flex: 1, gap: 8 },
-  dayTitle: { ...TYPOGRAPHY.heading, color: colors.text },
-
-  exerciseRow: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: SPACING.md,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  exerciseName: { color: colors.text, fontSize: FONT_SIZE.md, fontFamily: FONTS.bodySemi },
-  exerciseMeta: { color: colors.textMuted, fontSize: FONT_SIZE.sm },
+  // `.wi-row { gap:13; padding:15px; margin-bottom:9px }`
+  wiRow: { marginBottom: 9 },
+  wiRowInner: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 15 },
+  wiIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  wiName: { fontSize: 13.5, fontFamily: FONTS.bodySemi },
+  wiMeta: { fontSize: 11.5, marginTop: 2 },
 });

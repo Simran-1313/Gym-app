@@ -33,8 +33,11 @@ export const CheckoutScreen: React.FC = () => {
   const [success, setSuccess] = useState(false);
 
   const total = subscription.plan.price;
-  const baseAmount = total / (1 + GST_RATE);
-  const gstAmount = total - baseAmount;
+  // Round the GST line first and derive the base from it, so the two
+  // displayed lines always sum to exactly `total` — rounding both
+  // independently (e.g. total/1.18 and total-that) can be a paisa off.
+  const gstAmount = Math.round(((total * GST_RATE) / (1 + GST_RATE)) * 100) / 100;
+  const baseAmount = total - gstAmount;
 
   const handlePay = async () => {
     setPaying(true);
@@ -63,8 +66,6 @@ export const CheckoutScreen: React.FC = () => {
         style={s.root}
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40, paddingHorizontal: 16, gap: 16 }}
       >
-        <Text style={[s.pageTitle, { color: colors.text }]}>Confirm & Pay</Text>
-
         <GlassCard>
           <Row label="Plan" value={`${subscription.plan.name} · 1 month`} bold colors={colors} />
           <Row label="Base amount" value={`₹${baseAmount.toFixed(2)}`} colors={colors} divider />
@@ -73,7 +74,7 @@ export const CheckoutScreen: React.FC = () => {
         </GlassCard>
 
         <View>
-          <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>PAY WITH</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>Pay With</Text>
           <View style={s.methodRow}>
             {METHODS.map((m) => {
               const active = method === m;

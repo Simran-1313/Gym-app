@@ -18,6 +18,10 @@ interface Props {
   label?: string;
   value?: string;
   strokeWidth?: number;
+  /** Solid stroke color, e.g. for a set of rings that must read as distinct
+   * metrics (protein/carbs/fat). Omit to keep the default primary→secondary
+   * gradient used for a single "this metric" ring. */
+  color?: string;
 }
 
 export const ProgressRing: React.FC<Props> = ({
@@ -26,8 +30,10 @@ export const ProgressRing: React.FC<Props> = ({
   label,
   value,
   strokeWidth = 6,
+  color,
 }) => {
   const colors = useThemeColors();
+  const gradId = `ringGrad-${label ?? 'r'}`;
   const clamped = Math.min(1, Math.max(0, progress));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -49,12 +55,18 @@ export const ProgressRing: React.FC<Props> = ({
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size}>
-        <Defs>
-          <LinearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={colors.primary} />
-            <Stop offset="100%" stopColor={colors.secondary} />
-          </LinearGradient>
-        </Defs>
+        {/* Each ring needs its own gradient id: siblings sharing "ringGrad"
+            can resolve to whichever <LinearGradient> the renderer saw first,
+            so every ring in a row (e.g. protein/carbs/fat) rendered the same
+            color regardless of its own Stops. */}
+        {!color && (
+          <Defs>
+            <LinearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor={colors.primary} />
+              <Stop offset="100%" stopColor={colors.secondary} />
+            </LinearGradient>
+          </Defs>
+        )}
         <Circle
           cx={cx}
           cy={cy}
@@ -68,7 +80,7 @@ export const ProgressRing: React.FC<Props> = ({
             cx={cx}
             cy={cy}
             r={radius}
-            stroke="url(#ringGrad)"
+            stroke={color ?? `url(#${gradId})`}
             strokeWidth={strokeWidth}
             fill="transparent"
             strokeLinecap="round"
