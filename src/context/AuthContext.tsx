@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
+import { getSecureItem, setSecureItem } from '../utils/secureStorage';
 import { getCookie, clearCookie } from '../services/api';
 import { getMe, login as apiLogin, logout as apiLogout, LoginPayload } from '../services/auth.service';
 import { getDeviceTokenInfo } from '../services/deviceToken';
@@ -30,6 +31,9 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Persisted dark/light choice. Absent means "follow the device". */
+const THEME_KEY = 'clasendra.theme';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -38,7 +42,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [cachedGym, setCachedGym] = useState<GymBrand | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+
+  // Follow the device until the member picks a side, then remember the pick.
+  // Hardcoding 'light' meant a phone in dark mode opened to a bright screen,
+  // and the toggle used to reset on every launch because nothing persisted it.
+  const systemScheme = useColorScheme();
+  const [themeOverride, setThemeOverride] = useState<'dark' | 'light' | null>(null);
+  const theme: 'dark' | 'light' = themeOverride ?? (systemScheme === 'light' ? 'light' : 'dark');
+
+  useEffect(() => {
+    getSecureItem(THEME_KEY)
+      .then((v) => {
+        if (v === 'dark' || v === 'light') setThemeOverride(v);
+      })
+      .catch(() => {});
+  }, []);
 
   // Remember the gym so the *next* launch is branded from the first frame.
   const rememberGym = useCallback((user: User | null) => {
@@ -49,8 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-  }, []);
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setThemeOverride(next);
+    setSecureItem(THEME_KEY, next).catch(() => {});
+  }, [theme]);
 
   const refreshUser = useCallback(async () => {
     try {

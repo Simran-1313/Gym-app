@@ -1,23 +1,10 @@
-import React, { useEffect } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  ViewStyle,
-  StyleProp,
-} from 'react-native';
+import React from 'react';
+import { BackHandler, Pressable, StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import { AnimatedButton } from './AnimatedButton';
-import { RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
+import { FONTS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -31,9 +18,23 @@ interface Props {
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Extra content between the subtitle and the actions (progress bar, timer…). */
+  children?: React.ReactNode;
+  /** Hides the secondary action for sheets that only acknowledge. */
+  hideCancel?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
+/**
+ * The app's one modal: a bottom sheet, matching `.modal-sheet` in
+ * docs/UI_PROTOTYPE.html — grab handle, 26px top corners, slides up from the
+ * bottom edge, capped at 78% of the screen.
+ *
+ * It is deliberately not a centered dialog. On a phone the bottom edge is the
+ * only part of the screen a thumb reaches comfortably, so the actions belong
+ * there, and the actions stack rather than sitting side by side so neither is
+ * the small target.
+ */
 export const GlassOverlay: React.FC<Props> = ({
   visible,
   title,
@@ -44,81 +45,121 @@ export const GlassOverlay: React.FC<Props> = ({
   loading = false,
   onConfirm,
   onCancel,
+  children,
+  hideCancel = false,
+  style,
 }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
-  const scale = useSharedValue(0.92);
-
-  useEffect(() => {
-    if (visible) {
-      scale.value = withSpring(1, { damping: 18, stiffness: 280 });
-    } else {
-      scale.value = 0.92;
-    }
-  }, [visible, scale]);
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  // Android's back gesture should dismiss the sheet, not pop the screen behind it.
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (loading) return true;
+      onCancel();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, loading, onCancel]);
 
   if (!visible) return null;
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(150)}
-      style={styles.backdrop}
-    >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.35)' }]} />
-      <Animated.View style={[styles.card, cardStyle, {
-        backgroundColor: colors.surfaceElevated,
-        borderColor: colors.surfaceBorder,
-      }]}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
-        <View style={styles.actions}>
-          <AnimatedButton
-            label={cancelLabel}
-            variant="secondary"
-            onPress={onCancel}
-            style={styles.actionBtn}
-            disabled={loading}
-          />
-          <AnimatedButton
-            label={confirmLabel}
-            variant="primary"
-            destructive={destructive}
-            onPress={onConfirm}
-            loading={loading}
-            style={styles.actionBtn}
-          />
-        </View>
+    <View style={styles.host} pointerEvents="box-none">
+      <Animated.View
+        entering={FadeIn.duration(220)}
+        exiting={FadeOut.duration(180)}
+        style={StyleSheet.absoluteFill}
+      >
+        <Pressable
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(15,23,42,0.35)' },
+          ]}
+          onPress={loading ? undefined : onCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+        />
       </Animated.View>
-    </Animated.View>
+
+      <Animated.View
+        entering={SlideInDown.springify().damping(22).stiffness(240)}
+        exiting={SlideOutDown.duration(220)}
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: colors.overlay,
+            borderColor: colors.overlayBorder,
+            paddingBottom: insets.bottom + 26,
+          },
+          style,
+        ]}
+      >
+        <View style={[styles.handle, { backgroundColor: colors.overlayBorder }]} />
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.sub, { color: colors.textMuted }]}>{message}</Text>
+
+        {children}
+
+        <AnimatedButton
+          label={confirmLabel}
+          variant="primary"
+          destructive={destructive}
+          onPress={onConfirm}
+          loading={loading}
+        />
+        {hideCancel ? null : (
+          <>
+            <View style={{ height: 10 }} />
+            <AnimatedButton
+              label={cancelLabel}
+              variant="ghost"
+              onPress={onCancel}
+              disabled={loading}
+            />
+          </>
+        )}
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFill,
+  host: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.lg,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
   },
-  card: {
+  sheet: {
     width: '100%',
-    maxWidth: 340,
-    borderRadius: RADIUS.lg,
+    maxHeight: '78%',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderWidth: 1,
-    padding: SPACING.lg,
-    gap: SPACING.md,
+    borderBottomWidth: 0,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: -12 },
+    elevation: 24,
   },
-  title: { ...TYPOGRAPHY.heading },
-  message: { ...TYPOGRAPHY.body, lineHeight: 22 },
-  actions: { flexDirection: 'row', gap: SPACING.sm },
-  actionBtn: { flex: 1 },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  title: { fontFamily: FONTS.bodyExtra, fontSize: 16, marginBottom: 4 },
+  sub: { fontFamily: FONTS.body, fontSize: 12.5, lineHeight: 18, marginBottom: 18 },
 });

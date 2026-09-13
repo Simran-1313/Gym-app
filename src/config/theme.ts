@@ -37,6 +37,10 @@ export const DARK_COLORS = {
   surface: '#121821',
   surfaceElevated: '#171F2A',
   surfaceBorder: 'rgba(255,255,255,0.07)',
+  // Bottom sheets sit above every other surface, so they step up once more and
+  // take a stronger hairline than a card would.
+  overlay: '#22282F',
+  overlayBorder: 'rgba(255,255,255,0.13)',
   card: '#121821',
   cardBorder: 'rgba(255,255,255,0.07)',
   cardPressed: '#1A222D',
@@ -97,6 +101,8 @@ export const LIGHT_COLORS = {
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
   surfaceBorder: 'rgba(15,29,45,0.09)',
+  overlay: '#FFFFFF',
+  overlayBorder: 'rgba(15,23,42,0.15)',
   card: '#FFFFFF',
   cardBorder: 'rgba(15,29,45,0.09)',
   cardPressed: '#EEF2F6',

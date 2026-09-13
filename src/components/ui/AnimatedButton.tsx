@@ -142,22 +142,32 @@ export const AnimatedButton: React.FC<Props> = ({
   }
 
   // ── GHOST ──
+  // Matches `.btn-ghost` in the prototype: transparent, hairline outline, pill.
   return (
     <AnimatedPressable
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={isDisabled}
-      style={[animStyle, s.btn, { height: 44 }, style, isDisabled && s.disabled]}
+      style={[
+        animStyle,
+        s.btn,
+        s.ghostOuter,
+        { borderColor: colors.surfaceBorder },
+        style,
+        isDisabled && s.disabled,
+      ]}
     >
-      {loading ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : (
-        <View style={s.row}>
-          {icon}
-          <Text style={[s.ghostLabel, { color: colors.textSecondary }]}>{label}</Text>
-        </View>
-      )}
+      <View style={[s.btnInner, s.ghostInner]}>
+        {loading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <View style={s.row}>
+            {icon}
+            <Text style={[s.ghostLabel, { color: colors.text }]}>{label}</Text>
+          </View>
+        )}
+      </View>
     </AnimatedPressable>
   );
 };
@@ -183,6 +193,9 @@ const s = StyleSheet.create({
   glassBtnOuter: {
     borderWidth: 1,
   },
+
+  ghostOuter: { borderWidth: 1, borderRadius: RADIUS.full, backgroundColor: 'transparent' },
+  ghostInner: { height: 44 },
 
   // Labels
   primaryLabel: { color: ON_PRIMARY, fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
