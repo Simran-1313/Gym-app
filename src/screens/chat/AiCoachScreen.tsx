@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,15 +12,37 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useNavigation } from '@react-navigation/native';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONTS, RADIUS } from '../../config/theme';
+import type { ThemeColors } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/**
+ * Ported from `#screen-ai-coach` in docs/UI_PROTOTYPE.html.
+ *
+ * Shares its bubble geometry with `#screen-chat-thread` (`.bubble`, 78%
+ * max-width, 11/14 padding, 12.5/1.5 type, 5/16/16/16 corner pairs) but adds
+ * `.ai-msg-row` (a 26px `.ai-avatar-sm` beside every assistant bubble, 88%
+ * row max-width) and `.ai-cursor` (a 2×12 blinking bar, not a text glyph).
+ *
+ * The header's "Powered by your training data" and the lavender accent are
+ * the prototype's fixed AI-Coach identity — distinct from the tenant's
+ * brandable teal — so, as in ChatList/ChatRoom, this uses `colors.lavender`
+ * (`var(--lavender)` in the prototype), which stays fixed regardless of the
+ * gym's brand color, same as this screen's identity in the prototype.
+ *
+ * The prototype's `.suggestion-row` sits above the composer on every turn,
+ * reading as contextual follow-ups ("Give me a lighter option", etc.). This
+ * app has no backend that generates per-turn suggestions — only a fixed
+ * welcome-state prompt list — so that row is kept where the real feature
+ * lives (the empty state) rather than inventing contextual chips with no
+ * data behind them.
+ */
 
 interface LocalMessage {
   id: string;
@@ -28,8 +51,6 @@ interface LocalMessage {
   streaming?: boolean;
   error?: boolean;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   'What should I eat before a workout?',
@@ -41,7 +62,30 @@ const SUGGESTIONS = [
 let _msgId = 0;
 const nextId = () => String(++_msgId);
 
-// ─── Blinking cursor component ────────────────────────────────────────────────
+const ON_TEAL_STRONG = '#07231F';
+
+// ── Header (`.navbar` avatar + "FitCoach AI" + tagline) ─────────────────────
+
+const AiHeaderTitle: React.FC<{ colors: ThemeColors }> = ({ colors }) => (
+  <View style={hs.row}>
+    <View style={[hs.avatar, { backgroundColor: `${colors.lavender}2E` }]}>
+      <Ionicons name="shield-checkmark-outline" size={15} color={colors.lavender} />
+    </View>
+    <View>
+      <Text style={[hs.name, { color: colors.text }]}>FitCoach AI</Text>
+      <Text style={[hs.sub, { color: colors.lavender }]}>Powered by your training data</Text>
+    </View>
+  </View>
+);
+
+const hs = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 13, fontFamily: FONTS.bodyBold },
+  sub: { fontSize: 10.5, marginTop: 1 },
+});
+
+// ── Blinking cursor (`.ai-cursor`) ───────────────────────────────────────────
 
 const BlinkCursor: React.FC<{ color: string }> = ({ color }) => {
   const opacity = useRef(new Animated.Value(1)).current;
@@ -49,29 +93,29 @@ const BlinkCursor: React.FC<{ color: string }> = ({ color }) => {
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 450, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
       ]),
     );
     anim.start();
     return () => anim.stop();
   }, [opacity]);
 
-  return (
-    <Animated.Text style={{ opacity, color, fontSize: FONT_SIZE.md, lineHeight: 22 }}>
-      ▋
-    </Animated.Text>
-  );
+  // .ai-cursor { width:2px; height:12px; margin-left:2px }
+  return <Animated.View style={[styles.aiCursor, { backgroundColor: color, opacity }]} />;
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const AiCoachScreen: React.FC = () => {
-  const { theme } = useAuth();
   const headerHeight = useHeaderHeight();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerTitle: () => <AiHeaderTitle colors={colors} /> });
+  }, [navigation, colors]);
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -182,73 +226,78 @@ export const AiCoachScreen: React.FC = () => {
       const isUser = item.role === 'user';
       const isStreaming = item.streaming && item.id === streamingId;
 
+      const bubble = (
+        <View
+          style={[
+            styles.bubble,
+            isUser ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
+            isUser
+              ? { backgroundColor: colors.primary }
+              : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
+            item.error && { borderColor: colors.danger, borderWidth: 1 },
+          ]}
+        >
+          <Text style={{ flexShrink: 1 }}>
+            {(() => {
+              const baseStyle = [
+                styles.bubbleText,
+                { color: isUser ? ON_TEAL_STRONG : colors.text },
+                item.error && { color: colors.danger },
+              ];
+              const boldStyle = { fontFamily: FONTS.bodyBold };
+
+              if (!item.content) return null;
+              const parts = item.content.split(/(\*\*.*?\*\*)/g);
+              return parts.map((part, index) => {
+                if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+                  return (
+                    <Text key={index} style={[baseStyle, boldStyle]}>
+                      {part.slice(2, -2)}
+                    </Text>
+                  );
+                }
+                return (
+                  <Text key={index} style={baseStyle}>
+                    {part}
+                  </Text>
+                );
+              });
+            })()}
+            {isStreaming && !isUser && (
+              <BlinkCursor color={colors.lavender} />
+            )}
+          </Text>
+        </View>
+      );
+
+      if (isUser) {
+        return <View style={[styles.msgRow, styles.msgRowUser]}>{bubble}</View>;
+      }
+
+      // .ai-msg-row { gap:10; max-width:88%; align-self:flex-start } — the
+      // bubble sits directly alongside the avatar (not in an extra flexShrink
+      // wrapper) so its own 78% max-width resolves against this row, not an
+      // unconstrained intermediate view.
       return (
-        <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowAi]}>
-          {!isUser && (
-            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Ionicons name="fitness" size={14} color="#07231F" />
-            </View>
-          )}
-          <View
-            style={[
-              styles.bubble,
-              isUser
-                ? { backgroundColor: colors.primary }
-                : {
-                    backgroundColor: colors.inset,
-                    borderWidth: 1,
-                    borderColor: colors.surfaceBorder,
-                  },
-              item.error && { borderColor: colors.danger, borderWidth: 1 },
-            ]}
-          >
-            <View style={styles.bubbleInner}>
-              <Text style={{ flexShrink: 1 }}>
-                {(() => {
-                  const baseStyle = [
-                    styles.bubbleText,
-                    { color: isUser ? '#07231F' : colors.text },
-                    item.error && { color: colors.danger },
-                  ];
-                  const boldStyle = { fontFamily: FONTS.bodyBold };
-                  
-                  if (!item.content) return null;
-                  const parts = item.content.split(/(\*\*.*?\*\*)/g);
-                  return parts.map((part, index) => {
-                    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-                      return (
-                        <Text key={index} style={[baseStyle, boldStyle]}>
-                          {part.slice(2, -2)}
-                        </Text>
-                      );
-                    }
-                    return (
-                      <Text key={index} style={baseStyle}>
-                        {part}
-                      </Text>
-                    );
-                  });
-                })()}
-              </Text>
-              {isStreaming && !isUser && (
-                <BlinkCursor color={colors.text} />
-              )}
-            </View>
+        <View style={[styles.msgRow, styles.msgRowAi]}>
+          <View style={[styles.aiAvatarSm, { backgroundColor: `${colors.lavender}2E` }]}>
+            <Ionicons name="shield-checkmark-outline" size={13} color={colors.lavender} />
           </View>
+          {bubble}
         </View>
       );
     },
-    [colors, isDark, streamingId],
+    [colors, streamingId],
   );
 
   const isEmpty = messages.length === 0;
 
   return (
-    <LinearGradient colors={colors.backgroundGradient} style={styles.flex}>
+    <AnimatedScreen>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
         <FlatList
           ref={listRef}
@@ -258,54 +307,55 @@ export const AiCoachScreen: React.FC = () => {
           contentContainerStyle={[
             styles.listContent,
             isEmpty && styles.listContentEmpty,
-            { paddingBottom: SPACING.md, paddingTop: headerHeight + SPACING.md },
+            { paddingBottom: 12, paddingTop: headerHeight + 12 },
           ]}
           ListHeaderComponent={
             isEmpty ? (
               <View style={styles.emptyState}>
-                <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '22' }]}>
-                  <Ionicons name="fitness" size={36} color={colors.primary} />
+                <View style={[styles.emptyIcon, { backgroundColor: `${colors.lavender}2E` }]}>
+                  <Ionicons name="shield-checkmark-outline" size={34} color={colors.lavender} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>FitCoach AI</Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                   Your personal AI fitness &amp; nutrition coach.{'\n'}Ask me anything about workouts, diet, or wellness.
                 </Text>
-                <View style={styles.suggestions}>
+                {/* `.suggestion-row` — the fixed welcome-state prompt list */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.suggestionRow}
+                  style={styles.suggestionRowOuter}
+                >
                   {SUGGESTIONS.map((s) => (
                     <TouchableOpacity
                       key={s}
-                      style={[styles.chip, { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+                      style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.overlayBorder }]}
                       onPress={() => send(s)}
                     >
-                      <Text style={[styles.chipText, { color: colors.primary }]}>{s}</Text>
+                      <Text style={[styles.chipText, { color: colors.text }]}>{s}</Text>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
               </View>
             ) : null
           }
           removeClippedSubviews={false}
         />
 
-        {/* Input bar */}
+        {/* `.chat-input` */}
         <View
           style={[
             styles.inputBar,
             {
-              backgroundColor: colors.inset,
               borderTopColor: colors.surfaceBorder,
-              paddingBottom: insets.bottom + SPACING.sm,
+              paddingBottom: insets.bottom + 14,
             },
           ]}
         >
           <TextInput
             style={[
               styles.input,
-              {
-                color: colors.text,
-                backgroundColor: colors.inset,
-                borderColor: colors.surfaceBorder,
-              },
+              { color: colors.text, backgroundColor: colors.surface, borderColor: colors.overlayBorder },
             ]}
             value={input}
             onChangeText={setInput}
@@ -333,23 +383,23 @@ export const AiCoachScreen: React.FC = () => {
                 );
               }}
             >
-              <Ionicons name="stop" size={18} color="#fff" />
+              <Ionicons name="stop" size={15} color="#fff" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? colors.primary : colors.surfaceBorder },
+                { backgroundColor: input.trim() ? colors.primary : colors.inset },
               ]}
               onPress={() => send(input)}
               disabled={!input.trim()}
             >
-              <Ionicons name="send" size={18} color="#fff" />
+              <Ionicons name="send" size={15} color={input.trim() ? ON_TEAL_STRONG : colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </AnimatedScreen>
   );
 };
 
@@ -357,48 +407,79 @@ export const AiCoachScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  listContent: { padding: SPACING.md, gap: SPACING.sm },
+  // .chat-msgs { gap:10px; padding:12px 16px }
+  listContent: { paddingHorizontal: 16, gap: 10 },
   listContentEmpty: { flexGrow: 1, justifyContent: 'center' },
 
-  emptyState: { alignItems: 'center', paddingHorizontal: SPACING.lg, gap: SPACING.md },
-  emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: FONT_SIZE.xl, fontFamily: FONTS.bodyBold },
-  emptySubtitle: { fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20 },
-  suggestions: { gap: SPACING.sm, width: '100%' },
-  chip: { borderWidth: 1, borderRadius: RADIUS.full, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs + 2 },
-  chipText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium },
+  emptyState: { alignItems: 'center', paddingHorizontal: 8, gap: 14 },
+  emptyIcon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 18, fontFamily: FONTS.bodyBold },
+  emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
-  msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.xs },
+  // .suggestion-row { gap:8; padding:2px 2px 4px }
+  suggestionRowOuter: { width: '100%', marginTop: 2 },
+  suggestionRow: { gap: 8, paddingHorizontal: 2, paddingVertical: 4 },
+  // .suggestion-chip { padding:9px 14px; radius:100; font-size:11.5; border:hairline-strong }
+  chip: { borderWidth: 1, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 9 },
+  chipText: { fontSize: 11.5, fontFamily: FONTS.body },
+
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end' },
   msgRowUser: { justifyContent: 'flex-end' },
-  msgRowAi: { justifyContent: 'flex-start' },
+  // .ai-msg-row { gap:10 } — left unstretched at the row level (no
+  // alignSelf/max-width of its own): the bubble's *own* 78% max-width is what
+  // the prototype actually renders as the visible cap, and letting this row
+  // keep the FlatList row's default full-width stretch is what lets that
+  // percentage resolve against a definite width instead of a content-sized
+  // (and therefore circular) parent.
+  msgRowAi: { justifyContent: 'flex-start', alignItems: 'flex-start', gap: 10 },
 
-  avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  bubble: { maxWidth: '78%', borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
-  bubbleInner: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end' },
-  bubbleText: { fontSize: FONT_SIZE.md, lineHeight: 22 },
-
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-  },
-  input: {
-    flex: 1,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    fontSize: FONT_SIZE.md,
-    maxHeight: 120,
-  },
-  sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  // .ai-avatar-sm { 26x26; radius:50%; margin-top:2 }
+  aiAvatarSm: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+
+  // .bubble { max-width:78%; padding:11px 14px; font-size:12.5; line-height:1.5 }
+  bubble: { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11 },
+  // .bubble.me { radius: 16 5 16 16 } / .bubble.them { radius: 5 16 16 16 }
+  bubbleCornerOwn: { borderTopRightRadius: 5 },
+  bubbleCornerOther: { borderTopLeftRadius: 5 },
+  bubbleText: { fontSize: 12.5, lineHeight: 18.5 },
+
+  // .ai-cursor { 2x12; margin-left:2 }
+  aiCursor: { width: 2, height: 12, marginLeft: 2 },
+
+  // .chat-input { gap:9px; padding:11px 16px 14px }
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 16,
+    paddingTop: 11,
+    borderTopWidth: 1,
+  },
+  // .chat-input input { radius:100; padding:12px 16px; font-size:12.5 }
+  input: {
+    flex: 1,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 12.5,
+    maxHeight: 120,
+  },
+  // .send-btn { 39x39; radius:50% }
+  sendBtn: {
+    width: 39,
+    height: 39,
+    borderRadius: 19.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 });

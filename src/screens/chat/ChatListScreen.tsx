@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,16 +19,36 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 
 import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONTS, GRADIENTS, RADIUS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import type { ThemeColors } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { StaggerItem } from '../../components/ui/StaggerItem';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import type { TabParams } from '../../navigation/AppNavigator';
 
-type ChatListNav = CompositeNavigationProp<
-  NativeStackNavigationProp<ChatStackParams, 'ChatList'>,
-  BottomTabNavigationProp<TabParams>
->;
+/**
+ * Ported from `#screen-chat` in docs/UI_PROTOTYPE.html.
+ *
+ * `.search-bar` (radius 14, 11/14 padding, gap 8), `.ai-banner` (a flat —
+ * unrounded, per the prototype's own CSS — lavender-wash strip, not a
+ * `.card`), `.section-label` (10.5/700 uppercase at .08em) and
+ * `.thread-row` / `.avatar` / `.thread-meta` are all lifted from that file's
+ * stylesheet rather than eyeballed.
+ */
+
+const GUTTER = 18; // .scroll { padding: 0 18px 18px }
+const ROW_GAP = 9; // .thread-row { margin-bottom: 9px }
+/** rgba(lavender, N) alpha suffixes for `colors.lavender` below — the
+ *  prototype's fixed AI-Coach accent, distinct from the tenant-brandable teal. */
+const LAV_WASH = '24'; // 0.14
+const LAV_WASH_SOFT = '08'; // 0.03
+const LAV_BORDER = '38'; // 0.22
+const LAV_ICON_BG = '2E'; // 0.18
 
 function formatTime(iso: string) {
   const d = new Date(iso);
@@ -69,14 +89,55 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+type ChatListNav = CompositeNavigationProp<
+  NativeStackNavigationProp<ChatStackParams, 'ChatList'>,
+  BottomTabNavigationProp<TabParams>
+>;
+
+/* ─── AI Coach banner (`.ai-banner`) ─── */
+
+const AiBanner: React.FC<{ colors: ThemeColors; onPress: () => void }> = ({ colors, onPress }) => (
+  <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+    <LinearGradient
+      colors={[`${colors.lavender}${LAV_WASH}`, `${colors.lavender}${LAV_WASH_SOFT}`]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0.3 }}
+      style={[styles.aiBanner, { borderColor: `${colors.lavender}${LAV_BORDER}` }]}
+    >
+      <View style={[styles.aiBannerIcon, { backgroundColor: `${colors.lavender}${LAV_ICON_BG}` }]}>
+        <Ionicons name="shield-checkmark-outline" size={20} color={colors.lavender} />
+        <View style={[styles.aiSparkle, { backgroundColor: colors.background }]}>
+          <Ionicons name="sparkles" size={11} color={colors.warning} />
+        </View>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.aiBannerTitle, { color: colors.lavender }]}>FitCoach AI</Text>
+        <Text style={[styles.aiBannerSub, { color: colors.textSecondary }]}>
+          Ask about your plan, form, or recovery — anytime
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
+    </LinearGradient>
+  </TouchableOpacity>
+);
+
+/* ─── Section label (`.section-label`) ─── */
+
+const SectionLabel: React.FC<{ children: string; colors: ThemeColors }> = ({ children, colors }) => (
+  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{children}</Text>
+);
+
+/* ─── Thread row (`.card.tap.thread-row`) ─── */
+
 interface RoomItemProps {
   room: ChatRoom;
   currentUserId: string;
-  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
+  colors: ThemeColors;
+  index: number;
   onPress: () => void;
 }
 
-const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPress }) => {
+const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index, onPress }) => {
   const isGroup = room.type === 'GROUP';
   const otherUser = !isGroup
     ? room.members.find((m) => m.user.id !== currentUserId)?.user
@@ -98,61 +159,62 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, onPres
   const unread = room.unreadCount ?? 0;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.65}>
-      <View style={[styles.roomCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-        {isGroup ? (
-          <LinearGradient
-            colors={['#2DD4BF', '#0F766E']}
-            style={styles.avatarCircle}
-          >
-            <Ionicons name="people" size={22} color="#fff" />
-          </LinearGradient>
-        ) : (
-          <View style={[styles.avatarCircle, { backgroundColor: `${colors.primary}22` }]}>
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {getInitials(displayName)}
-            </Text>
-          </View>
-        )}
+    <StaggerItem index={index} style={{ marginBottom: ROW_GAP }}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+        <GlassCard innerStyle={styles.rowInner}>
+          {isGroup ? (
+            <LinearGradient colors={[...GRADIENTS.primary]} style={styles.avatar}>
+              <Ionicons name="people" size={20} color="#07231F" />
+            </LinearGradient>
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.inset }]}>
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {getInitials(displayName)}
+              </Text>
+            </View>
+          )}
 
-        <View style={styles.roomInfo}>
-          <View style={styles.roomTop}>
-            <Text style={[styles.roomName, { color: colors.text }]} numberOfLines={1}>
+          <View style={styles.threadBody}>
+            <Text style={[styles.threadTitle, { color: colors.text }]} numberOfLines={1}>
               {displayName}
             </Text>
-            {!!time && (
-              <Text style={[styles.timeText, { color: colors.textMuted }]}>{time}</Text>
-            )}
-          </View>
-          <View style={styles.roomBottom}>
             <Text
               style={[
-                styles.previewText,
+                styles.threadSub,
                 { color: lastMsg ? colors.textSecondary : colors.textMuted },
-                !lastMsg && styles.previewEmpty,
+                !lastMsg && styles.threadSubEmpty,
               ]}
               numberOfLines={1}
             >
               {preview}
             </Text>
+          </View>
+
+          <View style={styles.threadMeta}>
+            {!!time && <Text style={[styles.threadTime, { color: colors.textMuted }]}>{time}</Text>}
             {unread > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.info }]}>
-                <Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text>
+              <View style={[styles.unreadDot, { backgroundColor: colors.primary }]}>
+                <Text style={styles.unreadDotText}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
           </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+        </GlassCard>
+      </TouchableOpacity>
+    </StaggerItem>
   );
 };
 
 export const ChatListScreen: React.FC = () => {
-  const { user, theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const { user } = useAuth();
+  const colors = useThemeColors();
+  const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ChatListNav>();
+
+  // `.nav-title` reads "Chat" in the prototype (the stack default is "Messages").
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: 'Chat' });
+  }, [navigation]);
 
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,252 +296,194 @@ export const ChatListScreen: React.FC = () => {
     });
   }, [rooms, q, user?.id]);
 
+  // Prototype order: Direct Messages, then Groups.
   const sections = useMemo(() => {
-    const group = filteredRooms.filter((r) => r.type === 'GROUP');
     const dms = filteredRooms.filter((r) => r.type === 'DIRECT');
+    const group = filteredRooms.filter((r) => r.type === 'GROUP');
     const result: { title: string; data: ChatRoom[] }[] = [];
-    if (group.length) result.push({ title: 'Group', data: group });
     if (dms.length) result.push({ title: 'Direct Messages', data: dms });
+    if (group.length) result.push({ title: 'Groups', data: group });
     return result;
   }, [filteredRooms]);
 
-  const headerOffset = insets.top + 56;
+  if (loading) return <LoadingSpinner fullScreen />;
 
   return (
-    <LinearGradient colors={[...colors.backgroundGradient]} style={styles.screen}>
-      <View style={[styles.container, { paddingTop: headerOffset }]}>
-        {/* AI Coach banner */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => navigation.navigate('AiCoach')}
-          style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}
-        >
-          <LinearGradient
-            colors={['#2DD4BF', '#14B8A6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.aiCoachBanner}
-          >
-            <View style={styles.aiCoachIcon}>
-              <Ionicons name="fitness" size={22} color="#2DD4BF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.aiCoachTitle}>FitCoach AI</Text>
-              <Text style={styles.aiCoachSub}>Your personal fitness &amp; nutrition assistant</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          <Ionicons name="search" size={16} color={colors.textMuted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search conversations…"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.text }]}
+    <AnimatedScreen>
+      <SectionList
+        sections={error ? [] : sections}
+        keyExtractor={(r) => r.id}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: headerHeight + 8, paddingBottom: insets.bottom + 110 },
+        ]}
+        stickySectionHeadersEnabled={false}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadRooms(); }}
+            tintColor={colors.primary}
+            progressViewOffset={headerHeight}
           />
-          {!!search && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+        }
+        ListHeaderComponent={
+          <View>
+            <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Ionicons name="search" size={15} color={colors.textMuted} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search messages…"
+                placeholderTextColor={colors.textMuted}
+                style={[styles.searchInput, { color: colors.text }]}
+              />
+              {!!search && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={15} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
 
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <AiBanner colors={colors} onPress={() => navigation.navigate('AiCoach')} />
+
+            {error ? (
+              <EmptyState
+                icon="warning-outline"
+                title="Oops, something went wrong!"
+                subtitle={error}
+                actionLabel="Try Again"
+                onAction={() => { setLoading(true); loadRooms(); }}
+              />
+            ) : null}
           </View>
-        ) : error ? (
-          <View style={[styles.centered, { padding: SPACING.lg }]}>
+        }
+        ListEmptyComponent={
+          !error ? (
             <EmptyState
-              icon="warning-outline"
-              title="Oops, something went wrong!"
-              subtitle={error}
-              actionLabel="Try Again"
-              onAction={() => { setLoading(true); loadRooms(); }}
+              icon="chatbubbles-outline"
+              title="No chats found"
+              subtitle={search ? 'Try a different search' : 'Your gym chats will appear here'}
             />
-          </View>
-        ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={(r) => r.id}
-            contentContainerStyle={styles.list}
-            stickySectionHeadersEnabled={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => { setRefreshing(true); loadRooms(); }}
-                tintColor={colors.primary}
-              />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
-                <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>No chats found</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                  {search ? 'Try a different search' : 'Your gym chats will appear here'}
-                </Text>
-              </View>
-            }
-            renderSectionHeader={({ section: { title } }) => (
-              <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>{title}</Text>
-            )}
-            renderItem={({ item }) => (
-              <RoomItem
-                room={item}
-                currentUserId={user?.id || ''}
-                colors={colors}
-                onPress={() => openRoom(item)}
-              />
-            )}
-            ItemSeparatorComponent={() => <View style={{ height: SPACING.sm }} />}
+          ) : null
+        }
+        renderSectionHeader={({ section: { title } }) => (
+          <SectionLabel colors={colors}>{title}</SectionLabel>
+        )}
+        renderItem={({ item, index }) => (
+          <RoomItem
+            room={item}
+            currentUserId={user?.id || ''}
+            colors={colors}
+            index={index}
+            onPress={() => openRoom(item)}
           />
         )}
-      </View>
-    </LinearGradient>
+      />
+    </AnimatedScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  container: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: GUTTER, paddingBottom: GUTTER },
+
+  // .search-bar { gap:8; radius:14; padding:11px 14px; margin-bottom:14px }
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
     paddingHorizontal: 14,
-    height: 40,
-    borderRadius: RADIUS.lg,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: FONTS.body, padding: 0 },
+
+  // .ai-banner { gap:12; padding:15px; margin-bottom:16px } — no radius: the
+  // prototype never gives this class a `.card`, unlike every other tile here.
+  aiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 15,
+    marginBottom: 16,
     borderWidth: 1,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    paddingVertical: 0,
+  // .ai-banner-icon { 42x42; radius:14 }
+  aiBannerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  list: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: 110,
+  // .ai-sparkle { top:-3; right:-3; 14x14 } — a tiny opaque disc under the
+  // glyph stands in for the SVG's own transparent background.
+  aiSparkle: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sectionHeader: {
-    fontSize: 11,
+  aiBannerTitle: { fontSize: 13, fontFamily: FONTS.bodyBold },
+  aiBannerSub: { fontSize: 11.5, marginTop: 2, fontFamily: FONTS.body },
+
+  // .section-label { font-size:10.5; weight:700; letter-spacing:.08em; margin:14px 2px 10px }
+  sectionLabel: {
+    fontSize: 10.5,
     fontFamily: FONTS.bodyBold,
+    letterSpacing: 0.84,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs,
+    marginTop: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
   },
-  roomCard: {
+
+  // .thread-row { gap:13; padding:14px 15px; margin-bottom:9px }
+  rowInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
+    gap: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
   },
-  avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+
+  // .avatar { 44x44; radius:50%; font-size:14; weight:700 }
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  avatarText: {
-    fontSize: 16,
-    fontFamily: FONTS.bodyBold,
-  },
-  roomInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  roomTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  roomName: {
-    fontSize: FONT_SIZE.md,
-    fontFamily: FONTS.bodySemi,
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 11,
-    flexShrink: 0,
-  },
-  roomBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 3,
-    gap: 8,
-  },
-  previewText: {
-    fontSize: FONT_SIZE.xs,
-    flex: 1,
-  },
-  previewEmpty: {
-    fontStyle: 'italic',
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 5,
+  avatarText: { fontSize: 14, fontFamily: FONTS.bodyBold },
+
+  threadBody: { flex: 1, minWidth: 0 },
+  // .thread-title { font-size:13.5; weight:600 }
+  threadTitle: { fontSize: 13.5, fontFamily: FONTS.bodySemi },
+  // .thread-sub { font-size:12; margin-top:2 }
+  threadSub: { fontSize: 12, marginTop: 2, fontFamily: FONTS.body },
+  threadSubEmpty: { fontStyle: 'italic' },
+
+  // .thread-meta { column; align:flex-end; gap:6 }
+  threadMeta: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
+  // .thread-time { font-size:10 }
+  threadTime: { fontSize: 10 },
+  // .unread-dot { min-width:17; height:17; padding:0 4; radius:9; font-size:9.5; weight:800 }
+  unreadDot: {
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontFamily: FONTS.bodyBold,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 60,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: FONT_SIZE.sm,
-    fontFamily: FONTS.bodySemi,
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    fontSize: FONT_SIZE.xs,
-    textAlign: 'center',
-  },
-  aiCoachBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-  },
-  aiCoachIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  aiCoachTitle: {
-    color: '#fff',
-    fontSize: FONT_SIZE.md,
-    fontFamily: FONTS.bodyBold,
-  },
-  aiCoachSub: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: FONT_SIZE.xs,
-    marginTop: 1,
-  },
+  unreadDotText: { color: '#07231F', fontSize: 9.5, fontFamily: FONTS.bodyExtra },
 });

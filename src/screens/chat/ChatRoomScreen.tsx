@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -11,24 +12,85 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONTS, GRADIENTS, RADIUS } from '../../config/theme';
+import type { ThemeColors } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuth } from '../../context/AuthContext';
 import type { ChatStackParams } from '../../navigation/AppNavigator';
 import { EmojiPicker } from '../../components/chat/EmojiPicker';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+
+/**
+ * Ported from `#screen-chat-thread` in docs/UI_PROTOTYPE.html.
+ *
+ * `.bubble` (max-width 78%, 11/14 padding, 12.5/1.5 type, 5-16-16-16 /
+ * 16-5-16-16 corner pairs for them/me), `.bubble-img` (58% wide, no
+ * padding), `.typing-row` (a received-style bubble holding three bouncing
+ * dots) and `.chat-input` (39px circular icon buttons + a 100px pill input +
+ * a teal circular send button) are all lifted from that file's stylesheet.
+ *
+ * The prototype's navbar also shows an "Active now" presence line under the
+ * coach's name — this backend has no presence/online signal for the other
+ * member, so that line is replaced with something we can say truthfully:
+ * the socket's own connection state, and a member count for group threads.
+ */
 
 type ChatRoomRoute = RouteProp<ChatStackParams, 'ChatRoom'>;
+
+const getInitials = (name: string) =>
+  name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+// ── Header title (`.navbar` avatar + name + status) ─────────────────────────
+
+interface ChatHeaderProps {
+  name: string;
+  isGroup: boolean;
+  subtitle: string | null;
+  subtitleColor: string;
+  colors: ThemeColors;
+}
+
+const ChatHeaderTitle: React.FC<ChatHeaderProps> = ({ name, isGroup, subtitle, subtitleColor, colors }) => (
+  <View style={hs.row}>
+    {isGroup ? (
+      <LinearGradient colors={[...GRADIENTS.primary]} style={hs.avatar}>
+        <Ionicons name="people" size={13} color="#07231F" />
+      </LinearGradient>
+    ) : (
+      <View style={[hs.avatar, { backgroundColor: colors.inset }]}>
+        <Text style={[hs.avatarText, { color: colors.primary }]}>{getInitials(name)}</Text>
+      </View>
+    )}
+    <View style={hs.copy}>
+      <Text style={[hs.name, { color: colors.text }]} numberOfLines={1}>{name}</Text>
+      {subtitle ? (
+        <Text style={[hs.sub, { color: subtitleColor }]} numberOfLines={1}>{subtitle}</Text>
+      ) : null}
+    </View>
+  </View>
+);
+
+const hs = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: 220 },
+  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 11, fontFamily: FONTS.bodyBold },
+  copy: { flexShrink: 1 },
+  name: { fontSize: 13, fontFamily: FONTS.bodyBold },
+  sub: { fontSize: 10.5, marginTop: 1 },
+});
 
 // ── Tick ─────────────────────────────────────────────────────────────────────
 
@@ -41,28 +103,36 @@ interface TickProps {
   memberCount: number;
   pending?: boolean;
   failed?: boolean;
+  colors: ThemeColors;
 }
 
-const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed }) => {
+/** On-teal dim tone — the "me" bubble/receipt keeps dark text (`#07231F` in
+ *  this app, `#04211f` in the prototype) against the teal fill in both
+ *  themes, so its own timestamp/ticks dim from that dark tone, not from
+ *  `colors.text*`, which would be near-invisible on teal in dark mode. */
+const ON_TEAL_DIM = 'rgba(7,35,31,0.55)';
+const ON_TEAL_STRONG = '#07231F';
+
+const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed, colors }) => {
   if (senderId !== currentUserId) return null;
 
-  if (failed) return <Ionicons name="alert-circle" size={13} color="#F0768B" />;
-  if (pending) return <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.55)" />;
+  if (failed) return <Ionicons name="alert-circle" size={13} color={colors.danger} />;
+  if (pending) return <Ionicons name="time-outline" size={12} color={ON_TEAL_DIM} />;
 
   const others = statuses.filter((s) => s.userId !== currentUserId);
   const expectedOthers = memberCount - 1; // exclude sender
 
-  if (expectedOthers === 0) return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.5)" />;
+  if (expectedOthers === 0) return <Ionicons name="checkmark" size={13} color={ON_TEAL_DIM} />;
 
   const allRead = others.length > 0 && others.every((s) => s.status === 'READ');
   const allDelivered = others.length > 0 && others.every((s) => s.status !== 'SENT');
 
-  if (allRead) return <Ionicons name="checkmark-done" size={12} color="#5EEAD4" />;
-  if (allDelivered) return <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.55)" />;
-  return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.5)" />;
+  if (allRead) return <Ionicons name="checkmark-done" size={13} color={ON_TEAL_STRONG} />;
+  if (allDelivered) return <Ionicons name="checkmark-done" size={13} color={ON_TEAL_DIM} />;
+  return <Ionicons name="checkmark" size={13} color={ON_TEAL_DIM} />;
 };
 
-// ── Message Bubble ────────────────────────────────────────────────────────────
+// ── Message Bubble (`.bubble`, `.bubble.them`, `.bubble.me`, `.bubble-img`) ──
 
 interface BubbleProps {
   msg: ChatMessage;
@@ -71,7 +141,7 @@ interface BubbleProps {
   isGroupChat: boolean;
   memberCount: number;
   currentUserId: string;
-  colors: typeof DARK_COLORS | typeof LIGHT_COLORS;
+  colors: ThemeColors;
   onRetry: (msg: ChatMessage) => void;
 }
 
@@ -84,8 +154,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
     <View
       style={[
         styles.bubble,
-        isOwn ? styles.bubbleOwn : styles.bubbleOther,
-        // after the own/other style — bubbleOwn zeroes the border width
+        isOwn ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
         styles.bubbleDeleted,
         { borderColor: colors.surfaceBorder },
       ]}
@@ -96,51 +165,30 @@ const MessageBubble: React.FC<BubbleProps> = ({
           {deletedLabel(msg, currentUserId)}
         </Text>
       </View>
-      <View style={styles.msgFooter}>
-        <Text style={[styles.msgTime, { color: colors.textMuted }]}>{time}</Text>
-      </View>
+    </View>
+  ) : msg.type === 'IMAGE' ? (
+    <View
+      style={[
+        styles.bubbleImageWrap,
+        isOwn ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
+        { opacity: msg.pending ? 0.7 : 1 },
+      ]}
+    >
+      <Image source={{ uri: msg.content }} style={styles.chatImage} resizeMode="cover" />
     </View>
   ) : (
     <View
       style={[
         styles.bubble,
-        msg.type === 'IMAGE' ? styles.bubbleImage : null,
-        isOwn && msg.type !== 'IMAGE'
+        isOwn ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
+        isOwn
           ? [styles.bubbleOwn, { backgroundColor: colors.primary, opacity: msg.pending ? 0.7 : 1 }]
-          : msg.type !== 'IMAGE'
-            ? [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]
-            : { opacity: msg.pending ? 0.7 : 1 },
+          : [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }],
       ]}
     >
-      {msg.type === 'IMAGE' ? (
-        <Image
-          source={{ uri: msg.content }}
-          style={styles.chatImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <Text style={[styles.msgText, { color: isOwn ? '#07231F' : colors.text }]}>
-          {msg.content}
-        </Text>
-      )}
-      <View style={styles.msgFooter}>
-        {msg.failed && (
-          <Text style={styles.failedText}>Failed · tap to retry</Text>
-        )}
-        <Text style={[styles.msgTime, { color: isOwn ? 'rgba(255,255,255,0.55)' : colors.textMuted }]}>
-          {time}
-        </Text>
-        {isOwn && (
-          <MessageTick
-            statuses={msg.statuses}
-            senderId={msg.senderId}
-            currentUserId={currentUserId}
-            memberCount={memberCount}
-            pending={msg.pending}
-            failed={msg.failed}
-          />
-        )}
-      </View>
+      <Text style={[styles.msgText, { color: isOwn ? ON_TEAL_STRONG : colors.text }]}>
+        {msg.content}
+      </Text>
     </View>
   );
 
@@ -155,7 +203,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
       )}
       {!isOwn && isGroupChat && !showSender && <View style={{ width: 26 }} />}
 
-      <View style={{ maxWidth: '75%' }}>
+      <View style={{ maxWidth: '78%' }}>
         {!isOwn && isGroupChat && showSender && (
           <Text style={[styles.senderName, { color: colors.info }]}>
             {msg.sender.name} · {msg.sender.role === 'ADMIN' ? 'Admin' : 'Member'}
@@ -169,19 +217,74 @@ const MessageBubble: React.FC<BubbleProps> = ({
         ) : (
           bubbleInner
         )}
+
+        {/* `.msg-receipt` — a meta row under the bubble, not packed into its corner. */}
+        <View style={[styles.msgFooter, isOwn ? styles.msgFooterOwn : styles.msgFooterOther]}>
+          {msg.failed && <Text style={[styles.failedText, { color: colors.danger }]}>Failed · tap to retry</Text>}
+          <Text style={[styles.msgTime, { color: colors.textMuted }]}>{time}</Text>
+          {isOwn && (
+            <MessageTick
+              statuses={msg.statuses}
+              senderId={msg.senderId}
+              currentUserId={currentUserId}
+              memberCount={memberCount}
+              pending={msg.pending}
+              failed={msg.failed}
+              colors={colors}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
 };
 
-// ── Typing indicator ──────────────────────────────────────────────────────────
+// ── Typing indicator (`.typing-row`, three bouncing `.typing-dot`s) ─────────
 
-const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS | typeof LIGHT_COLORS }> = ({ names, colors }) => {
-  if (!names.length) return null;
-  const label = names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
+const TypingDot: React.FC<{ delay: number; colors: ThemeColors }> = ({ delay, colors }) => {
+  const y = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    // Mirrors `@keyframes typingBounce` (1.2s cycle, translateY -4 / opacity
+    // 1 at the 30% mark) with each dot's CSS `animation-delay` reproduced as
+    // a one-time startup delay before its own infinite loop begins.
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(y, { toValue: -4, duration: 360, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(y, { toValue: 0, duration: 360, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.5, duration: 360, useNativeDriver: true }),
+        ]),
+        Animated.delay(480),
+      ]),
+    );
+    const timer = setTimeout(() => loop.start(), delay);
+    return () => { clearTimeout(timer); loop.stop(); };
+  }, [y, opacity, delay]);
+
   return (
-    <View style={styles.typingRow}>
-      <Text style={[styles.typingText, { color: colors.textMuted }]}>{label}</Text>
+    <Animated.View
+      style={[
+        styles.typingDot,
+        { backgroundColor: colors.textMuted, opacity, transform: [{ translateY: y }] },
+      ]}
+    />
+  );
+};
+
+const TypingIndicator: React.FC<{ names: string[]; colors: ThemeColors }> = ({ names, colors }) => {
+  if (!names.length) return null;
+  return (
+    <View style={styles.bubbleRow}>
+      <View style={[styles.typingRow, { backgroundColor: colors.surface }]}>
+        <TypingDot delay={0} colors={colors} />
+        <TypingDot delay={150} colors={colors} />
+        <TypingDot delay={300} colors={colors} />
+      </View>
     </View>
   );
 };
@@ -191,10 +294,12 @@ const TypingIndicator: React.FC<{ names: string[]; colors: typeof DARK_COLORS | 
 export const ChatRoomScreen: React.FC = () => {
   const { user, theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const navigation = useNavigation();
   const route = useRoute<ChatRoomRoute>();
-  const { roomId } = route.params;
+  const { roomId, roomName } = route.params;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [roomMembers, setRoomMembers] = useState<{ user: { id: string; name: string; role: string } }[]>([]);
@@ -213,6 +318,28 @@ export const ChatRoomScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<Awaited<ReturnType<typeof connectSocket>> | null>(null);
+
+  // ── Header (`.navbar`) — avatar + name + a truthful status line ─────────
+  const headerSubtitle = !isConnected
+    ? 'Reconnecting…'
+    : isGroupChat && roomMembers.length
+      ? `${roomMembers.length} member${roomMembers.length === 1 ? '' : 's'}`
+      : null;
+  const headerSubtitleColor = !isConnected ? colors.warning : colors.textMuted;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <ChatHeaderTitle
+          name={roomName}
+          isGroup={isGroupChat}
+          subtitle={headerSubtitle}
+          subtitleColor={headerSubtitleColor}
+          colors={colors}
+        />
+      ),
+    });
+  }, [navigation, roomName, isGroupChat, headerSubtitle, headerSubtitleColor, colors]);
 
   // ── Load messages ─────────────────────────────────────────────────────────
 
@@ -540,23 +667,11 @@ export const ChatRoomScreen: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <LinearGradient
-        colors={[...colors.backgroundGradient]}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </LinearGradient>
-    );
-  }
+  if (loading) return <LoadingSpinner fullScreen />;
 
   if (error) {
     return (
-      <LinearGradient
-        colors={[...colors.backgroundGradient]}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg }}
-      >
+      <AnimatedScreen style={{ alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <EmptyState
           icon="warning-outline"
           title="Oops, something went wrong!"
@@ -564,18 +679,16 @@ export const ChatRoomScreen: React.FC = () => {
           actionLabel="Try Again"
           onAction={() => { setLoading(true); loadMessages(); }}
         />
-      </LinearGradient>
+      </AnimatedScreen>
     );
   }
 
-  const headerOffset = insets.top + 56;
-
   return (
-    <LinearGradient colors={[...colors.backgroundGradient]} style={styles.screen}>
+    <AnimatedScreen>
       <KeyboardAvoidingView
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerOffset : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -587,8 +700,8 @@ export const ChatRoomScreen: React.FC = () => {
           contentContainerStyle={[
             styles.messagesList,
             {
-              paddingTop: headerOffset + SPACING.sm,
-              paddingBottom: SPACING.md,
+              paddingTop: headerHeight + 12,
+              paddingBottom: 12,
               flexGrow: 1,
               justifyContent: messages.length ? 'flex-end' : 'flex-start',
             },
@@ -614,6 +727,11 @@ export const ChatRoomScreen: React.FC = () => {
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>No messages yet. Say hello!</Text>
             </View>
           }
+          ListFooterComponent={
+            Object.keys(typingUsers).length
+              ? <TypingIndicator names={Object.values(typingUsers)} colors={colors} />
+              : null
+          }
           renderItem={({ item, index }) => {
             const prev = messages[index - 1];
             const showSender = !prev || prev.senderId !== item.senderId;
@@ -632,18 +750,8 @@ export const ChatRoomScreen: React.FC = () => {
           }}
         />
 
-        <TypingIndicator names={Object.values(typingUsers)} colors={colors} />
-
-        <View
-          style={[
-            styles.inputBar,
-            {
-              paddingBottom: Math.max(insets.bottom, 12),
-              backgroundColor: colors.surface,
-              borderTopColor: colors.surfaceBorder,
-            },
-          ]}
-        >
+        {/* `.chat-input` */}
+        <View style={styles.inputBarWrap}>
           <EmojiPicker
             visible={showEmojiPicker}
             onClose={() => setShowEmojiPicker(false)}
@@ -653,36 +761,44 @@ export const ChatRoomScreen: React.FC = () => {
           {!isConnected && (
             <Text style={[styles.reconnectText, { color: colors.warning }]}>Reconnecting…</Text>
           )}
-          <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View
+            style={[
+              styles.chatInput,
+              { paddingBottom: Math.max(insets.bottom, 14) },
+            ]}
+          >
             <TouchableOpacity
               onPress={() => setShowEmojiPicker((v) => !v)}
-              style={styles.attachBtn}
+              style={[styles.chatIconBtn, { backgroundColor: colors.inset }]}
               activeOpacity={0.7}
             >
               <Ionicons
                 name={showEmojiPicker ? 'happy' : 'happy-outline'}
-                size={22}
-                color={showEmojiPicker ? colors.primary : colors.textSecondary}
+                size={20}
+                color={showEmojiPicker ? colors.primary : colors.textMuted}
               />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={pickAndSendImage}
               disabled={uploadingImage}
-              style={styles.attachBtn}
+              style={[styles.chatIconBtn, { backgroundColor: colors.inset }]}
               activeOpacity={0.7}
             >
               {uploadingImage ? (
                 <ActivityIndicator size="small" color={colors.info} />
               ) : (
-                <Ionicons name="image-outline" size={22} color={colors.info} />
+                <Ionicons name="image-outline" size={20} color={colors.textMuted} />
               )}
             </TouchableOpacity>
             <TextInput
               value={input}
               onChangeText={handleTyping}
-              placeholder="Type a message…"
+              placeholder={`Message ${roomName}…`}
               placeholderTextColor={colors.textMuted}
-              style={[styles.textInput, { color: colors.text }]}
+              style={[
+                styles.textInput,
+                { color: colors.text, backgroundColor: colors.surface, borderColor: colors.overlayBorder },
+              ]}
               multiline
               maxLength={4000}
               returnKeyType="send"
@@ -694,16 +810,16 @@ export const ChatRoomScreen: React.FC = () => {
               disabled={!input.trim()}
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? colors.primary : colors.card },
+                { backgroundColor: input.trim() ? colors.primary : colors.inset },
               ]}
               activeOpacity={0.7}
             >
-              <Ionicons name="send" size={16} color={input.trim() ? '#07231F' : colors.textMuted} />
+              <Ionicons name="send" size={15} color={input.trim() ? ON_TEAL_STRONG : colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </AnimatedScreen>
   );
 };
 
@@ -714,9 +830,10 @@ const styles = StyleSheet.create({
   messageList: {
     flex: 1,
   },
+  // .chat-msgs { gap:10px; padding:12px 16px }
   messagesList: {
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
+    paddingHorizontal: 16,
+    gap: 10,
   },
   emptyState: {
     flex: 1,
@@ -726,11 +843,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: 13,
   },
   bubbleRow: {
     flexDirection: 'row',
-    marginBottom: 4,
     gap: 6,
   },
   bubbleRowOwn: {
@@ -749,24 +865,30 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   senderName: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: 11,
     fontFamily: FONTS.bodySemi,
     marginBottom: 2,
     paddingLeft: 4,
   },
+  // .bubble { max-width:78%; padding:11px 14px; font-size:12.5px; line-height:1.5 }
   bubble: {
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  // .bubble.me { radius: 16 5 16 16 }
+  bubbleCornerOwn: {
+    borderTopRightRadius: 5,
+  },
+  // .bubble.them { radius: 5 16 16 16 }
+  bubbleCornerOther: {
+    borderTopLeftRadius: 5,
   },
   bubbleOwn: {
-    borderRadius: 16,
-    borderTopRightRadius: 4,
     borderWidth: 0,
   },
   bubbleOther: {
-    borderTopLeftRadius: 4,
+    borderWidth: 1,
   },
   bubbleDeleted: {
     borderStyle: 'dashed',
@@ -779,101 +901,109 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   deletedText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: 12.5,
     fontStyle: 'italic',
   },
-  bubbleImage: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
+  // .bubble-img { width:58%; radius: (see corner styles); overflow:hidden }
+  bubbleImageWrap: {
+    width: '58%',
+    overflow: 'hidden',
   },
   chatImage: {
-    width: 220,
-    height: 220,
-    borderRadius: 12,
+    width: '100%',
+    aspectRatio: 4 / 3,
     backgroundColor: 'rgba(128,128,128,0.15)',
   },
-  attachBtn: {
-    width: 32,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   msgText: {
-    fontSize: FONT_SIZE.sm,
-    lineHeight: 20,
+    fontSize: 12.5,
+    lineHeight: 18.5,
   },
+  // .msg-receipt { row; justify-end; gap:3; margin-top:2 }
   msgFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 3,
-    marginTop: 2,
+    marginTop: 3,
+    paddingHorizontal: 2,
   },
+  msgFooterOwn: { justifyContent: 'flex-end' },
+  msgFooterOther: { justifyContent: 'flex-start' },
   msgTime: {
-    fontSize: 10,
+    fontSize: 9.5,
   },
   failedText: {
     fontSize: 10,
-    color: '#F0768B',
     marginRight: 2,
   },
+  // .typing-row { row; gap:4; padding:12px 16px; radius:5 16 16 16 }
   typingRow: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderTopLeftRadius: 5,
   },
-  typingText: {
-    fontSize: FONT_SIZE.xs,
-    fontStyle: 'italic',
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  inputBar: {
-    borderTopWidth: 1,
-    paddingTop: 8,
-    paddingHorizontal: SPACING.md,
+  // .chat-input { gap:9px; padding:11px 16px 14px }
+  inputBarWrap: {
     position: 'relative',
-    zIndex: 10,
   },
   reconnectText: {
     textAlign: 'center',
-    fontSize: FONT_SIZE.xs,
+    fontSize: 11,
     marginBottom: 4,
   },
-  inputRow: {
+  chatInput: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    paddingLeft: 14,
-    paddingRight: 4,
-    paddingVertical: 6,
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 16,
+    paddingTop: 11,
   },
-  textInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    lineHeight: 20,
-    maxHeight: 100,
-    paddingTop: 2,
-    paddingBottom: 2,
-  },
-  sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  // .chat-icon-btn { 39x39; radius:50% }
+  chatIconBtn: {
+    width: 39,
+    height: 39,
+    borderRadius: 19.5,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  // .chat-input input { radius:100; padding:12px 16px; font-size:12.5px; border:hairline-strong }
+  textInput: {
+    flex: 1,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 12.5,
+    maxHeight: 100,
+  },
+  // .send-btn { 39x39; radius:50% }
+  sendBtn: {
+    width: 39,
+    height: 39,
+    borderRadius: 19.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   loadMoreRow: {
     alignItems: 'center',
-    paddingVertical: SPACING.sm,
+    paddingVertical: 8,
   },
   loadMoreBtn: {
     alignItems: 'center',
-    paddingVertical: SPACING.sm,
+    paddingVertical: 8,
   },
   loadMoreText: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: 11,
     fontFamily: FONTS.bodySemi,
   },
 });
