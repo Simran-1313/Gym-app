@@ -1,4 +1,4 @@
-import React, { useState , useMemo} from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -7,25 +7,31 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import { clearCookie } from '../../services/api';
-import { DARK_COLORS, FONT_SIZE, LIGHT_COLORS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
+import { FONTS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
-import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
-import { GymLogo } from '../../components/ui/GymLogo';
 
+/**
+ * Ported from `#screen-change-password` in docs/UI_PROTOTYPE.html: an eyebrow
+ * line and three bare `.field`s directly on the scroll — no hero logo, no
+ * card wrapper, matching the equally plain in-app variant
+ * (`#screen-change-password-inapp`), which this same component also serves
+ * (reached from Profile once `isFirstLogin` is false).
+ */
 export const ChangePasswordScreen: React.FC = () => {
-  const { logout, setFirstLoginDone, gym, theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { user, logout } = useAuth();
+  const colors = useThemeColors();
+  const isFirstLogin = !!user?.isFirstLogin;
+
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -71,84 +77,77 @@ export const ChangePasswordScreen: React.FC = () => {
     }
   };
 
+  const fields = [
+    { key: 'current' as const, label: 'Current Password', value: current, onChange: setCurrent },
+    { key: 'next' as const, label: 'New Password', value: next, onChange: setNext },
+    { key: 'confirm' as const, label: 'Confirm New Password', value: confirm, onChange: setConfirm },
+  ];
+
   return (
     <AnimatedScreen>
       <SuccessBurst visible={showSuccess} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <Animated.View entering={ZoomIn.duration(400)} style={styles.iconBox}>
-            <GymLogo name={gym?.name} logo={gym?.logo} size={64} />
-          </Animated.View>
-          <Text style={styles.title}>Set Your Password</Text>
-          <Text style={styles.subtitle}>
-            This is your first login. Please change your temporary password to continue.
-          </Text>
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          {/* `.eyebrow { margin:14px 2px 18px }` — only makes sense as a forced
+              first-login notice; the in-app entry already knows why it's here. */}
+          {isFirstLogin ? (
+            <Text style={[s.eyebrow, { color: colors.textMuted }]}>
+              For your security, choose a new password before continuing
+            </Text>
+          ) : null}
 
-          <GlassCard glowColor={colors.primary}>
-            {([
-              { key: 'current', label: 'Current Password', value: current, onChange: setCurrent },
-              { key: 'next', label: 'New Password', value: next, onChange: setNext },
-              { key: 'confirm', label: 'Confirm New Password', value: confirm, onChange: setConfirm },
-            ] as const).map(({ key, label, value, onChange }, i) => (
-              <Animated.View key={key} entering={FadeIn.delay(i * 80).duration(300)}>
-                <GlassInput
-                  label={label}
-                  placeholder={label}
-                  value={value}
-                  onChangeText={onChange}
-                  secureTextEntry={!revealed[key]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType={key === 'current' ? 'password' : 'newPassword'}
-                  editable={!loading}
-                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />}
-                  rightIcon={
-                    <TouchableOpacity
-                      onPress={() => setRevealed((r) => ({ ...r, [key]: !r[key] }))}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${revealed[key] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
-                    >
-                      <Ionicons
-                        name={revealed[key] ? 'eye-off-outline' : 'eye-outline'}
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  }
-                />
-              </Animated.View>
-            ))}
+          {fields.map(({ key, label, value, onChange }, i) => (
+            <Animated.View key={key} entering={FadeIn.delay(i * 80).duration(300)}>
+              <GlassInput
+                label={label}
+                placeholder={label}
+                value={value}
+                onChangeText={onChange}
+                secureTextEntry={!revealed[key]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType={key === 'current' ? 'password' : 'newPassword'}
+                editable={!loading}
+                leftIcon={<Ionicons name="lock-closed-outline" size={16} color={colors.textFaint} />}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setRevealed((r) => ({ ...r, [key]: !r[key] }))}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${revealed[key] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+                  >
+                    <Ionicons
+                      name={revealed[key] ? 'eye-off-outline' : 'eye-outline'}
+                      size={18}
+                      color={colors.textFaint}
+                    />
+                  </TouchableOpacity>
+                }
+              />
+            </Animated.View>
+          ))}
 
-            <AnimatedButton
-              label="Change Password"
-              onPress={handleSubmit}
-              loading={loading}
-              style={styles.btn}
-            />
+          <AnimatedButton label="Update Password" onPress={handleSubmit} loading={loading} style={s.btn} />
+
+          {/* The prototype's back chevron returns to Login without changing
+              anything — this is that same escape, just as a ghost button
+              since the forced flow hides the header's back control. It would
+              be a confusing way to leave a *voluntary* password change
+              (Profile → Change Password), where the header back button
+              already does that without logging anyone out, so it's hidden
+              outside the first-login gate. */}
+          {isFirstLogin ? (
             <AnimatedButton label="Skip for now" variant="ghost" onPress={logout} />
-          </GlassCard>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </AnimatedScreen>
   );
 };
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const s = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.xl },
-  iconBox: { alignItems: 'center', marginBottom: SPACING.md },
-  title: { ...TYPOGRAPHY.title, color: colors.text, textAlign: 'center' },
-  subtitle: {
-    ...TYPOGRAPHY.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.xl,
-    lineHeight: 22,
-  },
-  btn: { marginTop: SPACING.xs },
+  scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.md, gap: SPACING.xs },
+  eyebrow: { fontSize: 12.5, fontFamily: FONTS.body, lineHeight: 18, marginBottom: 6 },
+  btn: { marginTop: SPACING.sm },
 });

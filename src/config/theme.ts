@@ -60,6 +60,10 @@ export const DARK_COLORS = {
 
   secondary: '#7FD1E8',
   accent: '#4FD1B5',
+  // `--lavender` in the prototype: the AI/assistant accent (chat banner icon,
+  // shield-milestone outline) and the default (non-booked, non-full) class
+  // capacity bar fill. Distinct from `secondary`/`info`, which are a cyan.
+  lavender: '#7C8CFF',
 
   success: '#4ADE80',
   warning: '#FBBF24',
@@ -120,6 +124,7 @@ export const LIGHT_COLORS = {
 
   secondary: '#1E88A8',
   accent: '#0D9488',
+  lavender: '#5A6EEA',
 
   success: '#16A34A',
   warning: '#D97706',

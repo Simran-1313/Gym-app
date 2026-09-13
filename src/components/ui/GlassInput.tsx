@@ -76,7 +76,14 @@ export const GlassInput: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   field: { gap: SPACING.sm },
-  label: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyMedium, letterSpacing: 0.1 },
+  // `.field-label { font-size:11.5px; font-weight:700; text-transform:none but visually all-caps copy }`
+  label: {
+    fontSize: 11.5,
+    fontFamily: FONTS.bodyBold,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',

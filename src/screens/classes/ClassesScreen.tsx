@@ -1,133 +1,316 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Pressable,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
-import { getClassSchedules, bookClass } from '../../services/member.service';
+import { getClassSchedules, bookClass, joinWaitlist } from '../../services/member.service';
 import { ClassSchedule } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONTS, RADIUS } from '../../config/theme';
+import type { ThemeColors } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
-import { AnimatedButton } from '../../components/ui/AnimatedButton';
+import { GlassOverlay } from '../../components/ui/GlassOverlay';
 import { StaggerItem } from '../../components/ui/StaggerItem';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
-import { useAuth } from '../../context/AuthContext';
+
+/**
+ * Ported from `#screen-classes` in docs/UI_PROTOTYPE.html.
+ *
+ * Every number below is lifted from that file's stylesheet rather than
+ * eyeballed: `.scroll` gutter 18, `.day-chip` 46px pill, `.class-card` 15px
+ * padding with a 12px gap, `.ct-h`/`.ct-m` split time block, `.class-name`
+ * 13.5/700, `.class-trainer` 11, `.class-cap-bar` 4px track, `.class-book-btn`
+ * 11/700 pill.
+ */
+
+/* ─── Prototype metrics ─── */
+
+const GUTTER = 18; // .scroll { padding: 0 18px 18px }
+const ROW_GAP = 10; // .class-card { margin-bottom: 10px }
+
+/**
+ * `.class-book-btn` is always `color:#04211f` in the prototype regardless of
+ * theme — a fixed near-black label made to sit on a saturated teal/lavender
+ * fill, the same convention `AnimatedButton`'s local `ON_PRIMARY` constant
+ * already uses for the same reason. `.day-chip.active .dc-n` reuses this
+ * exact literal; `.dc-d` reuses it at 0.7 alpha (`rgba(4,33,31,0.7)`).
+ */
+const ON_ACCENT = '#04211f';
+
+/** `.class-cap-fill`'s default color — teal marks a booked class, red a full
+ * one, and this indigo everything in between. */
+const availableFillColor = (colors: ThemeColors) => colors.lavender;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /* ─── Helpers ─── */
 
-const safeFormatTime = (iso: string): string => {
-  try { const d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }); }
-  catch { return '—'; }
+const formatTimeParts = (iso: string): { main: string; meridiem: string } => {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { main: '--:--', meridiem: '' };
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).formatToParts(d);
+    const hour = parts.find((p) => p.type === 'hour')?.value ?? '--';
+    const minute = parts.find((p) => p.type === 'minute')?.value ?? '--';
+    const meridiem = (parts.find((p) => p.type === 'dayPeriod')?.value ?? '').toUpperCase();
+    return { main: `${hour}:${minute}`, meridiem };
+  } catch {
+    return { main: '--:--', meridiem: '' };
+  }
 };
 
-const safeFormatDay = (iso: string): string => {
-  try { const d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }); }
-  catch { return '—'; }
+/** `Thursday, September 12` — the `.section-label` heading over the day's list. */
+const formatSectionDate = (dateKey: string | null): string => {
+  if (!dateKey) return 'Classes';
+  try {
+    const d = new Date(dateKey);
+    if (isNaN(d.getTime())) return 'Classes';
+    return d.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
+  } catch {
+    return 'Classes';
+  }
 };
 
-const safeFormatMonth = (iso: string): string => {
-  try { const d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN', { month: 'short' }); }
-  catch { return '—'; }
+/** `Today` / `Tomorrow` / a formatted date — used in the booking-confirm sheet copy. */
+const relativeDayLabel = (iso: string): string => {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'this day';
+    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOf(d) - startOf(new Date())) / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    return d.toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' });
+  } catch {
+    return 'this day';
+  }
 };
 
-const safeFormatDayNum = (iso: string): string => {
-  try { const d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.getDate().toString(); }
-  catch { return '—'; }
+/* ─── NavBar (`.navbar`, right `.nav-icon` opens Bookings) ─── */
+
+const NavBar: React.FC<{ colors: ThemeColors; onBookingsPress: () => void }> = ({
+  colors,
+  onBookingsPress,
+}) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s.navbar, { paddingTop: insets.top }]}>
+      <View style={s.navIconSlot} />
+      <Text style={[s.navTitle, { color: colors.text }]}>Classes</Text>
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          onBookingsPress();
+        }}
+        style={({ pressed }) => [
+          s.navIconSlot,
+          s.navIcon,
+          pressed && { backgroundColor: colors.inset, transform: [{ scale: 0.9 }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="My Bookings"
+      >
+        <Ionicons name="calendar-outline" size={18} color={colors.text} />
+      </Pressable>
+    </View>
+  );
 };
 
-/* ─── Schedule Card ─── */
+/* ─── Section label (`.section-label`) ─── */
+
+const SectionLabel: React.FC<{ children: string; colors: ThemeColors; zeroTop?: boolean }> = ({
+  children,
+  colors,
+  zeroTop,
+}) => (
+  <Text style={[s.sectionLabel, { color: colors.textMuted }, zeroTop && s.sectionLabelZero]}>
+    {children}
+  </Text>
+);
+
+/* ─── Day chip (`.day-chip`) ─── */
+
+const DayChip: React.FC<{ date: Date; active: boolean; onPress: () => void; colors: ThemeColors }> = ({
+  date,
+  active,
+  onPress,
+  colors,
+}) => (
+  <Pressable
+    onPress={onPress}
+    style={[
+      s.dayChip,
+      {
+        backgroundColor: active ? colors.primary : colors.surface,
+        borderColor: active ? colors.primary : colors.cardBorder,
+      },
+    ]}
+  >
+    <Text style={[s.dcD, { color: active ? `${ON_ACCENT}B3` : colors.textMuted }]}>
+      {date.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase()}
+    </Text>
+    <Text style={[s.dcN, { color: active ? ON_ACCENT : colors.text }]}>{date.getDate()}</Text>
+  </Pressable>
+);
+
+/* ─── Book pill (`.class-book-btn`) ─── */
+
+type PillVariant = 'book' | 'booked' | 'waitlist' | 'waitlisted';
+
+const BookPill: React.FC<{
+  label: string;
+  variant: PillVariant;
+  loading?: boolean;
+  onPress?: () => void;
+  colors: ThemeColors;
+}> = ({ label, variant, loading, onPress, colors }) => {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const disabled = variant === 'booked' || variant === 'waitlisted' || loading || !onPress;
+
+  const backgroundColor =
+    variant === 'book' ? colors.primary : variant === 'waitlist' ? availableFillColor(colors) : colors.inset;
+  const textColor =
+    variant === 'booked' ? colors.primary : variant === 'waitlisted' ? availableFillColor(colors) : ON_ACCENT;
+  const borderColor =
+    variant === 'booked'
+      ? `${colors.primary}4D`
+      : variant === 'waitlisted'
+      ? `${availableFillColor(colors)}4D`
+      : 'transparent';
+
+  return (
+    <AnimatedPressable
+      disabled={disabled}
+      onPressIn={() => {
+        scale.value = withSpring(0.92, { damping: 15, stiffness: 400 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+      }}
+      onPress={() => {
+        if (disabled) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress?.();
+      }}
+      style={[
+        animStyle,
+        s.bookBtn,
+        { backgroundColor, borderColor, borderWidth: borderColor === 'transparent' ? 0 : 1 },
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <Text style={[s.bookBtnText, { color: textColor }]} numberOfLines={1}>
+          {label}
+        </Text>
+      )}
+    </AnimatedPressable>
+  );
+};
+
+/* ─── Schedule Card (`.card.class-card`) ─── */
 
 const ScheduleCard: React.FC<{
   schedule: ClassSchedule;
-  onBook: (id: string) => void;
-  booking: boolean;
   index: number;
-}> = ({ schedule, onBook, booking, index }) => {
+  pendingId: string | null;
+  onBook: (schedule: ClassSchedule) => void;
+  onWaitlist: (schedule: ClassSchedule) => void;
+  colors: ThemeColors;
+}> = ({ schedule, index, pendingId, onBook, onWaitlist, colors }) => {
   const capacity = schedule.capacity ?? 0;
   const bookedCount = schedule.bookedCount ?? 0;
-  const spotsLeft = Math.max(0, capacity - bookedCount);
-  const isFull = spotsLeft <= 0;
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const isFull = capacity > 0 && bookedCount >= capacity;
   const fillPct = capacity > 0 ? Math.min(100, (bookedCount / capacity) * 100) : 0;
+  const { main, meridiem } = formatTimeParts(schedule.startTime);
+  const trainerName = schedule.class?.trainer?.name;
+  const pending = pendingId === schedule.id;
+
+  const fillColor = isFull ? colors.danger : schedule.isBooked ? colors.primary : availableFillColor(colors);
+
+  let variant: PillVariant = 'book';
+  let label = 'Book';
+  let onPress: (() => void) | undefined = () => onBook(schedule);
+  if (schedule.isBooked) {
+    variant = 'booked';
+    label = 'Booked';
+    onPress = undefined;
+  } else if (schedule.isWaitlisted) {
+    variant = 'waitlisted';
+    label = 'Waitlisted';
+    onPress = undefined;
+  } else if (isFull) {
+    variant = 'waitlist';
+    label = 'Waitlist';
+    onPress = () => onWaitlist(schedule);
+  }
 
   return (
     <StaggerItem index={index}>
-      <GlassCard glowColor={schedule.isBooked ? colors.success : colors.primary} style={s.card} noPadding>
-        <View style={s.cardBody}>
-          {/* Date block */}
-          <View style={[s.dateBlock, { backgroundColor: colors.inset }]}>
-            <Text style={[s.dateMonth, { color: colors.primary }]}>{safeFormatMonth(schedule.startTime)}</Text>
-            <Text style={[s.dateNum, { color: colors.text }]}>{safeFormatDayNum(schedule.startTime)}</Text>
-          </View>
+      <GlassCard
+        style={s.card}
+        innerStyle={s.cardInner}
+        noPadding
+        glowColor={schedule.isBooked ? colors.primary : undefined}
+      >
+        <View style={s.timeBlock}>
+          <Text style={[s.ctH, { color: colors.text }]}>{main}</Text>
+          <Text style={[s.ctM, { color: colors.textMuted }]}>{meridiem}</Text>
+        </View>
 
-          {/* Info */}
-          <View style={s.infoBlock}>
-            <Text style={[s.className, { color: colors.text }]} numberOfLines={1}>{schedule.class?.name ?? 'Class'}</Text>
-            <View style={s.metaRow}>
-              <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-              <Text style={[s.metaText, { color: colors.textSecondary }]}>
-                {safeFormatTime(schedule.startTime)} • {schedule.class?.durationMinutes ?? 0}m
-              </Text>
+        <View style={s.infoBlock}>
+          <Text style={[s.className, { color: colors.text }]} numberOfLines={1}>
+            {schedule.class?.name ?? 'Class'}
+          </Text>
+          {trainerName ? (
+            <Text style={[s.trainerText, { color: colors.textMuted }]} numberOfLines={1}>
+              with {trainerName}
+            </Text>
+          ) : null}
+          <View style={s.capRow}>
+            <View style={[s.capBar, { backgroundColor: colors.inset }]}>
+              <View style={[s.capFill, { width: `${fillPct}%`, backgroundColor: fillColor }]} />
             </View>
-            {schedule.class?.trainer && (
-              <View style={s.metaRow}>
-                <Ionicons name="person-outline" size={13} color={colors.textMuted} />
-                <Text style={[s.metaText, { color: colors.textSecondary }]}>{schedule.class.trainer.name}</Text>
-              </View>
-            )}
+            <Text style={[s.capLabel, { color: colors.textMuted }]}>
+              {isFull ? 'Full' : `${bookedCount}/${capacity}`}
+            </Text>
           </View>
         </View>
 
-        {/* Capacity bar */}
-        <View style={[s.capacitySection, { borderTopColor: colors.insetBorder }]}>
-          <View style={s.capacityRow}>
-            <View style={s.capacityInfo}>
-              <View style={[s.capacityBarBg, { backgroundColor: colors.inset }]}>
-                <View style={[s.capacityBarFill, {
-                  width: `${fillPct}%`,
-                  backgroundColor: isFull ? colors.danger : colors.primary,
-                }]} />
-              </View>
-              <Text style={[s.spotsText, { color: isFull ? colors.danger : colors.textSecondary }]}>
-                {isFull ? 'Full' : `${spotsLeft} of ${capacity} spots left`}
-              </Text>
-            </View>
-
-            {schedule.isBooked ? (
-              <View style={[s.bookedBadge, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                <Text style={[s.bookedText, { color: colors.success }]}>Booked</Text>
-              </View>
-            ) : (
-              <AnimatedButton
-                label={isFull ? 'Class Full' : 'Book Now'}
-                variant={isFull ? "secondary" : "primary"}
-                onPress={() => onBook(schedule.id)}
-                disabled={isFull || booking}
-                loading={booking}
-                style={s.bookBtn}
-              />
-            )}
-          </View>
-        </View>
+        <BookPill
+          label={pending ? '…' : label}
+          variant={variant}
+          loading={pending}
+          onPress={onPress}
+          colors={colors}
+        />
       </GlassCard>
     </StaggerItem>
   );
@@ -135,33 +318,33 @@ const ScheduleCard: React.FC<{
 
 /* ─── Main Screen ─── */
 
+type ConfirmTarget = { schedule: ClassSchedule; mode: 'book' | 'waitlist' };
+
 export const ClassesScreen: React.FC = () => {
   const nav = useNavigation<NativeStackNavigationProp<ClassesStackParams>>();
   const insets = useSafeAreaInsets();
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [bookingId, setBookingId] = useState<string | null>(null);
-  const [confirmBookingId, setConfirmBookingId] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { 
-      setError(null); 
-      let data = await getClassSchedules(); 
-      
+    try {
+      setError(null);
+      let data = await getClassSchedules();
+
       // Inject dummy data if backend is empty so user can experience the UI
       if (!data || data.length === 0) {
         const now = new Date();
         const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
         const dayAfter = new Date(now); dayAfter.setDate(dayAfter.getDate() + 2);
-        
+
         data = [
           {
             id: 'd1', classId: 'c1', startTime: new Date(now.setHours(9, 0, 0, 0)).toISOString(), endTime: new Date(now.setHours(9, 45, 0, 0)).toISOString(), capacity: 20, bookedCount: 20, isBooked: false,
@@ -182,7 +365,7 @@ export const ClassesScreen: React.FC = () => {
         ];
       }
 
-      setSchedules(data); 
+      setSchedules(data);
       if (data.length > 0 && !selectedDate) {
         setSelectedDate(new Date(data[0].startTime).toDateString());
       }
@@ -196,27 +379,44 @@ export const ClassesScreen: React.FC = () => {
     setRefreshing(true); await load(); setRefreshing(false);
   }, [load]);
 
-  const handleBook = useCallback(async (scheduleId: string) => {
-    setConfirmBookingId(scheduleId);
+  const handleBook = useCallback((schedule: ClassSchedule) => {
+    setConfirmTarget({ schedule, mode: 'book' });
   }, []);
 
   const confirmBookClass = async () => {
-    if (!confirmBookingId) return;
-    const scheduleId = confirmBookingId;
-    setConfirmBookingId(null);
-    setBookingId(scheduleId);
-    try { 
-      await bookClass(scheduleId); 
-      if (scheduleId.startsWith('d')) {
-        setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, isBooked: true, bookedCount: s.bookedCount + 1 } : s));
+    if (!confirmTarget) return;
+    const { schedule } = confirmTarget;
+    setConfirmTarget(null);
+    setPendingId(schedule.id);
+    try {
+      await bookClass(schedule.id);
+      if (schedule.id.startsWith('d')) {
+        setSchedules(prev => prev.map(sc => sc.id === schedule.id ? { ...sc, isBooked: true, bookedCount: sc.bookedCount + 1 } : sc));
       } else {
-        await load(); 
+        await load();
       }
-      setShowSuccess(true); 
+      setShowSuccess(true);
     }
     catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Booking failed'); }
-    finally { setBookingId(null); }
+    finally { setPendingId(null); }
   };
+
+  // The prototype joins the waitlist immediately on tap (no confirm sheet) —
+  // only a fresh booking gets the "Confirm Booking" sheet.
+  const handleWaitlist = useCallback(async (schedule: ClassSchedule) => {
+    setPendingId(schedule.id);
+    try {
+      await joinWaitlist(schedule.id);
+      if (schedule.id.startsWith('d')) {
+        setSchedules(prev => prev.map(sc => sc.id === schedule.id ? { ...sc, isWaitlisted: true } : sc));
+      } else {
+        await load();
+      }
+      setShowSuccess(true);
+    }
+    catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not join the waitlist'); }
+    finally { setPendingId(null); }
+  }, [load]);
 
   // Derive unique dates from schedules
   const uniqueDatesMap = new Map<string, Date>();
@@ -228,66 +428,39 @@ export const ClassesScreen: React.FC = () => {
   const uniqueDates = Array.from(uniqueDatesMap.values()).sort((a, b) => a.getTime() - b.getTime());
 
   // Filter schedules by selected date
-  const filteredSchedules = schedules.filter(s => {
+  const filteredSchedules = schedules.filter(sc => {
     if (!selectedDate) return true;
-    return new Date(s.startTime).toDateString() === selectedDate;
+    return new Date(sc.startTime).toDateString() === selectedDate;
   });
 
   if (loading) return <LoadingSpinner fullScreen />;
 
+  const confirmSchedule = confirmTarget?.schedule;
+  const confirmTime = confirmSchedule ? formatTimeParts(confirmSchedule.startTime) : null;
+
   return (
     <AnimatedScreen>
       <SuccessBurst visible={showSuccess} onDone={() => setShowSuccess(false)} />
+      <NavBar colors={colors} onBookingsPress={() => nav.navigate('MyBookings')} />
+
       <ScrollView
         style={s.root}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 110 }]}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + GUTTER }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}
         showsVerticalScrollIndicator={false}
       >
-        {/* Inline page title */}
-        <Animated.View entering={FadeInUp.duration(350)} style={s.pageHeader}>
-          <Text style={[s.pageTitle, { color: colors.text }]}>Classes</Text>
-          <Text style={[s.pageSubtitle, { color: colors.textSecondary }]}>Browse & book upcoming sessions</Text>
-        </Animated.View>
-
-        {/* Bookings shortcut */}
-        <Animated.View entering={FadeInUp.duration(350).delay(60)}>
-          <AnimatedButton
-            label="View My Bookings"
-            variant="secondary"
-            onPress={() => nav.navigate('MyBookings')}
-            icon={<Ionicons name="calendar-outline" size={16} color={isDark ? '#FFF' : colors.primary} />}
-          />
-        </Animated.View>
-
-        {/* ── Day Picker Ribbon ── */}
-        <Animated.View entering={FadeInUp.duration(350).delay(100)}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dayPickerContent}>
-            {uniqueDates.map((d, i) => {
-              const isSelected = d.toDateString() === selectedDate;
-              return (
-                <Pressable
-                  key={i}
-                  onPress={() => setSelectedDate(d.toDateString())}
-                  style={[
-                    s.dayBubble,
-                    { backgroundColor: isSelected ? colors.primary : (colors.inset) },
-                    isSelected && s.dayBubbleActive
-                  ]}
-                >
-                  <Text style={[s.dayBubbleName, { color: isSelected ? '#FFF' : colors.textSecondary }]}>
-                    {d.toLocaleDateString('en-IN', { weekday: 'short' })}
-                  </Text>
-                  <Text style={[s.dayBubbleNum, { color: isSelected ? '#FFF' : colors.text }]}>
-                    {d.getDate()}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </Animated.View>
+        {/* ── Day Picker Ribbon (`.day-picker`) ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dayPickerContent}>
+          {uniqueDates.map((d, i) => (
+            <DayChip
+              key={i}
+              date={d}
+              active={d.toDateString() === selectedDate}
+              onPress={() => setSelectedDate(d.toDateString())}
+              colors={colors}
+            />
+          ))}
+        </ScrollView>
 
         {/* Error state */}
         {error ? (
@@ -298,168 +471,132 @@ export const ClassesScreen: React.FC = () => {
             actionLabel="Try Again"
             onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}
           />
-        ) : filteredSchedules.length === 0 ? (
-          <EmptyState
-            icon="calendar-outline"
-            title="No Classes Today"
-            subtitle={`There are no classes scheduled for ${selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric'}) : 'this day'}.`}
-            actionLabel="Browse other days"
-            onAction={() => setSelectedDate(uniqueDates.length > 0 ? uniqueDates[0].toDateString() : null)}
-          />
         ) : (
           <>
-            {/* Schedule count */}
-            <Text style={[s.countLabel, { color: colors.textMuted }]}>
-              {filteredSchedules.length} class{filteredSchedules.length !== 1 ? 'es' : ''} available
-            </Text>
-            {filteredSchedules.map((sc, i) => (
-              <ScheduleCard
-                key={sc.id}
-                schedule={sc}
-                onBook={handleBook}
-                booking={bookingId === sc.id}
-                index={i}
+            <SectionLabel colors={colors} zeroTop>{formatSectionDate(selectedDate)}</SectionLabel>
+            {filteredSchedules.length === 0 ? (
+              <EmptyState
+                icon="calendar-outline"
+                title="No Classes Today"
+                subtitle={`There are no classes scheduled for ${selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric'}) : 'this day'}.`}
+                actionLabel="Browse other days"
+                onAction={() => setSelectedDate(uniqueDates.length > 0 ? uniqueDates[0].toDateString() : null)}
               />
-            ))}
+            ) : (
+              filteredSchedules.map((sc, i) => (
+                <ScheduleCard
+                  key={sc.id}
+                  schedule={sc}
+                  index={i}
+                  pendingId={pendingId}
+                  onBook={handleBook}
+                  onWaitlist={handleWaitlist}
+                  colors={colors}
+                />
+              ))
+            )}
           </>
         )}
       </ScrollView>
 
-      {/* Custom Booking Confirmation Modal */}
-      <Modal transparent visible={!!confirmBookingId} animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: isDark ? '#121821' : '#FFFFFF', borderColor: colors.insetBorder }]}>
-            <Text style={[s.modalTitle, { color: colors.text }]}>Confirm Booking</Text>
-            <Text style={[s.modalText, { color: colors.textSecondary }]}>Are you sure you want to book this class?</Text>
-            
-            <View style={s.modalActions}>
-              <AnimatedButton
-                label="Cancel"
-                variant="secondary"
-                onPress={() => setConfirmBookingId(null)}
-                style={{ flex: 1 }}
-              />
-              <AnimatedButton
-                label="Book"
-                variant="primary"
-                onPress={confirmBookClass}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* `#modal-book-class` — sheet-handle / sheet-title / sheet-sub / btn-primary / btn-ghost */}
+      <GlassOverlay
+        visible={!!confirmTarget}
+        title={confirmSchedule?.class?.name ?? 'Confirm Booking'}
+        message={
+          confirmSchedule && confirmTime
+            ? `${relativeDayLabel(confirmSchedule.startTime)} at ${confirmTime.main} ${confirmTime.meridiem} — you'll get a reminder 30 minutes before class starts`
+            : "You're about to reserve your spot in this class"
+        }
+        confirmLabel="Confirm Booking"
+        cancelLabel="Cancel"
+        loading={!!pendingId}
+        onConfirm={confirmBookClass}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </AnimatedScreen>
   );
 };
 
-/* ─── Styles ─── */
+/* ─── Styles (values from the prototype stylesheet) ─── */
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 14, gap: 12 },
+  // .scroll { padding: 0 18px 18px }
+  content: { paddingHorizontal: GUTTER },
 
-  pageHeader: { gap: 4, marginBottom: 4 },
-  pageTitle: { fontSize: 28, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
-  pageSubtitle: { fontSize: FONT_SIZE.sm },
-
-  dayPickerContent: { gap: SPACING.md, paddingVertical: SPACING.sm, paddingHorizontal: 4 },
-  dayBubble: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 64,
-    height: 72,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  dayBubbleActive: {
-    borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  dayBubbleName: { fontSize: 11, fontFamily: FONTS.bodyBold, textTransform: 'uppercase', marginBottom: 4 },
-  dayBubbleNum: { fontSize: 20, fontFamily: FONTS.bodyExtra },
-
-  countLabel: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodySemi, letterSpacing: 0.3, marginTop: 2 },
-
-  // Card
-  card: { gap: 0 },
-  cardBody: { flexDirection: 'row', padding: SPACING.md, gap: SPACING.md },
-  dateBlock: {
-    width: 62, height: 66, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md,
-  },
-  dateMonth: { fontSize: 11, fontFamily: FONTS.bodyExtra, textTransform: 'uppercase', letterSpacing: 1 },
-  dateNum: { fontSize: 26, fontFamily: FONTS.bodyExtra, marginTop: -2 },
-
-  infoBlock: { flex: 1, gap: 4, justifyContent: 'center' },
-  className: { fontSize: 17, fontFamily: FONTS.bodyExtra, letterSpacing: -0.2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodyMedium },
-
-  // Capacity section
-  capacitySection: {
-    paddingHorizontal: SPACING.md, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  capacityRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACING.md },
-  capacityInfo: { flex: 1, gap: 4 },
-  capacityBarBg: { height: 5, borderRadius: 3, overflow: 'hidden' },
-  capacityBarFill: { height: '100%', borderRadius: 3 },
-  spotsText: { fontSize: 11, fontFamily: FONTS.bodySemi },
-
-  bookedBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 16, height: 50, borderRadius: 14, borderWidth: 1,
-    justifyContent: 'center', minWidth: 110,
-  },
-  bookedText: { fontSize: 15, fontFamily: FONTS.bodyBold },
-  bookBtn: { minWidth: 110 },
-
-  // Error
-  errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.lg },
-  errorTitle: { fontSize: FONT_SIZE.lg, fontFamily: FONTS.bodyBold },
-  errorText: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
-
-  // Custom Modal
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.lg,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: FONTS.displayBold,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  },
-  modalText: {
-    fontSize: 15,
-    fontFamily: FONTS.bodyMedium,
-    marginBottom: SPACING.xl,
-    textAlign: 'center',
-  },
-  modalActions: {
+  // .navbar { padding: 46px 18px 8px } — the 46 is the status bar, so it
+  // comes from the safe-area inset instead of a fixed number.
+  navbar: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: GUTTER,
+    paddingBottom: 8,
   },
+  navTitle: { fontSize: 16, fontFamily: FONTS.bodyBold }, // .nav-title
+  navIconSlot: { width: 36, height: 36 }, // .nav-icon / .nav-spacer
+  navIcon: {
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // .day-picker { gap:8px; padding:4px 2px 16px }
+  dayPickerContent: { gap: 8, paddingTop: 4, paddingHorizontal: 2, paddingBottom: 16 },
+  // .day-chip { width:46px; padding:10px 0; border-radius:16px; border:1px }
+  dayChip: {
+    width: 46,
+    flexShrink: 0,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  dcD: { fontSize: 9.5, fontFamily: FONTS.bodyBold }, // .dc-d
+  dcN: { fontSize: 14, fontFamily: FONTS.bodyExtra, marginTop: 3 }, // .dc-n
+
+  // .section-label { font-size:10.5; weight:700; letter-spacing:.08em; margin:14px 2px 10px }
+  sectionLabel: {
+    fontSize: 10.5,
+    fontFamily: FONTS.bodyBold,
+    letterSpacing: 0.84,
+    textTransform: 'uppercase',
+    marginTop: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
+  },
+  sectionLabelZero: { marginTop: 0 },
+
+  // .class-card { gap:12px; padding:15px; margin-bottom:10px; align-items:center }
+  card: { marginBottom: ROW_GAP },
+  cardInner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15 },
+
+  // .class-time-block { width:52px }
+  timeBlock: { width: 52, alignItems: 'center', flexShrink: 0 },
+  ctH: { fontSize: 15, fontFamily: FONTS.bodyExtra }, // .ct-h { weight:800 }
+  ctM: { fontSize: 9.5, marginTop: 2, fontFamily: FONTS.body }, // .ct-m
+
+  // .class-info { flex:1; min-width:0 }
+  infoBlock: { flex: 1 },
+  className: { fontSize: 13.5, fontFamily: FONTS.bodyBold }, // .class-name { weight:700 }
+  trainerText: { fontSize: 11, marginTop: 2, fontFamily: FONTS.body }, // .class-trainer
+
+  // .class-cap-row { gap:6px; margin-top:7px }
+  capRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
+  capBar: { flex: 1, height: 4, borderRadius: 4, overflow: 'hidden' }, // .class-cap-bar
+  capFill: { height: '100%', borderRadius: 4 }, // .class-cap-fill
+  capLabel: { fontSize: 9.5, flexShrink: 0, fontFamily: FONTS.body }, // .class-cap-label
+
+  // .class-book-btn { padding:9px 14px; radius:100; font 11/700 }
+  bookBtn: {
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: RADIUS.full,
+    minWidth: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookBtnText: { fontSize: 11, fontFamily: FONTS.bodyBold },
 });

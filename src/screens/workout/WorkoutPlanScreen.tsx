@@ -223,7 +223,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             <Text style={[s.spL, { color: colors.textMuted }]}>Exercises</Text>
           </View>
           <View style={[s.statPill, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons name="repeat-outline" size={16} color={colors.info} />
+            <Ionicons name="repeat-outline" size={16} color={colors.lavender} />
             <Text style={[s.spV, { color: colors.text }]}>{totalSets}</Text>
             <Text style={[s.spL, { color: colors.textMuted }]}>Total Sets</Text>
           </View>

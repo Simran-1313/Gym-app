@@ -276,7 +276,7 @@ export const DietPlanScreen: React.FC = () => {
             <View style={s.ringsRow}>
               <ProgressRing progress={pct.protein / 100} size={64} strokeWidth={6} color={colors.primary} value={`${pct.protein}%`} label="Protein" />
               <ProgressRing progress={pct.carbs / 100} size={64} strokeWidth={6} color={colors.warning} value={`${pct.carbs}%`} label="Carbs" />
-              <ProgressRing progress={pct.fat / 100} size={64} strokeWidth={6} color={colors.info} value={`${pct.fat}%`} label="Fat" />
+              <ProgressRing progress={pct.fat / 100} size={64} strokeWidth={6} color={colors.lavender} value={`${pct.fat}%`} label="Fat" />
             </View>
           </View>
           {!!updatedLabel && (
