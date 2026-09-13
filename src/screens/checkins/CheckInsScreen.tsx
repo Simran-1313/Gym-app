@@ -1,42 +1,46 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { getCheckIns } from '../../services/member.service';
 import { CheckIn, Meta } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { FONTS, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
-import { StatBadge } from '../../components/ui/StatBadge';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { StaggerItem } from '../../components/ui/StaggerItem';
-import { useAuth } from '../../context/AuthContext';
+
+/**
+ * Ported from `#screen-checkins` in docs/UI_PROTOTYPE.html.
+ *
+ * Every number below is lifted from that file's stylesheet rather than
+ * eyeballed: `.scroll` gutter 18, `.checkin-row` 14/15 padding with a 9px
+ * rhythm, `.checkin-icon` 40×40 r12, `.checkin-name` 13.5/600,
+ * `.checkin-meta` 11.5, `.checkin-badge` 9.5/700 pill, `.section-label`
+ * 10.5/700 uppercase at .08em.
+ */
+
+/* ─── Prototype metrics ─── */
+
+const GUTTER = 18; // .scroll { padding: 0 18px 18px }
+const ROW_GAP = 9; // .checkin-row { margin-bottom: 9px }
+/** rgba(teal, 0.14) — the accent wash behind `.checkin-icon` / `.checkin-badge`. */
+const TEAL_WASH = '24';
 
 /* ─── Helpers ─── */
-
-const formatDateTime = (iso: string) => {
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleString('en-IN', {
-      weekday: 'short', day: 'numeric', month: 'short',
-      hour: '2-digit', minute: '2-digit', hour12: true,
-    });
-  } catch { return '—'; }
-};
 
 const formatTime = (iso: string) => {
   try {
@@ -46,25 +50,23 @@ const formatTime = (iso: string) => {
   } catch { return '—'; }
 };
 
-const formatDate = (iso: string) => {
+/**
+ * The prototype labels rows "Today", "Yesterday", "Mon", "Sun" — a relative
+ * day for the last week, then a plain date. Anything older than a week reads
+ * as a weekday name that could be any of several weeks.
+ */
+const relativeDay = (iso: string): string => {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days > 1 && days < 7) return d.toLocaleDateString('en-IN', { weekday: 'short' });
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   } catch { return '—'; }
 };
-
-const methodIcon: Record<string, keyof typeof Ionicons.glyphMap> = {
-  MANUAL: 'hand-left-outline',
-  QR: 'qr-code-outline',
-  BIOMETRIC: 'finger-print-outline',
-};
-
-const getMethodColor = (colors: ThemeColors) => ({
-  MANUAL: colors.accent,
-  QR: colors.primary,
-  BIOMETRIC: colors.success,
-} as Record<string, string>);
 
 const duration = (inTime: string, outTime: string | null): string => {
   if (!outTime) return 'In progress';
@@ -79,93 +81,121 @@ const duration = (inTime: string, outTime: string | null): string => {
   } catch { return '—'; }
 };
 
-/* ─── Check-In Card ─── */
+/** `.checkin-name` copy and glyph per check-in method, per the prototype rows. */
+const METHOD: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  QR: { label: 'QR Check-In', icon: 'shield-checkmark-outline' },
+  BIOMETRIC: { label: 'Biometric Scan', icon: 'finger-print-outline' },
+  MANUAL: { label: 'Manual Check-In', icon: 'document-text-outline' },
+};
 
-const CheckInCard: React.FC<{ item: CheckIn; index: number }> = ({ item, index }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
+/* ─── Navbar (`.navbar`) ─── */
+
+const NavBar: React.FC<{ colors: ThemeColors }> = ({ colors }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s.navbar, { paddingTop: insets.top }]}>
+      <View style={s.navSpacer} />
+      <Text style={[s.navTitle, { color: colors.text }]}>Check-Ins</Text>
+      <View style={s.navSpacer} />
+    </View>
+  );
+};
+
+/* ─── Section label (`.section-label`) ─── */
+
+const SectionLabel: React.FC<{ children: string; colors: ThemeColors; first?: boolean }> = ({
+  children,
+  colors,
+  first,
+}) => (
+  <Text style={[s.sectionLabel, { color: colors.textMuted }, first && s.sectionLabelFirst]}>
+    {children}
+  </Text>
+);
+
+/* ─── Check-in row (`.card.checkin-row`) ─── */
+
+const CheckInRow: React.FC<{ item: CheckIn; index: number }> = ({ item, index }) => {
   const colors = useThemeColors();
-  const mColors = getMethodColor(colors);
-  const color = mColors[item.method] ?? colors.primary;
+  const method = METHOD[item.method] ?? { label: 'Check-In', icon: 'enter-outline' as const };
   const isActive = !item.checkedOutAt;
+
+  // The prototype tints the icon for QR entries and keeps the rest neutral;
+  // the badge only goes teal on the newest row (or a session still running).
+  const iconTinted = item.method === 'QR';
+  const badgeTinted = isActive || index === 0;
+
+  const out = item.checkedOutAt;
 
   return (
     <StaggerItem index={index}>
-      <GlassCard glowColor={isActive ? colors.success : color} innerStyle={s.card}>
-        <View style={s.cardTop}>
-          {/* Icon */}
-          <View style={[s.iconBox, { backgroundColor: `${color}15` }]}>
-            <Ionicons name={methodIcon[item.method] ?? 'enter-outline'} size={20} color={color} />
-          </View>
-
-          {/* Details */}
-          <View style={s.details}>
-            <Text style={[s.dateText, { color: colors.text }]}>{formatDate(item.checkedInAt)}</Text>
-            <View style={s.timeRow}>
-              <Ionicons name="enter-outline" size={13} color={colors.textMuted} />
-              <Text style={[s.timeText, { color: colors.textSecondary }]}>{formatTime(item.checkedInAt)}</Text>
-              {item.checkedOutAt && (
-                <>
-                  <Ionicons name="arrow-forward" size={11} color={colors.textMuted} style={{ marginHorizontal: 2 }} />
-                  <Ionicons name="exit-outline" size={13} color={colors.textMuted} />
-                  <Text style={[s.timeText, { color: colors.textSecondary }]}>{formatTime(item.checkedOutAt)}</Text>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* Duration / Active badge */}
-          <View style={s.rightCol}>
-            {isActive ? (
-              <View style={[s.activeBadge, { backgroundColor: `${colors.success}12`, borderColor: `${colors.success}25` }]}>
-                <View style={[s.activeDot, { backgroundColor: colors.success }]} />
-                <Text style={[s.activeText, { color: colors.success }]}>Active</Text>
-              </View>
-            ) : (
-              <View style={s.durationBox}>
-                <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-                <Text style={[s.durationText, { color: colors.text }]}>{duration(item.checkedInAt, item.checkedOutAt)}</Text>
-              </View>
-            )}
-          </View>
+      <GlassCard style={s.rowCard} innerStyle={s.rowInner}>
+        <View
+          style={[
+            s.checkinIcon,
+            { backgroundColor: iconTinted ? `${colors.primary}${TEAL_WASH}` : colors.inset },
+          ]}
+        >
+          <Ionicons name={method.icon} size={17} color={iconTinted ? colors.primary : colors.text} />
         </View>
 
-        {/* Bottom bar: method pill */}
-        <View style={[s.cardBottom, { borderTopColor: colors.insetBorder }]}>
-          <View style={[s.methodPill, { backgroundColor: `${color}10`, borderColor: `${color}20` }]}>
-            <Ionicons name={methodIcon[item.method] ?? 'enter-outline'} size={12} color={color} />
-            <Text style={[s.methodText, { color }]}>{item.method}</Text>
-          </View>
+        <View style={s.rowCopy}>
+          <Text style={[s.checkinName, { color: colors.text }]} numberOfLines={1}>
+            {method.label}
+          </Text>
+          <Text style={[s.checkinMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+            {relativeDay(item.checkedInAt)} · {formatTime(item.checkedInAt)}
+            {out ? ` – ${formatTime(out)}` : ''}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            s.checkinBadge,
+            { backgroundColor: badgeTinted ? `${colors.primary}${TEAL_WASH}` : colors.inset },
+          ]}
+        >
+          <Text
+            style={[s.checkinBadgeText, { color: badgeTinted ? colors.primary : colors.textSecondary }]}
+          >
+            {isActive ? 'Active' : duration(item.checkedInAt, out)}
+          </Text>
         </View>
       </GlassCard>
     </StaggerItem>
   );
 };
 
-/* ─── Summary Header ─── */
+/* ─── Summary tile (`.card.card-elevated`, the 42-visits header) ─── */
 
-const SummaryHeader: React.FC<{ total: number }> = ({ total }) => {
+const SummaryCard: React.FC<{ total: number }> = ({ total }) => {
   const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInUp.duration(350)}>
-      <GlassCard glowColor={colors.primary} style={s.summaryCard}>
-        <View style={s.summaryRow}>
-          <View style={[s.summaryIconWrap, { backgroundColor: `${colors.primary}12` }]}>
-            <Ionicons name="fitness-outline" size={22} color={colors.primary} />
-          </View>
-          <View style={s.summaryInfo}>
-            <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>Total Gym Visits</Text>
-            <Text style={[s.summaryValue, { color: colors.text }]}>{total}</Text>
-          </View>
-          <View style={[s.summaryBadge, { backgroundColor: `${colors.success}12` }]}>
-            <Ionicons name="trending-up" size={16} color={colors.success} />
-          </View>
+      <GlassCard elevated style={s.summaryCard} innerStyle={s.summaryInner}>
+        <View style={[s.summaryIcon, { backgroundColor: `${colors.primary}${TEAL_WASH}` }]}>
+          <Ionicons name="home-outline" size={22} color={colors.primary} />
+        </View>
+        <View>
+          <Text style={[s.summaryValue, { color: colors.text }]}>{total}</Text>
+          <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>Total visits</Text>
         </View>
       </GlassCard>
     </Animated.View>
   );
 };
+
+/** The prototype's dimmed shimmer row that trails the list while more loads. */
+const SkeletonRow: React.FC = () => (
+  <GlassCard style={s.skeletonCard} innerStyle={s.rowInner}>
+    <SkeletonLoader height={40} style={s.skeletonIcon} />
+    <View style={s.rowCopy}>
+      <SkeletonLoader height={12} style={s.skeletonBarWide} />
+      <SkeletonLoader height={9} style={s.skeletonBarNarrow} />
+    </View>
+  </GlassCard>
+);
 
 /* ─── Main Screen ─── */
 
@@ -206,14 +236,9 @@ export const CheckInsScreen: React.FC = () => {
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  const ListHeader = () => (
-    <View style={s.listHeader}>
-      {/* Inline page title */}
-      <Animated.View entering={FadeInUp.duration(350)} style={s.pageHeader}>
-        <Text style={[s.pageTitle, { color: colors.text }]}>Check-ins</Text>
-        <Text style={[s.pageSubtitle, { color: colors.textSecondary }]}>Your gym visit history</Text>
-      </Animated.View>
-      {meta ? <SummaryHeader total={meta.total} /> : null}
+  const listHeader = (
+    <View>
+      {meta ? <SummaryCard total={meta.total} /> : null}
       {error ? (
         <EmptyState
           icon="warning-outline"
@@ -222,19 +247,24 @@ export const CheckInsScreen: React.FC = () => {
           actionLabel="Try Again"
           onAction={() => { setLoading(true); load(1).finally(() => setLoading(false)); }}
         />
+      ) : checkIns.length > 0 ? (
+        <SectionLabel colors={colors} first>Recent</SectionLabel>
       ) : null}
     </View>
   );
 
   return (
     <AnimatedScreen>
+      <NavBar colors={colors} />
+
       <FlatList
         style={s.root}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 110 }]}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 110 }]}
         data={error ? [] : checkIns}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => <CheckInCard item={item} index={index} />}
-        ListHeaderComponent={<ListHeader />}
+        renderItem={({ item, index }) => <CheckInRow item={item} index={index} />}
+        ListHeaderComponent={listHeader}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           !error ? (
             <EmptyState
@@ -246,14 +276,11 @@ export const CheckInsScreen: React.FC = () => {
         }
         ListFooterComponent={
           loadingMore ? (
-            <View style={s.footer}>
-              <SkeletonLoader height={64} />
-              <SkeletonLoader height={64} />
-            </View>
+            <SkeletonRow />
           ) : meta?.hasNext ? (
-            <TouchableOpacity style={s.loadMoreBtn} onPress={loadMore}>
+            <Pressable style={s.loadMoreBtn} onPress={loadMore}>
               <Text style={[s.loadMoreText, { color: colors.primary }]}>Load more</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : null
         }
         refreshControl={
@@ -264,67 +291,92 @@ export const CheckInsScreen: React.FC = () => {
   );
 };
 
-/* ─── Styles ─── */
+/* ─── Styles (values from the prototype stylesheet) ─── */
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 14, gap: 12 },
+  // .scroll { padding: 0 18px 18px }
+  content: { paddingHorizontal: GUTTER, paddingBottom: GUTTER },
 
-  listHeader: { gap: 12 },
-  pageHeader: { gap: 4, marginBottom: 2 },
-  pageTitle: { fontSize: 28, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
-  pageSubtitle: { fontSize: FONT_SIZE.sm },
-
-  // Summary
-  summaryCard: { gap: 0 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  summaryIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  summaryInfo: { flex: 1, gap: 2 },
-  summaryLabel: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodySemi },
-  summaryValue: { fontSize: 26, fontFamily: FONTS.bodyExtra, letterSpacing: -0.5 },
-  summaryBadge: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-
-  // Card
-  card: { gap: 0, paddingBottom: 0 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  iconBox: {
-    width: 42, height: 42, borderRadius: 13,
-    alignItems: 'center', justifyContent: 'center',
+  // .navbar { padding: 46px 18px 8px } — the 46 is the status bar, so it comes
+  // from the safe-area inset instead of a fixed number.
+  navbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: GUTTER,
+    paddingBottom: 8,
   },
-  details: { flex: 1, gap: 3 },
-  dateText: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodyBold },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  timeText: { fontSize: FONT_SIZE.xs, fontFamily: FONTS.bodyMedium },
+  navTitle: { fontSize: 16, fontFamily: FONTS.bodyBold }, // .nav-title
+  navSpacer: { width: 36 }, // .nav-spacer
 
-  rightCol: { alignItems: 'flex-end' },
-  durationBox: { alignItems: 'center', gap: 2 },
-  durationText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyExtra },
-
-  activeBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.full, borderWidth: 1,
+  // .section-label { font-size:10.5; weight:700; letter-spacing:.08em; margin:14px 2px 10px }
+  sectionLabel: {
+    fontSize: 10.5,
+    fontFamily: FONTS.bodyBold,
+    letterSpacing: 0.84,
+    textTransform: 'uppercase',
+    marginTop: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
   },
-  activeDot: { width: 7, height: 7, borderRadius: 4 },
-  activeText: { fontSize: 11, fontFamily: FONTS.bodyBold },
+  sectionLabelFirst: { marginTop: 14 },
 
-  cardBottom: {
-    marginTop: SPACING.sm, marginHorizontal: -SPACING.md, paddingHorizontal: SPACING.md,
-    paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth,
+  // .card.card-elevated { padding:18px; margin-bottom:16px; gap:14px }
+  summaryCard: { marginBottom: 16 },
+  summaryInner: { padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  summaryIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  methodPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full,
-    borderWidth: 1, alignSelf: 'flex-start',
+  summaryValue: { fontSize: 22, fontFamily: FONTS.bodyExtra },
+  summaryLabel: { fontSize: 11.5, fontFamily: FONTS.body, marginTop: 2 },
+
+  // .checkin-row { gap:13px; padding:14px 15px; margin-bottom:9px }
+  rowCard: { marginBottom: ROW_GAP },
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
   },
-  methodText: { fontSize: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.5 },
+  rowCopy: { flex: 1 },
 
-  // Error
-  errorBox: { alignItems: 'center', gap: SPACING.sm, padding: SPACING.md },
-  errorText: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
-  retryText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold, marginTop: 4 },
+  // .checkin-icon { 40×40; radius 12 }
+  checkinIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  // Footer
-  footer: { gap: SPACING.sm, marginTop: SPACING.sm },
-  loadMoreBtn: { alignItems: 'center', paddingVertical: SPACING.md },
-  loadMoreText: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodySemi },
+  checkinName: { fontSize: 13.5, fontFamily: FONTS.bodySemi }, // .checkin-name
+  checkinMeta: { fontSize: 11.5, fontFamily: FONTS.body, marginTop: 2 }, // .checkin-meta
+
+  // .checkin-badge { 9.5/700; padding 4px 9px; radius 100; uppercase; .02em }
+  checkinBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: RADIUS.full,
+  },
+  checkinBadgeText: {
+    fontSize: 9.5,
+    fontFamily: FONTS.bodyBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.19,
+  },
+
+  // The trailing shimmer row sits at .55 opacity in the prototype.
+  skeletonCard: { marginBottom: ROW_GAP, opacity: 0.55 },
+  skeletonIcon: { width: 40, borderRadius: 12 },
+  skeletonBarWide: { width: '60%', borderRadius: 6 },
+  skeletonBarNarrow: { width: '40%', borderRadius: 6, marginTop: 6 },
+
+  loadMoreBtn: { alignItems: 'center', paddingVertical: 14 },
+  loadMoreText: { fontSize: 12.5, fontFamily: FONTS.bodySemi },
 });

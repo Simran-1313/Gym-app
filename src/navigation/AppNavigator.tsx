@@ -93,6 +93,9 @@ export type RootStackParams = {
   Membership: undefined;
   Checkout: { subscription: ActiveSubscription };
   Challenges: undefined;
+  // Also reachable from Profile, not just through the first-login gate — the
+  // prototype has an in-app "Change Password" row (#screen-change-password-inapp).
+  ChangePassword: undefined;
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
@@ -265,6 +268,11 @@ export const AppNavigator: React.FC = () => {
         <RootStack.Screen name="Membership" component={MembershipScreen} options={{ title: 'Membership & Billing' }} />
         <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirm & Pay' }} />
         <RootStack.Screen name="Challenges" component={ChallengesScreen} options={{ title: 'Challenges' }} />
+        <RootStack.Screen
+          name="ChangePassword"
+          component={ChangePasswordScreen}
+          options={{ title: 'Change Password' }}
+        />
       </RootStack.Navigator>
     );
   }
