@@ -23,17 +23,16 @@ import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import {
-  DARK_COLORS,
   FONTS,
-  LIGHT_COLORS,
   RADIUS,
   SPACING,
   TYPOGRAPHY,
   shadow,
   type ThemeColors,
 } from '../../config/theme';
-import { ActiveSubscription, User, ActivitySummary, CheckIn } from '../../types';
-import { getCheckIns } from '../../services/member.service';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { ActiveSubscription, User, ActivitySummary, CheckIn, MemberProfile } from '../../types';
+import { getCheckIns, getProfile } from '../../services/member.service';
 import { getActivitySummary, logWater } from '../../services/activity.service';
 import { RootStackParams, TabParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -265,26 +264,38 @@ export const HomeScreen: React.FC = () => {
   const nav = useNavigation<HomeNavProp>();
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
-  const colors: ThemeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   const [refreshing, setRefreshing] = useState(false);
   const [waterLogged, setWaterLogged] = useState(0);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
+  const [profile, setProfile] = useState<MemberProfile | null>(null);
 
-  const [weight, setWeight] = useState(75);
-  const [height, setHeight] = useState(175);
+  // The BMI card's weight/height steppers used to open on fake defaults
+  // (75kg/175cm) regardless of the signed-in member's real stats — showing a
+  // BMI computed from someone else's numbers as if it were theirs. They now
+  // seed from the real profile once it loads, and the card hides until then
+  // rather than show a number that isn't the member's.
+  const [weight, setWeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
 
   const loadActivityData = useCallback(async () => {
     try {
-      const [checkInRes, summaryRes] = await Promise.all([
+      const [checkInRes, summaryRes, profileRes] = await Promise.all([
         getCheckIns(1, 30),
         getActivitySummary(),
+        getProfile(),
       ]);
       setCheckIns(checkInRes.checkIns || []);
       setSummary(summaryRes);
       if (summaryRes.metrics?.hydration?.consumedMl !== undefined) {
         setWaterLogged(summaryRes.metrics.hydration.consumedMl);
+      }
+      if (profileRes) {
+        setProfile(profileRes);
+        setWeight((w) => w ?? profileRes.weight);
+        setHeight((h) => h ?? profileRes.height);
       }
     } catch (e) {
       console.log('Failed to fetch home activity data:', e);
@@ -397,17 +408,19 @@ export const HomeScreen: React.FC = () => {
     return count;
   }, [checkIns]);
 
-  const bmi = (weight / Math.pow(height / 100, 2)).toFixed(1);
-  const bmiValue = parseFloat(bmi);
+  // null until the real profile has loaded — see the weight/height state above.
+  const hasBmiInputs = weight != null && height != null;
+  const bmi = hasBmiInputs ? (weight / Math.pow(height / 100, 2)).toFixed(1) : '—';
+  const bmiValue = hasBmiInputs ? parseFloat(bmi) : 0;
   let bmiCategory = 'Normal';
   let bmiColor: string = colors.success;
-  if (bmiValue < 18.5) {
+  if (hasBmiInputs && bmiValue < 18.5) {
     bmiCategory = 'Underweight';
     bmiColor = colors.info;
-  } else if (bmiValue > 30) {
+  } else if (hasBmiInputs && bmiValue > 30) {
     bmiCategory = 'Obese';
     bmiColor = colors.danger;
-  } else if (bmiValue > 25) {
+  } else if (hasBmiInputs && bmiValue > 25) {
     bmiCategory = 'Overweight';
     bmiColor = colors.warning;
   }
@@ -608,6 +621,44 @@ export const HomeScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
           </Pressable>
         </Animated.View>
+
+        {/* ── Membership status (`.sub-status-card`) ── */}
+        {sub ? (
+          <Animated.View entering={FadeInUp.duration(340).delay(30)} style={styles.block}>
+            <Pressable
+              onPress={() => {
+                tap();
+                nav.navigate('Membership');
+              }}
+              style={({ pressed }) => [
+                styles.subStatusCard,
+                shadow(isDark, 'sm'),
+                {
+                  backgroundColor: pressed ? colors.cardPressed : colors.surfaceElevated,
+                  borderColor: colors.cardBorder,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.subStatusDot,
+                  { backgroundColor: sub.status === 'ACTIVE' ? colors.success : colors.warning },
+                ]}
+              />
+              <View style={styles.subStatusCopy}>
+                <Text style={[styles.subStatusTitle, { color: colors.text }]} numberOfLines={1}>
+                  {sub.plan.name} · {sub.status === 'ACTIVE' ? 'Active' : sub.status.charAt(0) + sub.status.slice(1).toLowerCase()}
+                </Text>
+                <Text style={[styles.subStatusSub, { color: colors.textMuted }]} numberOfLines={1}>
+                  {sub.status === 'ACTIVE'
+                    ? `Renews in ${activeDays} day${activeDays === 1 ? '' : 's'} · ₹${sub.plan.price.toLocaleString('en-IN')}/mo`
+                    : 'Tap to renew your plan'}
+                </Text>
+              </View>
+              <Text style={[styles.subStatusCta, { color: colors.primary }]}>Manage</Text>
+            </Pressable>
+          </Animated.View>
+        ) : null}
 
         {/* ── Hero: today's energy ── */}
         <Animated.View entering={FadeInUp.duration(380).delay(60)} style={styles.block}>
@@ -979,7 +1030,9 @@ export const HomeScreen: React.FC = () => {
           </Pressable>
         </Animated.View>
 
-        {/* ── BMI ── */}
+        {/* ── BMI — hidden until the real profile loads, rather than open on
+             placeholder weight/height that could read as the member's own ── */}
+        {hasBmiInputs && weight != null && height != null ? (
         <Animated.View entering={FadeInUp.duration(340).delay(450)} style={styles.block}>
           <GlassCard>
             <View style={styles.weekHead}>
@@ -1013,7 +1066,7 @@ export const HomeScreen: React.FC = () => {
                         hitSlop={6}
                         onPress={() => {
                           Haptics.selectionAsync().catch(() => {});
-                          c.set((v) => Math.max(c.min, v - 1));
+                          c.set((v) => Math.max(c.min, (v ?? c.min) - 1));
                         }}
                       >
                         <Ionicons name="remove-circle-outline" size={22} color={colors.textSecondary} />
@@ -1025,7 +1078,7 @@ export const HomeScreen: React.FC = () => {
                         hitSlop={6}
                         onPress={() => {
                           Haptics.selectionAsync().catch(() => {});
-                          c.set((v) => Math.min(c.max, v + 1));
+                          c.set((v) => Math.min(c.max, (v ?? c.max) + 1));
                         }}
                       >
                         <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
@@ -1054,6 +1107,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           </GlassCard>
         </Animated.View>
+        ) : null}
       </ScrollView>
     </AnimatedScreen>
   );
@@ -1112,6 +1166,22 @@ const styles = StyleSheet.create({
   greetLabel: { ...TYPOGRAPHY.body, fontFamily: FONTS.bodyMedium },
   greetName: { ...TYPOGRAPHY.hero, marginTop: 1 },
   greetQuote: { ...TYPOGRAPHY.caption, marginTop: 3, fontSize: 13 },
+
+  // `.sub-status-card` — a slim membership-renewal nudge above the hero.
+  subStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  subStatusDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  subStatusCopy: { flex: 1 },
+  subStatusTitle: { fontSize: 12.5, fontFamily: FONTS.bodyBold },
+  subStatusSub: { fontSize: 11, marginTop: 2 },
+  subStatusCta: { fontSize: 12, fontFamily: FONTS.bodyBold },
   streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
