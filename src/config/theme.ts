@@ -57,6 +57,11 @@ export const DARK_COLORS = {
   primaryLight: '#99F6E4',
   primarySoft: 'rgba(45,212,191,0.12)',
   primaryBorder: 'rgba(45,212,191,0.24)',
+  // A deepened primary for surfaces that always carry white text (CTAs,
+  // filled chips, banners) — `primary` itself is a bright accent teal that
+  // white fails badly against (~1.9:1). See utils/color.ts's `solidFillFor`,
+  // which is how useThemeColors derives this for a tenant's own brand color.
+  primarySolid: '#1B7F73',
 
   secondary: '#7FD1E8',
   accent: '#4FD1B5',
@@ -121,6 +126,7 @@ export const LIGHT_COLORS = {
   primaryLight: '#5EEAD4',
   primarySoft: 'rgba(13,148,136,0.10)',
   primaryBorder: 'rgba(13,148,136,0.22)',
+  primarySolid: '#0C857A',
 
   secondary: '#1E88A8',
   accent: '#0D9488',
@@ -240,6 +246,35 @@ export const GRADIENTS = {
   profileHero: ['#2DD4BF', '#14B8A6', '#0F766E'] as const,
   // Deep teal-navy behind vector scenery in hero cards.
   scenery: ['#0C1A22', '#102A33', '#0A1219'] as const,
+} as const;
+
+/**
+ * Spring physics, named by job rather than by number. Before this existed,
+ * every pressable picked its own {damping, stiffness} pair by feel, so eight
+ * near-identical gestures across the app each settled at a slightly
+ * different speed — the kind of inconsistency that reads as carelessness
+ * even when no single instance looks wrong on its own.
+ *
+ * Values are in Reanimated's duration/dampingRatio form (`withSpring(v,
+ * MOTION.press)`), which is the same vocabulary Apple designs springs in:
+ * dampingRatio 1 = critically damped (no overshoot), <1 = overshoots and
+ * settles. duration is the *perceptual* settle time, not a fixed clock — the
+ * spring still reacts to velocity and can be redirected mid-flight.
+ */
+export const MOTION = {
+  // Default press feedback: nothing was thrown, so nothing should bounce.
+  // Buttons, cards, rows. Apple's baseline for a non-gestural move (WWDC18
+  // "Designing Fluid Interfaces": damping 1.0, response ~0.4).
+  press: { duration: 260, dampingRatio: 1 },
+  // Same job at small sizes (chips, glyphs) — the full 260ms settle reads
+  // sluggish under a 24px icon.
+  pressSmall: { duration: 200, dampingRatio: 1 },
+  // A control that slides to a resting position (toggle knob, segmented
+  // control). Apple's drawer spec: damping 0.8, response 0.3.
+  settle: { duration: 240, dampingRatio: 0.8 },
+  // Momentum was carried into this motion — a success burst, a tab icon
+  // popping on select — so visible overshoot reads as "thrown", not sloppy.
+  bouncy: { duration: 260, dampingRatio: 0.65 },
 } as const;
 
 /**

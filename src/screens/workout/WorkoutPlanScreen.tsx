@@ -18,7 +18,6 @@ import { FONTS, RADIUS, SPACING } from '../../config/theme';
 import { WorkoutDay, WorkoutExercise } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
 import { ScreenBackground } from '../../components/ui/ScreenBackground';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
@@ -283,7 +282,7 @@ export const WorkoutPlanScreen: React.FC = () => {
           <AnimatedButton
             label="Start Workout"
             onPress={() => navigation.navigate('WorkoutSession', { day: activeDay })}
-            icon={<Ionicons name="play" size={16} color={bestTextOn(colors.primary)} />}
+            icon={<Ionicons name="play" size={16} color="#FFFFFF" />}
           />
         ) : null}
 

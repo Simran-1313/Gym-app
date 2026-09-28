@@ -21,7 +21,7 @@ import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service
 import { connectSocket } from '../../services/socket';
 import { FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
+import { shade } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -164,8 +164,8 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
       <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
         <GlassCard innerStyle={styles.rowInner}>
           {isGroup ? (
-            <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.avatar}>
-              <Ionicons name="people" size={20} color={bestTextOn(colors.primary)} />
+            <LinearGradient colors={[colors.primarySolid, shade(colors.primarySolid, -0.18)]} style={styles.avatar}>
+              <Ionicons name="people" size={20} color="#FFFFFF" />
             </LinearGradient>
           ) : (
             <View style={[styles.avatar, { backgroundColor: colors.inset }]}>
@@ -194,8 +194,8 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
           <View style={styles.threadMeta}>
             {!!time && <Text style={[styles.threadTime, { color: colors.textMuted }]}>{time}</Text>}
             {unread > 0 && (
-              <View style={[styles.unreadDot, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.unreadDotText, { color: bestTextOn(colors.primary) }]}>{unread > 99 ? '99+' : unread}</Text>
+              <View style={[styles.unreadDot, { backgroundColor: colors.primarySolid }]}>
+                <Text style={[styles.unreadDotText, { color: '#FFFFFF' }]}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
           </View>

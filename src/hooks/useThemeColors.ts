@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DARK_COLORS, LIGHT_COLORS, ThemeColors } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
-import { isValidHex, shade } from '../utils/color';
+import { isValidHex, shade, solidFillFor } from '../utils/color';
 
 /**
  * The themed color set for the current screen: dark/light per the user's
@@ -35,6 +35,7 @@ export const useThemeColors = (): ThemeColors => {
       primaryGlow: shade(tenantPrimary, 0.35),
       primarySoft: `${tenantPrimary}1F`,
       primaryBorder: `${tenantPrimary}3D`,
+      primarySolid: solidFillFor(tenantPrimary),
     } as unknown as ThemeColors;
   }, [base, tenantPrimary]);
 };

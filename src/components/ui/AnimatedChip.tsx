@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT_SIZE, FONTS, MOTION, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuth } from '../../context/AuthContext';
-import { bestTextOn } from '../../utils/color';
+import { shade } from '../../utils/color';
 
 interface Props {
   label: string;
@@ -32,7 +32,7 @@ export const AnimatedChip: React.FC<Props> = ({
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
-  const onPrimary = bestTextOn(colors.primary);
+  const onPrimary = '#FFFFFF';
 
   const scale = useSharedValue(1);
 
@@ -61,7 +61,7 @@ export const AnimatedChip: React.FC<Props> = ({
     >
       {selected ? (
         <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
+          colors={[colors.primarySolid, shade(colors.primarySolid, -0.18)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.chipInner}

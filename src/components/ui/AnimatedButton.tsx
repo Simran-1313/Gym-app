@@ -18,7 +18,12 @@ import * as Haptics from 'expo-haptics';
 
 import { FONTS, MOTION, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
+import { shade, solidFillFor } from '../../utils/color';
+
+/** White text is always the label color on a solid CTA fill — the fill
+ *  itself (colors.primarySolid / a darkened danger) is what's guaranteed
+ *  to carry it, rather than flipping the text color per background. */
+const ON_SOLID = '#FFFFFF';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
@@ -47,9 +52,6 @@ export const AnimatedButton: React.FC<Props> = ({
   destructive = false,
 }) => {
   const colors = useThemeColors();
-  // Computed from whatever colors.primary actually resolves to (default teal
-  // or a tenant's own brand color) rather than assumed — see bestTextOn.
-  const onPrimary = bestTextOn(colors.primary);
 
   const scale = useSharedValue(1);
 
@@ -75,12 +77,12 @@ export const AnimatedButton: React.FC<Props> = ({
 
   // ── PRIMARY ──
   if (variant === 'primary') {
-    // Derived from the resolved primary/primaryDark (tenant-aware), not the
-    // fixed GRADIENTS.primary constant — a tenant's brand color used to only
-    // reach colors.primary, never the button that's the app's main CTA.
-    const gradient = destructive
-      ? ([colors.danger, colors.danger] as const)
-      : ([colors.primary, colors.primaryDark] as const);
+    // colors.primarySolid (or a darkened danger for the destructive case) is
+    // deep enough that white always clears WCAG AA on it — see
+    // solidFillFor's doc comment. Derived from the tenant's actual brand
+    // color when one is set, not the fixed GRADIENTS.primary constant.
+    const fill = destructive ? solidFillFor(colors.danger) : colors.primarySolid;
+    const gradient = [fill, shade(fill, -0.18)] as const;
     return (
       <AnimatedPressable
         onPress={handlePress}
@@ -96,18 +98,11 @@ export const AnimatedButton: React.FC<Props> = ({
           style={s.btnInner}
         >
           {loading ? (
-            <ActivityIndicator color={destructive ? bestTextOn(colors.danger) : onPrimary} />
+            <ActivityIndicator color={ON_SOLID} />
           ) : (
             <View style={s.row}>
               {icon}
-              <Text
-                style={[
-                  s.primaryLabel,
-                  { color: destructive ? bestTextOn(colors.danger) : onPrimary },
-                ]}
-              >
-                {label}
-              </Text>
+              <Text style={[s.primaryLabel, { color: ON_SOLID }]}>{label}</Text>
             </View>
           )}
         </LinearGradient>

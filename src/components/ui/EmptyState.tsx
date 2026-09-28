@@ -13,7 +13,6 @@ import * as Haptics from 'expo-haptics';
 
 import { FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
 
 interface Props {
   icon: keyof typeof Ionicons.glyphMap;
@@ -25,7 +24,7 @@ interface Props {
 
 export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel, onAction }) => {
   const colors = useThemeColors();
-  const onPrimary = bestTextOn(colors.primary);
+  const onPrimary = '#FFFFFF';
 
   const floatY = useSharedValue(0);
 
@@ -70,8 +69,8 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
               onAction();
             }}
             style={({ pressed }) => [
-              styles.actionPill, 
-              { backgroundColor: colors.primary },
+              styles.actionPill,
+              { backgroundColor: colors.primarySolid },
               pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 }
             ]}
           >

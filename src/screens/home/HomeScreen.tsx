@@ -30,7 +30,6 @@ import {
   type ThemeColors,
 } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
 import { ActiveSubscription, User, ActivitySummary, CheckIn, MemberProfile } from '../../types';
 import { getCheckIns, getProfile } from '../../services/member.service';
 import { getActivitySummary, logWater } from '../../services/activity.service';
@@ -264,7 +263,7 @@ export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
-  const onPrimary = bestTextOn(colors.primary);
+  const onPrimary = '#FFFFFF';
 
   const [refreshing, setRefreshing] = useState(false);
   const [waterLogged, setWaterLogged] = useState(0);
@@ -811,7 +810,7 @@ export const HomeScreen: React.FC = () => {
               onPress={handleCreateWorkout}
               style={({ pressed }) => [
                 styles.playFab,
-                { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.93 : 1 }] },
+                { backgroundColor: colors.primarySolid, transform: [{ scale: pressed ? 0.93 : 1 }] },
               ]}
             >
               <Ionicons name="play" size={21} color={onPrimary} style={{ marginLeft: 2 }} />
@@ -871,7 +870,7 @@ export const HomeScreen: React.FC = () => {
               },
             ]}
           >
-            <View style={[styles.coachIcon, { backgroundColor: colors.primary }]}>
+            <View style={[styles.coachIcon, { backgroundColor: colors.primarySolid }]}>
               <Ionicons name="sparkles" size={15} color={onPrimary} />
             </View>
             <View style={styles.coachCopy}>
@@ -1015,7 +1014,7 @@ export const HomeScreen: React.FC = () => {
                 See this week's schedule
               </Text>
             </View>
-            <View style={[styles.upcomingCta, { backgroundColor: colors.primary }]}>
+            <View style={[styles.upcomingCta, { backgroundColor: colors.primarySolid }]}>
               <Text style={[styles.upcomingCtaText, { color: onPrimary }]}>Browse</Text>
             </View>
           </Pressable>

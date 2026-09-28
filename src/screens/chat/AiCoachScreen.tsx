@@ -19,7 +19,6 @@ import { useNavigation } from '@react-navigation/native';
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
 import { FONTS, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
-import { bestTextOn } from '../../utils/color';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 
@@ -231,7 +230,7 @@ export const AiCoachScreen: React.FC = () => {
             styles.bubble,
             isUser ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
             isUser
-              ? { backgroundColor: colors.primary }
+              ? { backgroundColor: colors.primarySolid }
               : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder },
             item.error && { borderColor: colors.danger, borderWidth: 1 },
           ]}
@@ -240,7 +239,7 @@ export const AiCoachScreen: React.FC = () => {
             {(() => {
               const baseStyle = [
                 styles.bubbleText,
-                { color: isUser ? bestTextOn(colors.primary) : colors.text },
+                { color: isUser ? '#FFFFFF' : colors.text },
                 item.error && { color: colors.danger },
               ];
               const boldStyle = { fontFamily: FONTS.bodyBold };
@@ -388,12 +387,12 @@ export const AiCoachScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? colors.primary : colors.inset },
+                { backgroundColor: input.trim() ? colors.primarySolid : colors.inset },
               ]}
               onPress={() => send(input)}
               disabled={!input.trim()}
             >
-              <Ionicons name="send" size={15} color={input.trim() ? bestTextOn(colors.primary) : colors.textMuted} />
+              <Ionicons name="send" size={15} color={input.trim() ? '#FFFFFF' : colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>

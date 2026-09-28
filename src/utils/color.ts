@@ -60,3 +60,25 @@ export const bestTextOn = (bgHex: string): string => {
   const light = '#F7FAF9';
   return contrastRatio(bgHex, dark) >= contrastRatio(bgHex, light) ? dark : light;
 };
+
+/**
+ * Darkens `hex` just enough that white text on it clears WCAG AA (4.5:1),
+ * for surfaces that must always carry white — a brand's primary CTA fill,
+ * say, where the product wants one consistent "white on brand color" look
+ * rather than the text flipping between light/dark per tenant (see
+ * `bestTextOn` for that alternative). This app's own default teal
+ * (#2DD4BF) is a bright accent — white on it is ~1.9:1, unreadable — so
+ * committing to white text means the *fill* has to earn it instead. Works
+ * for any tenant's brand color the same way: keeps its hue, deepens it only
+ * as far as necessary. Already-dark colors pass on the first check and come
+ * back unchanged.
+ */
+export const solidFillFor = (hex: string): string => {
+  let amount = 0;
+  for (let i = 0; i < 24; i++) {
+    const candidate = amount === 0 ? hex : shade(hex, amount);
+    if (contrastRatio('#FFFFFF', candidate) >= 4.5) return candidate;
+    amount -= 0.05;
+  }
+  return shade(hex, -1); // pathological input; black always clears 21:1
+};

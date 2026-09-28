@@ -24,7 +24,7 @@ import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
 import { FONTS, RADIUS } from '../../config/theme';
-import { bestTextOn } from '../../utils/color';
+import { shade } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuth } from '../../context/AuthContext';
@@ -67,8 +67,8 @@ interface ChatHeaderProps {
 const ChatHeaderTitle: React.FC<ChatHeaderProps> = ({ name, isGroup, subtitle, subtitleColor, colors }) => (
   <View style={hs.row}>
     {isGroup ? (
-      <LinearGradient colors={[colors.primary, colors.primaryDark]} style={hs.avatar}>
-        <Ionicons name="people" size={13} color={bestTextOn(colors.primary)} />
+      <LinearGradient colors={[colors.primarySolid, shade(colors.primarySolid, -0.18)]} style={hs.avatar}>
+        <Ionicons name="people" size={13} color="#FFFFFF" />
       </LinearGradient>
     ) : (
       <View style={[hs.avatar, { backgroundColor: colors.inset }]}>
@@ -110,12 +110,11 @@ interface TickProps {
 const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed, colors }) => {
   if (senderId !== currentUserId) return null;
 
-  // The "me" bubble/receipt keeps whichever of dark/light text actually
-  // contrasts with colors.primary (see bestTextOn) — its own ticks/timestamp
-  // dim from that same tone, not from colors.text*, which could be
-  // near-invisible against a bright primary in dark mode.
-  const onTeal = bestTextOn(colors.primary);
-  const onTealDim = `${onTeal}8C`;
+  // The "me" bubble fills colors.primarySolid and always carries white text
+  // (see AnimatedButton's ON_SOLID) — its own ticks/timestamp dim from white,
+  // not from colors.text*, which could be near-invisible on a solid teal fill.
+  const onTeal = '#FFFFFF';
+  const onTealDim = 'rgba(255,255,255,0.55)';
 
   if (failed) return <Ionicons name="alert-circle" size={13} color={colors.danger} />;
   if (pending) return <Ionicons name="time-outline" size={12} color={onTealDim} />;
@@ -183,11 +182,11 @@ const MessageBubble: React.FC<BubbleProps> = ({
         styles.bubble,
         isOwn ? styles.bubbleCornerOwn : styles.bubbleCornerOther,
         isOwn
-          ? [styles.bubbleOwn, { backgroundColor: colors.primary, opacity: msg.pending ? 0.7 : 1 }]
+          ? [styles.bubbleOwn, { backgroundColor: colors.primarySolid, opacity: msg.pending ? 0.7 : 1 }]
           : [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }],
       ]}
     >
-      <Text style={[styles.msgText, { color: isOwn ? bestTextOn(colors.primary) : colors.text }]}>
+      <Text style={[styles.msgText, { color: isOwn ? '#FFFFFF' : colors.text }]}>
         {msg.content}
       </Text>
     </View>
@@ -811,11 +810,11 @@ export const ChatRoomScreen: React.FC = () => {
               disabled={!input.trim()}
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? colors.primary : colors.inset },
+                { backgroundColor: input.trim() ? colors.primarySolid : colors.inset },
               ]}
               activeOpacity={0.7}
             >
-              <Ionicons name="send" size={15} color={input.trim() ? bestTextOn(colors.primary) : colors.textMuted} />
+              <Ionicons name="send" size={15} color={input.trim() ? '#FFFFFF' : colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>

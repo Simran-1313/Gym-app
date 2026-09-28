@@ -34,9 +34,9 @@ import {
   SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
-import { FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
+import { shade, solidFillFor } from '../../utils/color';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -84,8 +84,11 @@ export const ActivityScreen: React.FC = () => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
-  const onPrimary = bestTextOn(colors.primary);
-  const onAccent = bestTextOn(colors.accent);
+  const onPrimary = '#FFFFFF';
+  // colors.accent isn't tenant-overridden, but it's still a bright teal that
+  // white fails against directly — same fix as colors.primarySolid.
+  const accentSolid = solidFillFor(colors.accent);
+  const onAccent = '#FFFFFF';
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
@@ -359,7 +362,7 @@ export const ActivityScreen: React.FC = () => {
             style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
           >
             <LinearGradient
-              colors={[...GRADIENTS.accent]}
+              colors={[accentSolid, shade(accentSolid, -0.18)]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.workoutBanner}
@@ -506,7 +509,7 @@ export const ActivityScreen: React.FC = () => {
                           backgroundColor: colors.inset,
                           borderColor: colors.insetBorder,
                         },
-                        active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        active && { backgroundColor: colors.primarySolid, borderColor: colors.primarySolid },
                       ]}
                     >
                       {active ? (

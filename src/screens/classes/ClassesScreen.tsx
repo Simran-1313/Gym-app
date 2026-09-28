@@ -167,15 +167,15 @@ const DayChip: React.FC<{ date: Date; active: boolean; onPress: () => void; colo
     style={[
       s.dayChip,
       {
-        backgroundColor: active ? colors.primary : colors.surface,
-        borderColor: active ? colors.primary : colors.cardBorder,
+        backgroundColor: active ? colors.primarySolid : colors.surface,
+        borderColor: active ? colors.primarySolid : colors.cardBorder,
       },
     ]}
   >
-    <Text style={[s.dcD, { color: active ? `${bestTextOn(colors.primary)}B3` : colors.textMuted }]}>
+    <Text style={[s.dcD, { color: active ? 'rgba(255,255,255,0.7)' : colors.textMuted }]}>
       {date.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase()}
     </Text>
-    <Text style={[s.dcN, { color: active ? bestTextOn(colors.primary) : colors.text }]}>{date.getDate()}</Text>
+    <Text style={[s.dcN, { color: active ? '#FFFFFF' : colors.text }]}>{date.getDate()}</Text>
   </Pressable>
 );
 
@@ -195,17 +195,18 @@ const BookPill: React.FC<{
   const disabled = variant === 'booked' || variant === 'waitlisted' || loading || !onPress;
 
   const backgroundColor =
-    variant === 'book' ? colors.primary : variant === 'waitlist' ? availableFillColor(colors) : colors.inset;
-  // 'book'/'waitlist' fill solid (colors.primary / the lavender accent) and
-  // need contrast-computed text; 'booked'/'waitlisted' sit on the neutral
-  // `colors.inset` and just borrow that same accent as a colored label.
+    variant === 'book' ? colors.primarySolid : variant === 'waitlist' ? availableFillColor(colors) : colors.inset;
+  // 'book' fills solid teal, always with white text. 'waitlist' fills the
+  // lavender accent, which is light enough that a computed dark/light pick
+  // still applies. 'booked'/'waitlisted' sit on the neutral `colors.inset`
+  // and just borrow that same accent as a colored label.
   const textColor =
     variant === 'booked'
       ? colors.primary
       : variant === 'waitlisted'
       ? availableFillColor(colors)
       : variant === 'book'
-      ? bestTextOn(colors.primary)
+      ? '#FFFFFF'
       : bestTextOn(availableFillColor(colors));
   const borderColor =
     variant === 'booked'
