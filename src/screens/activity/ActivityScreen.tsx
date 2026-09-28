@@ -13,7 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -44,6 +45,7 @@ import { AppleActivityRings } from '../../components/ui/AppleActivityRings';
 import { AppleBarChart } from '../../components/ui/AppleBarChart';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { useAuth } from '../../context/AuthContext';
+import { RootStackParams } from '../../navigation/AppNavigator';
 
 const DAYS_OF_WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -78,6 +80,7 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: keyof typeof Ioni
 export const ActivityScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
@@ -150,6 +153,7 @@ export const ActivityScreen: React.FC = () => {
   const handleMetricSelect = (metric: typeof activeMetric) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     setActiveMetric(metric);
+    navigation.navigate('MetricDetail', { metric });
   };
 
   const handleSegmentSelect = (mode: typeof viewMode) => {

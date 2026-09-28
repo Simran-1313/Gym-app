@@ -10,7 +10,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { FloatingTabBar } from '../components/ui/FloatingTabBar';
 import { FONT_SIZE, FONTS, ThemeColors } from '../config/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { ActiveSubscription, AiPlan } from '../types';
+import { ActiveSubscription, AiPlan, WorkoutDay } from '../types';
 
 // A flat, solid header — one elevation tier above the screen body, separated
 // by a single hairline. Replaces a blurred/gradient strip: cheaper to render,
@@ -41,8 +41,10 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
 import { DietPlanScreen } from '../screens/dietplan/DietPlanScreen';
 import { WorkoutPlanScreen } from '../screens/workout/WorkoutPlanScreen';
+import { WorkoutSessionScreen } from '../screens/workout/WorkoutSessionScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { ActivityScreen } from '../screens/activity/ActivityScreen';
+import { MetricDetailScreen, METRIC_TITLES } from '../screens/activity/MetricDetailScreen';
 import { ProductsScreen } from '../screens/products/ProductsScreen';
 import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
@@ -87,8 +89,15 @@ export type RootStackParams = {
   Onboarding: undefined;
   DietPlan: { plan?: AiPlan; fromOnboarding?: boolean; generate?: boolean } | undefined;
   WorkoutPlan: { plan?: AiPlan; generate?: boolean } | undefined;
+  // A live, in-memory set-by-set tracker for one day's exercise list — see
+  // WorkoutSessionScreen for why per-set weight/reps live only for the
+  // session's duration rather than being persisted (no backend endpoint for
+  // it) and why only a session-level summary is logged on finish.
+  WorkoutSession: { day: WorkoutDay };
   Notifications: undefined;
   Activity: undefined;
+  // Per-metric drill-down opened from Activity's (and Home's) metric chips.
+  MetricDetail: { metric: 'CALORIES' | 'DURATION' | 'WATER' };
   Products: undefined;
   Membership: undefined;
   Checkout: { subscription: ActiveSubscription };
@@ -261,9 +270,19 @@ export const AppNavigator: React.FC = () => {
         <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
         <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ title: 'My Diet Plan' }} />
         <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: 'My Workout Plan' }} />
+        <RootStack.Screen
+          name="WorkoutSession"
+          component={WorkoutSessionScreen}
+          options={({ route }) => ({ title: route.params.day.focus })}
+        />
         <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Update Fitness Profile' }} />
         <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <RootStack.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity Dashboard' }} />
+        <RootStack.Screen
+          name="MetricDetail"
+          component={MetricDetailScreen}
+          options={({ route }) => ({ title: METRIC_TITLES[route.params.metric] })}
+        />
         <RootStack.Screen name="Products" component={ProductsNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Membership" component={MembershipScreen} options={{ title: 'Membership & Billing' }} />
         <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirm & Pay' }} />

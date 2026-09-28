@@ -733,7 +733,7 @@ export const HomeScreen: React.FC = () => {
             tint={colors.tint.energy}
             colors={colors}
             isDark={isDark}
-            onPress={() => nav.navigate('Activity')}
+            onPress={() => nav.navigate('MetricDetail', { metric: 'CALORIES' })}
             delay={90}
           />
           <MetricTile
@@ -744,7 +744,7 @@ export const HomeScreen: React.FC = () => {
             tint={colors.tint.recovery}
             colors={colors}
             isDark={isDark}
-            onPress={() => nav.navigate('Activity')}
+            onPress={() => nav.navigate('MetricDetail', { metric: 'DURATION' })}
             delay={120}
           />
           <MetricTile
@@ -755,6 +755,7 @@ export const HomeScreen: React.FC = () => {
             tint={colors.tint.hydration}
             colors={colors}
             isDark={isDark}
+            onPress={() => nav.navigate('MetricDetail', { metric: 'WATER' })}
             delay={150}
           />
           <MetricTile
