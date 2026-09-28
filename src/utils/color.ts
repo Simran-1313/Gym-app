@@ -23,3 +23,40 @@ export const shade = (hex: string, amount: number): string => {
 /** Basic hex format check — a tenant-supplied `primaryColor` is user input from an admin panel. */
 export const isValidHex = (hex?: string | null): hex is string =>
   Boolean(hex && /^#?[a-f\d]{6}$/i.test(hex.trim()));
+
+/** WCAG relative luminance (sRGB → linear, ITU-R BT.709 weights). */
+const relativeLuminance = (hex: string): number => {
+  const rgb = toRgb(hex);
+  if (!rgb) return 1;
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = rgb.map(lin);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/** WCAG contrast ratio between two colors, 1–21. */
+const contrastRatio = (hexA: string, hexB: string): number => {
+  const a = relativeLuminance(hexA) + 0.05;
+  const b = relativeLuminance(hexB) + 0.05;
+  return a > b ? a / b : b / a;
+};
+
+/**
+ * The higher-contrast of near-black or white for text on `bgHex` — the
+ * general form of "should this button's label be dark or light," correct
+ * for whatever a tenant's actual brand color turns out to be rather than
+ * assuming it behaves like this app's own default teal. A bright brand color
+ * (teal, lime, amber) needs dark text; a deep one (navy, maroon, forest
+ * green) needs light text — hardcoding either fails half of them.
+ * `#0B1210`/`#F7FAF9` are near-black/near-white rather than pure — pure
+ * black or white against a saturated color can look harsh; both still clear
+ * WCAG AA (4.5:1) by a wide margin against anything this picks the "dark"
+ * or "light" side for.
+ */
+export const bestTextOn = (bgHex: string): string => {
+  const dark = '#0B1210';
+  const light = '#F7FAF9';
+  return contrastRatio(bgHex, dark) >= contrastRatio(bgHex, light) ? dark : light;
+};

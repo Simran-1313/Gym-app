@@ -8,12 +8,12 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
-  FadeInUp,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONTS, RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 
 interface Props {
   icon: keyof typeof Ionicons.glyphMap;
@@ -24,9 +24,8 @@ interface Props {
 }
 
 export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel, onAction }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
+  const onPrimary = bestTextOn(colors.primary);
 
   const floatY = useSharedValue(0);
 
@@ -49,9 +48,9 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
 
 
   return (
-    <Animated.View entering={FadeInUp.duration(400)} style={styles.container}>
+    <View style={styles.container}>
       <View style={[styles.dashedBox, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-        
+
 
 
         {/* Floating Icon Container */}
@@ -76,13 +75,13 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
               pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 }
             ]}
           >
-            <Text style={styles.actionText}>{actionLabel}</Text>
-            <Ionicons name="arrow-forward" size={14} color="#07231F" style={{ marginLeft: 4 }} />
+            <Text style={[styles.actionText, { color: onPrimary }]}>{actionLabel}</Text>
+            <Ionicons name="arrow-forward" size={14} color={onPrimary} style={{ marginLeft: 4 }} />
           </Pressable>
         )}
 
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -135,13 +134,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: RADIUS.full,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   actionText: {
-    color: '#07231F',
     fontSize: 13,
     fontFamily: FONTS.bodyBold,
     letterSpacing: 0.3,

@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   icon: keyof typeof Ionicons.glyphMap;
@@ -17,9 +17,7 @@ export const StatBadge: React.FC<Props> = ({
   value,
   color,
 }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const themeColors = useThemeColors();
 
   const actualColor = color || themeColors.primary;
 
@@ -31,7 +29,7 @@ export const StatBadge: React.FC<Props> = ({
         borderColor: themeColors.surfaceBorder,
       }
     ]}>
-      <View style={[styles.iconWrap, { backgroundColor: `${actualColor}22`, shadowColor: actualColor }]}>
+      <View style={[styles.iconWrap, { backgroundColor: `${actualColor}22` }]}>
         <Ionicons name={icon} size={14} color={actualColor} />
       </View>
       <View>
@@ -58,10 +56,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
   },
   label: { fontSize: FONT_SIZE.xs },
   value: { fontSize: FONT_SIZE.sm, fontFamily: FONTS.bodyBold },

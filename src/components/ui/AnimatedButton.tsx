@@ -16,16 +16,11 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { DARK_COLORS, LIGHT_COLORS, FONTS, GRADIENTS, RADIUS } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONTS, MOTION, RADIUS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
-
-/**
- * Label colour on a teal fill. White on #2DD4BF is roughly 1.9:1 — well under
- * AA — so the primary button uses a near-black teal instead.
- */
-const ON_PRIMARY = '#07231F';
 
 interface Props {
   label: string;
@@ -51,9 +46,10 @@ export const AnimatedButton: React.FC<Props> = ({
   icon,
   destructive = false,
 }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
+  // Computed from whatever colors.primary actually resolves to (default teal
+  // or a tenant's own brand color) rather than assumed — see bestTextOn.
+  const onPrimary = bestTextOn(colors.primary);
 
   const scale = useSharedValue(1);
 
@@ -62,11 +58,11 @@ export const AnimatedButton: React.FC<Props> = ({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(0.97, MOTION.press);
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(1, MOTION.press);
   };
 
   const handlePress = () => {
@@ -79,7 +75,12 @@ export const AnimatedButton: React.FC<Props> = ({
 
   // ── PRIMARY ──
   if (variant === 'primary') {
-    const gradient = destructive ? ([colors.danger, colors.danger] as const) : GRADIENTS.primary;
+    // Derived from the resolved primary/primaryDark (tenant-aware), not the
+    // fixed GRADIENTS.primary constant — a tenant's brand color used to only
+    // reach colors.primary, never the button that's the app's main CTA.
+    const gradient = destructive
+      ? ([colors.danger, colors.danger] as const)
+      : ([colors.primary, colors.primaryDark] as const);
     return (
       <AnimatedPressable
         onPress={handlePress}
@@ -95,11 +96,18 @@ export const AnimatedButton: React.FC<Props> = ({
           style={s.btnInner}
         >
           {loading ? (
-            <ActivityIndicator color={ON_PRIMARY} />
+            <ActivityIndicator color={destructive ? bestTextOn(colors.danger) : onPrimary} />
           ) : (
             <View style={s.row}>
               {icon}
-              <Text style={s.primaryLabel}>{label}</Text>
+              <Text
+                style={[
+                  s.primaryLabel,
+                  { color: destructive ? bestTextOn(colors.danger) : onPrimary },
+                ]}
+              >
+                {label}
+              </Text>
             </View>
           )}
         </LinearGradient>
@@ -198,7 +206,7 @@ const s = StyleSheet.create({
   ghostInner: { height: 44 },
 
   // Labels
-  primaryLabel: { color: ON_PRIMARY, fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  primaryLabel: { fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
   glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
   ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },

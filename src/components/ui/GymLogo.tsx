@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import { FONTS, RADIUS } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { ClasendraLogo } from './ClasendraLogo';
 
 interface Props {
@@ -25,8 +25,7 @@ const initialsOf = (name?: string | null): string => {
  * doesn't know which gym it belongs to yet.
  */
 export const GymLogo: React.FC<Props> = ({ name, logo, size = 80, style }) => {
-  const { theme } = useAuth();
-  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
   const [failed, setFailed] = useState(false);
 
   const initials = initialsOf(name);
@@ -42,7 +41,6 @@ export const GymLogo: React.FC<Props> = ({ name, logo, size = 80, style }) => {
           borderRadius: size * 0.28,
           backgroundColor: showImage ? colors.white : `${colors.primary}1F`,
           borderColor: colors.surfaceBorder,
-          shadowColor: colors.primary,
         },
         style,
       ]}
@@ -73,10 +71,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderRadius: RADIUS.lg,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 6,
   },
   initials: { fontFamily: FONTS.bodyExtra, letterSpacing: 0.5 },
 });

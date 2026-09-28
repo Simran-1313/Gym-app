@@ -17,7 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Circle, G } from 'react-native-svg';
-import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
+import Animated, { Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -27,10 +27,10 @@ import {
   RADIUS,
   SPACING,
   TYPOGRAPHY,
-  shadow,
   type ThemeColors,
 } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 import { ActiveSubscription, User, ActivitySummary, CheckIn, MemberProfile } from '../../types';
 import { getCheckIns, getProfile } from '../../services/member.service';
 import { getActivitySummary, logWater } from '../../services/activity.service';
@@ -124,13 +124,12 @@ const MetricTile: React.FC<{
   onPress?: () => void;
   delay: number;
 }> = ({ icon, label, value, status, tint, colors, isDark, onPress, delay }) => (
-  <Animated.View entering={FadeInUp.duration(320).delay(delay)} style={styles.tileWrap}>
+  <View style={styles.tileWrap}>
     <Pressable
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [
         styles.tile,
-        shadow(isDark, 'sm'),
         {
           backgroundColor: pressed ? colors.cardPressed : colors.surface,
           borderColor: colors.cardBorder,
@@ -153,7 +152,7 @@ const MetricTile: React.FC<{
         </Text>
       </View>
     </Pressable>
-  </Animated.View>
+  </View>
 );
 
 /** A day marker in the weekly strip: hollow when idle, teal arc when trained. */
@@ -265,6 +264,7 @@ export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
+  const onPrimary = bestTextOn(colors.primary);
 
   const [refreshing, setRefreshing] = useState(false);
   const [waterLogged, setWaterLogged] = useState(0);
@@ -577,7 +577,7 @@ export const HomeScreen: React.FC = () => {
         automaticallyAdjustContentInsets={false}
       >
         {/* ── Greeting + streak ── */}
-        <Animated.View entering={FadeInUp.duration(360)} style={styles.greetBlock}>
+        <View style={styles.greetBlock}>
           <View style={styles.greetCopy}>
             <View style={styles.greetRow}>
               <Ionicons name={greetingIcon()} size={15} color={colors.textSecondary} />
@@ -620,11 +620,11 @@ export const HomeScreen: React.FC = () => {
             </View>
             <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* ── Membership status (`.sub-status-card`) ── */}
         {sub ? (
-          <Animated.View entering={FadeInUp.duration(340).delay(30)} style={styles.block}>
+          <View style={styles.block}>
             <Pressable
               onPress={() => {
                 tap();
@@ -632,7 +632,6 @@ export const HomeScreen: React.FC = () => {
               }}
               style={({ pressed }) => [
                 styles.subStatusCard,
-                shadow(isDark, 'sm'),
                 {
                   backgroundColor: pressed ? colors.cardPressed : colors.surfaceElevated,
                   borderColor: colors.cardBorder,
@@ -657,11 +656,11 @@ export const HomeScreen: React.FC = () => {
               </View>
               <Text style={[styles.subStatusCta, { color: colors.primary }]}>Manage</Text>
             </Pressable>
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* ── Hero: today's energy ── */}
-        <Animated.View entering={FadeInUp.duration(380).delay(60)} style={styles.block}>
+        <View style={styles.block}>
           <Pressable
             onPress={() => {
               tap();
@@ -669,11 +668,10 @@ export const HomeScreen: React.FC = () => {
             }}
             style={({ pressed }) => [
               styles.heroCard,
-              shadow(isDark, 'lg'),
               { borderColor: colors.cardBorder, opacity: pressed ? 0.94 : 1 },
             ]}
           >
-            <SceneryBackdrop variant="mountains" isDark={isDark} />
+            <SceneryBackdrop variant="mountains" />
 
             <View style={styles.heroTop}>
               <View style={styles.heroCopy}>
@@ -721,7 +719,7 @@ export const HomeScreen: React.FC = () => {
               </View>
             </View>
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* ── Metric tiles ── */}
         <View style={[styles.block, styles.tileGrid]}>
@@ -773,15 +771,14 @@ export const HomeScreen: React.FC = () => {
         </View>
 
         {/* ── Today's workout ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(200)} style={styles.block}>
+        <View style={styles.block}>
           <View
             style={[
               styles.workoutCard,
-              shadow(isDark, 'lg'),
               { borderColor: colors.cardBorder },
             ]}
           >
-            <SceneryBackdrop variant="equipment" isDark={isDark} scrimStrength={1.1} />
+            <SceneryBackdrop variant="equipment" scrimStrength={1.1} />
 
             <View style={styles.workoutBody}>
               <Text style={[styles.eyebrow, { color: onArtMuted }]}>
@@ -813,17 +810,16 @@ export const HomeScreen: React.FC = () => {
               onPress={handleCreateWorkout}
               style={({ pressed }) => [
                 styles.playFab,
-                shadow(isDark, 'md'),
                 { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.93 : 1 }] },
               ]}
             >
-              <Ionicons name="play" size={21} color="#07231F" style={{ marginLeft: 2 }} />
+              <Ionicons name="play" size={21} color={onPrimary} style={{ marginLeft: 2 }} />
             </Pressable>
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Weekly progress ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(230)} style={styles.block}>
+        <View style={styles.block}>
           <GlassCard>
             <View style={styles.weekHead}>
               <View style={styles.weekTitleRow}>
@@ -856,10 +852,10 @@ export const HomeScreen: React.FC = () => {
               ))}
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ── Coach insight ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(260)} style={styles.block}>
+        <View style={styles.block}>
           <Pressable
             onPress={() => {
               tap();
@@ -875,7 +871,7 @@ export const HomeScreen: React.FC = () => {
             ]}
           >
             <View style={[styles.coachIcon, { backgroundColor: colors.primary }]}>
-              <Ionicons name="sparkles" size={15} color="#07231F" />
+              <Ionicons name="sparkles" size={15} color={onPrimary} />
             </View>
             <View style={styles.coachCopy}>
               <Text style={[styles.coachTitle, { color: colors.primary }]}>Your Coach</Text>
@@ -886,10 +882,10 @@ export const HomeScreen: React.FC = () => {
             </View>
             <Ionicons name="chevron-forward" size={15} color={colors.primary} />
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* ── Hydration ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(280)} style={styles.block}>
+        <View style={styles.block}>
           <GlassCard>
             <View style={styles.weekHead}>
               <View style={styles.weekTitleRow}>
@@ -954,7 +950,7 @@ export const HomeScreen: React.FC = () => {
               </Pressable>
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ── Quick actions ── */}
         <View style={styles.block}>
@@ -968,11 +964,7 @@ export const HomeScreen: React.FC = () => {
                 { title: 'Store', icon: 'bag-handle', tint: colors.tint.sleep, onPress: () => nav.navigate('Products') },
               ] as const
             ).map((a, i) => (
-              <Animated.View
-                key={a.title}
-                entering={FadeInUp.duration(300).delay(300 + i * 30)}
-                style={styles.actionWrap}
-              >
+              <View key={a.title} style={styles.actionWrap}>
                 <Pressable
                   onPress={() => {
                     tap();
@@ -980,7 +972,6 @@ export const HomeScreen: React.FC = () => {
                   }}
                   style={({ pressed }) => [
                     styles.actionBtn,
-                    shadow(isDark, 'sm'),
                     {
                       backgroundColor: pressed ? colors.cardPressed : colors.surface,
                       borderColor: colors.cardBorder,
@@ -994,13 +985,13 @@ export const HomeScreen: React.FC = () => {
                     {a.title}
                   </Text>
                 </Pressable>
-              </Animated.View>
+              </View>
             ))}
           </View>
         </View>
 
         {/* ── Upcoming class ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(420)} style={styles.block}>
+        <View style={styles.block}>
           <Pressable
             onPress={() => {
               tap();
@@ -1008,7 +999,6 @@ export const HomeScreen: React.FC = () => {
             }}
             style={({ pressed }) => [
               styles.upcomingCard,
-              shadow(isDark, 'sm'),
               {
                 backgroundColor: pressed ? colors.cardPressed : colors.surface,
                 borderColor: colors.cardBorder,
@@ -1025,15 +1015,15 @@ export const HomeScreen: React.FC = () => {
               </Text>
             </View>
             <View style={[styles.upcomingCta, { backgroundColor: colors.primary }]}>
-              <Text style={styles.upcomingCtaText}>Browse</Text>
+              <Text style={[styles.upcomingCtaText, { color: onPrimary }]}>Browse</Text>
             </View>
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* ── BMI — hidden until the real profile loads, rather than open on
              placeholder weight/height that could read as the member's own ── */}
         {hasBmiInputs && weight != null && height != null ? (
-        <Animated.View entering={FadeInUp.duration(340).delay(450)} style={styles.block}>
+        <View style={styles.block}>
           <GlassCard>
             <View style={styles.weekHead}>
               <View style={styles.weekTitleRow}>
@@ -1106,7 +1096,7 @@ export const HomeScreen: React.FC = () => {
               />
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
         ) : null}
       </ScrollView>
     </AnimatedScreen>
@@ -1413,7 +1403,7 @@ const styles = StyleSheet.create({
   upcomingTitle: { fontFamily: FONTS.displaySemi, fontSize: 15, letterSpacing: -0.2 },
   upcomingSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2 },
   upcomingCta: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: RADIUS.full },
-  upcomingCtaText: { color: '#07231F', fontFamily: FONTS.bodySemi, fontSize: 12.5 },
+  upcomingCtaText: { fontFamily: FONTS.bodySemi, fontSize: 12.5 },
 
   /* BMI */
   bmiBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },

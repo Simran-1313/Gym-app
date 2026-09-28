@@ -13,8 +13,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { DARK_COLORS, FONTS, LIGHT_COLORS, RADIUS, shadow } from '../../config/theme';
+import { FONTS, MOTION, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -48,9 +49,7 @@ function TabIcon({
 
   const [active, inactive] = TAB_ICONS[name] ?? ['ellipse', 'ellipse-outline'];
   const label = TAB_LABELS[name] ?? name;
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   useEffect(() => {
     activeProgress.value = withTiming(focused ? 1 : 0, { duration: 220 });
@@ -71,8 +70,8 @@ function TabIcon({
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    iconScale.value = withSpring(0.86, { damping: 10, stiffness: 420 }, () => {
-      iconScale.value = withSpring(1, { damping: 13, stiffness: 220 });
+    iconScale.value = withSpring(0.86, MOTION.pressSmall, () => {
+      iconScale.value = withSpring(1, MOTION.bouncy);
     });
     onPress();
   };
@@ -115,7 +114,7 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
   const insets = useSafeAreaInsets();
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = useThemeColors();
 
   // Hide the bar once a tab's nested stack has pushed a detail screen, so a
   // chat room or product page gets the full height.
@@ -127,7 +126,9 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
 
   return (
     <View style={[styles.container, { bottom: Math.max(insets.bottom, 10) + 2 }]}>
-      <View style={[styles.bar, shadow(isDark, 'lg'), { borderColor: colors.cardBorder }]}>
+      {/* Blur + a near-opaque wash already separate this from scrolling content
+          — a drop shadow on top of that is redundant, not load-bearing. */}
+      <View style={[styles.bar, { borderColor: colors.cardBorder }]}>
         <BlurView
           tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
           intensity={isDark ? 60 : 70}

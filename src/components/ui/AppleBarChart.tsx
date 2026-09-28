@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 export interface DataPoint {
   label: string;
@@ -86,7 +87,7 @@ const themeColors: Record<Props['metricType'], string[]> = {
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
-  const themeColorsDynamic = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const themeColorsDynamic = useThemeColors();
 
   const data = (customData && customData.length > 0) ? customData : (mockData[metricType]?.[viewMode] ?? []);
   const colors = themeColors[metricType] ?? ['#2DD4BF', '#14B8A6'];
@@ -147,12 +148,10 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
                 <View style={styles.barContainer}>
                   {point.value > 0 ? (
                     <Animated.View
-                      entering={FadeInDown.delay(index * 60).duration(300)}
                       layout={Layout.springify().damping(15)}
                       style={[
                         styles.barFill,
                         { height: `${Math.max(8, heightPercent)}%` },
-                        isSelected && { shadowColor: colors[0], shadowOpacity: 0.8, shadowRadius: 8 },
                       ]}
                     >
                       <LinearGradient

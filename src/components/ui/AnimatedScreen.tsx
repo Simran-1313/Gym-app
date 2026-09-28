@@ -1,30 +1,27 @@
 import React from 'react';
-import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
+import { View, ViewStyle, StyleProp, StyleSheet } from 'react-native';
 import { ScreenBackground } from './ScreenBackground';
 
 interface Props {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  delay?: number;
   noBackground?: boolean;
 }
 
+/**
+ * Every screen used to pop in with a 450ms spring fade-up on mount, on top of
+ * the native stack push/tab-switch transition the OS already plays. Two
+ * arrivals stacked on every navigation read as slow rather than polished —
+ * the native transition is the one with a reason to exist (it's how the
+ * platform tells you where the new screen came from); this second one
+ * wasn't adding information, just delay. Content now renders immediately.
+ */
 export const AnimatedScreen: React.FC<Props> = ({
   children,
   style,
-  delay = 0,
   noBackground = false,
 }) => {
-  // 3D pop-in entrance: fade in from below + subtle scale for depth
-  const content = (
-    <Animated.View
-      entering={FadeInUp.duration(450).delay(delay).springify().damping(18).stiffness(140)}
-      style={[styles.content, style]}
-    >
-      {children}
-    </Animated.View>
-  );
+  const content = <View style={[styles.content, style]}>{children}</View>;
 
   if (noBackground) return content;
 

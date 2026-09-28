@@ -12,13 +12,13 @@ import Svg, {
 } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { DARK_COLORS, LIGHT_COLORS } from '../../config/theme';
+import { useAuth } from '../../context/AuthContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 export type SceneryVariant = 'mountains' | 'equipment' | 'track';
 
 interface Props {
   variant?: SceneryVariant;
-  isDark: boolean;
   style?: StyleProp<ViewStyle>;
   /** Darkening pass over the art. Raise it when text sits directly on top. */
   scrimStrength?: number;
@@ -62,11 +62,12 @@ const PHOTO_GRADE = 'rgba(12,52,64,0.34)';
 
 export const SceneryBackdrop: React.FC<Props> = ({
   variant = 'mountains',
-  isDark,
   style,
   scrimStrength = 1,
 }) => {
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+  const colors = useThemeColors();
 
   if (variant === 'mountains') {
     const scrim = PHOTO_SCRIM.map((c) => withAlpha(c, scrimStrength)) as unknown as

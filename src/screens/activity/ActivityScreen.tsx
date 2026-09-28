@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
@@ -36,6 +35,7 @@ import {
 } from '../../types';
 import { FONT_SIZE, FONTS, RADIUS, SPACING, GRADIENTS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -81,6 +81,8 @@ export const ActivityScreen: React.FC = () => {
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
+  const onPrimary = bestTextOn(colors.primary);
+  const onAccent = bestTextOn(colors.accent);
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
@@ -238,7 +240,7 @@ export const ActivityScreen: React.FC = () => {
         {/* ═══ BENTO BOX: Rings + Water Tracker Side by Side ═══ */}
         <View style={styles.bentoBox}>
           {/* Left: Activity Rings */}
-          <Animated.View entering={FadeInUp.duration(320).delay(60)} style={styles.bentoLeft}>
+          <View style={styles.bentoLeft}>
             <GlassCard glowColor={colors.accent} style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
               <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>ACTIVITY</Text>
               <View style={styles.ringsCenter}>
@@ -264,10 +266,10 @@ export const ActivityScreen: React.FC = () => {
                 </View>
               </View>
             </GlassCard>
-          </Animated.View>
+          </View>
 
           {/* Right: Water Tracker */}
-          <Animated.View entering={FadeInUp.duration(320).delay(80)} style={styles.bentoRight}>
+          <View style={styles.bentoRight}>
             <GlassCard glowColor="#6BB8F0" style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
               <View style={styles.bentoHeaderRow}>
                 <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>HYDRATION</Text>
@@ -315,11 +317,11 @@ export const ActivityScreen: React.FC = () => {
                 </View>
               </View>
             </GlassCard>
-          </Animated.View>
+          </View>
         </View>
 
         {/* ═══ WEEKLY SNAPSHOT — 3-stat row ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(100)}>
+        <View>
           <GlassCard glowColor={colors.primary} style={{ marginBottom: 0 }}>
             <View style={styles.snapshotHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>WEEKLY SNAPSHOT</Text>
@@ -344,10 +346,10 @@ export const ActivityScreen: React.FC = () => {
               </View>
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ═══ START WORKOUT — Premium Gradient Banner ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(120)}>
+        <View>
           <Pressable
             onPress={() => setIsWorkoutModalOpen(true)}
             style={({ pressed }) => [pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
@@ -361,11 +363,11 @@ export const ActivityScreen: React.FC = () => {
               <View style={styles.workoutBannerGlow} />
               <View style={styles.workoutBannerContent}>
                 <View style={styles.workoutBannerIcon}>
-                  <Ionicons name="stopwatch" size={26} color="#07231F" />
+                  <Ionicons name="stopwatch" size={26} color={onAccent} />
                 </View>
                 <View style={styles.workoutBannerCopy}>
-                  <Text style={styles.workoutBannerTitle}>Start Live Workout</Text>
-                  <Text style={styles.workoutBannerSub}>Track session with real-time calorie burn</Text>
+                  <Text style={[styles.workoutBannerTitle, { color: onAccent }]}>Start Live Workout</Text>
+                  <Text style={[styles.workoutBannerSub, { color: `${onAccent}B8` }]}>Track session with real-time calorie burn</Text>
                 </View>
                 <View style={styles.workoutBannerPlayBtn}>
                   <Ionicons name="play" size={18} color={colors.accent} />
@@ -373,10 +375,10 @@ export const ActivityScreen: React.FC = () => {
               </View>
             </LinearGradient>
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* ═══ WEARABLE TRACKER — Coming Soon ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(140)}>
+        <View>
           <GlassCard glowColor={undefined}>
             <View style={styles.wearableRow}>
               <View style={[styles.wearableIcon, { backgroundColor: colors.inset }]}>
@@ -400,10 +402,10 @@ export const ActivityScreen: React.FC = () => {
               </Pressable>
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ═══ AI INSIGHT ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(160)}>
+        <View>
           <GlassCard glowColor={colors.accent}>
             <View style={styles.insightRow}>
               <View style={[styles.insightIconWrap, { backgroundColor: `${colors.accent}15` }]}>
@@ -417,10 +419,10 @@ export const ActivityScreen: React.FC = () => {
               </View>
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ═══ ANALYTICS & INTERACTIVE CHART ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(180)}>
+        <View>
           <GlassCard glowColor={activeColor}>
             {/* Header */}
             <View style={styles.analyticsHeader}>
@@ -474,10 +476,10 @@ export const ActivityScreen: React.FC = () => {
             {/* Chart */}
             <AppleBarChart metricType={activeMetric} viewMode={viewMode} customData={chartPoints} />
           </GlassCard>
-        </Animated.View>
+        </View>
 
         {/* ═══ WEEKLY STREAK / CONSISTENCY ═══ */}
-        <Animated.View entering={FadeInUp.duration(320).delay(200)}>
+        <View>
           <GlassCard glowColor={colors.primary}>
             <View style={styles.snapshotHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>WEEKLY CONSISTENCY</Text>
@@ -504,7 +506,7 @@ export const ActivityScreen: React.FC = () => {
                       ]}
                     >
                       {active ? (
-                        <Ionicons name="checkmark" size={14} color="#07231F" />
+                        <Ionicons name="checkmark" size={14} color={onPrimary} />
                       ) : (
                         <Text style={[styles.dayCircleText, { color: colors.textMuted }]}>{day}</Text>
                       )}
@@ -515,7 +517,7 @@ export const ActivityScreen: React.FC = () => {
               })}
             </View>
           </GlassCard>
-        </Animated.View>
+        </View>
       </ScrollView>
 
       {/* ═══ LIVE WORKOUT MODAL ═══ */}
@@ -740,12 +742,10 @@ const styles = StyleSheet.create({
   workoutBannerTitle: {
     fontSize: 16,
     fontFamily: FONTS.bodyBold,
-    color: '#07231F',
   },
   workoutBannerSub: {
     fontSize: 12,
     fontFamily: FONTS.bodySemi,
-    color: 'rgba(7,35,31,0.72)',
     marginTop: 2,
   },
   workoutBannerPlayBtn: {
