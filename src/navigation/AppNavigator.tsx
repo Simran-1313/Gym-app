@@ -141,7 +141,7 @@ const ChatNavigator: React.FC = () => {
 
   return (
     <ChatStack.Navigator screenOptions={makeScreenOptions(colors)}>
-      <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Messages' }} />
+      <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Chat' }} />
       <ChatStack.Screen
         name="ChatRoom"
         component={ChatRoomScreen}

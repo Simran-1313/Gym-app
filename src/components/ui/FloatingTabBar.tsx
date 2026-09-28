@@ -23,13 +23,18 @@ const TAB_ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Io
   Home: ['home', 'home-outline'],
   Classes: ['barbell', 'barbell-outline'],
   Chat: ['chatbubble-ellipses', 'chatbubble-ellipses-outline'],
-  CheckIns: ['trophy', 'trophy-outline'],
+  // Stopwatch, matching the prototype's tab glyph — a trophy reads as
+  // "achievements" (Challenges' own icon), not "check in".
+  CheckIns: ['stopwatch', 'stopwatch-outline'],
   Profile: ['person', 'person-outline'],
 };
 
+// Matches each screen's own on-screen title exactly (`.nav-title` in the
+// prototype) — the tab bar previously called this tab "Workouts" while the
+// screen it opens titles itself "Classes" everywhere else.
 const TAB_LABELS: Record<string, string> = {
   Home: 'Home',
-  Classes: 'Workouts',
+  Classes: 'Classes',
   Chat: 'Chat',
   CheckIns: 'Check-In',
   Profile: 'Profile',
