@@ -19,8 +19,9 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 
 import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { FONTS, GRADIENTS, RADIUS } from '../../config/theme';
+import { FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -163,8 +164,8 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
       <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
         <GlassCard innerStyle={styles.rowInner}>
           {isGroup ? (
-            <LinearGradient colors={[...GRADIENTS.primary]} style={styles.avatar}>
-              <Ionicons name="people" size={20} color="#07231F" />
+            <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.avatar}>
+              <Ionicons name="people" size={20} color={bestTextOn(colors.primary)} />
             </LinearGradient>
           ) : (
             <View style={[styles.avatar, { backgroundColor: colors.inset }]}>
@@ -194,7 +195,7 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
             {!!time && <Text style={[styles.threadTime, { color: colors.textMuted }]}>{time}</Text>}
             {unread > 0 && (
               <View style={[styles.unreadDot, { backgroundColor: colors.primary }]}>
-                <Text style={styles.unreadDotText}>{unread > 99 ? '99+' : unread}</Text>
+                <Text style={[styles.unreadDotText, { color: bestTextOn(colors.primary) }]}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
           </View>
@@ -485,5 +486,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  unreadDotText: { color: '#07231F', fontSize: 9.5, fontFamily: FONTS.bodyExtra },
+  unreadDotText: { fontSize: 9.5, fontFamily: FONTS.bodyExtra },
 });

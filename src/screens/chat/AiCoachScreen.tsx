@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
 import { FONTS, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
+import { bestTextOn } from '../../utils/color';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 
@@ -61,8 +62,6 @@ const SUGGESTIONS = [
 
 let _msgId = 0;
 const nextId = () => String(++_msgId);
-
-const ON_TEAL_STRONG = '#07231F';
 
 // ── Header (`.navbar` avatar + "FitCoach AI" + tagline) ─────────────────────
 
@@ -241,7 +240,7 @@ export const AiCoachScreen: React.FC = () => {
             {(() => {
               const baseStyle = [
                 styles.bubbleText,
-                { color: isUser ? ON_TEAL_STRONG : colors.text },
+                { color: isUser ? bestTextOn(colors.primary) : colors.text },
                 item.error && { color: colors.danger },
               ];
               const boldStyle = { fontFamily: FONTS.bodyBold };
@@ -394,7 +393,7 @@ export const AiCoachScreen: React.FC = () => {
               onPress={() => send(input)}
               disabled={!input.trim()}
             >
-              <Ionicons name="send" size={15} color={input.trim() ? ON_TEAL_STRONG : colors.textMuted} />
+              <Ionicons name="send" size={15} color={input.trim() ? bestTextOn(colors.primary) : colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>

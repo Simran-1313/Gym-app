@@ -23,7 +23,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
-import { FONTS, GRADIENTS, RADIUS } from '../../config/theme';
+import { FONTS, RADIUS } from '../../config/theme';
+import { bestTextOn } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuth } from '../../context/AuthContext';
@@ -66,8 +67,8 @@ interface ChatHeaderProps {
 const ChatHeaderTitle: React.FC<ChatHeaderProps> = ({ name, isGroup, subtitle, subtitleColor, colors }) => (
   <View style={hs.row}>
     {isGroup ? (
-      <LinearGradient colors={[...GRADIENTS.primary]} style={hs.avatar}>
-        <Ionicons name="people" size={13} color="#07231F" />
+      <LinearGradient colors={[colors.primary, colors.primaryDark]} style={hs.avatar}>
+        <Ionicons name="people" size={13} color={bestTextOn(colors.primary)} />
       </LinearGradient>
     ) : (
       <View style={[hs.avatar, { backgroundColor: colors.inset }]}>
@@ -106,30 +107,30 @@ interface TickProps {
   colors: ThemeColors;
 }
 
-/** On-teal dim tone — the "me" bubble/receipt keeps dark text (`#07231F` in
- *  this app, `#04211f` in the prototype) against the teal fill in both
- *  themes, so its own timestamp/ticks dim from that dark tone, not from
- *  `colors.text*`, which would be near-invisible on teal in dark mode. */
-const ON_TEAL_DIM = 'rgba(7,35,31,0.55)';
-const ON_TEAL_STRONG = '#07231F';
-
 const MessageTick: React.FC<TickProps> = ({ statuses, senderId, currentUserId, memberCount, pending, failed, colors }) => {
   if (senderId !== currentUserId) return null;
 
+  // The "me" bubble/receipt keeps whichever of dark/light text actually
+  // contrasts with colors.primary (see bestTextOn) — its own ticks/timestamp
+  // dim from that same tone, not from colors.text*, which could be
+  // near-invisible against a bright primary in dark mode.
+  const onTeal = bestTextOn(colors.primary);
+  const onTealDim = `${onTeal}8C`;
+
   if (failed) return <Ionicons name="alert-circle" size={13} color={colors.danger} />;
-  if (pending) return <Ionicons name="time-outline" size={12} color={ON_TEAL_DIM} />;
+  if (pending) return <Ionicons name="time-outline" size={12} color={onTealDim} />;
 
   const others = statuses.filter((s) => s.userId !== currentUserId);
   const expectedOthers = memberCount - 1; // exclude sender
 
-  if (expectedOthers === 0) return <Ionicons name="checkmark" size={13} color={ON_TEAL_DIM} />;
+  if (expectedOthers === 0) return <Ionicons name="checkmark" size={13} color={onTealDim} />;
 
   const allRead = others.length > 0 && others.every((s) => s.status === 'READ');
   const allDelivered = others.length > 0 && others.every((s) => s.status !== 'SENT');
 
-  if (allRead) return <Ionicons name="checkmark-done" size={13} color={ON_TEAL_STRONG} />;
-  if (allDelivered) return <Ionicons name="checkmark-done" size={13} color={ON_TEAL_DIM} />;
-  return <Ionicons name="checkmark" size={13} color={ON_TEAL_DIM} />;
+  if (allRead) return <Ionicons name="checkmark-done" size={13} color={onTeal} />;
+  if (allDelivered) return <Ionicons name="checkmark-done" size={13} color={onTealDim} />;
+  return <Ionicons name="checkmark" size={13} color={onTealDim} />;
 };
 
 // ── Message Bubble (`.bubble`, `.bubble.them`, `.bubble.me`, `.bubble-img`) ──
@@ -186,7 +187,7 @@ const MessageBubble: React.FC<BubbleProps> = ({
           : [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }],
       ]}
     >
-      <Text style={[styles.msgText, { color: isOwn ? ON_TEAL_STRONG : colors.text }]}>
+      <Text style={[styles.msgText, { color: isOwn ? bestTextOn(colors.primary) : colors.text }]}>
         {msg.content}
       </Text>
     </View>
@@ -814,7 +815,7 @@ export const ChatRoomScreen: React.FC = () => {
               ]}
               activeOpacity={0.7}
             >
-              <Ionicons name="send" size={15} color={input.trim() ? ON_TEAL_STRONG : colors.textMuted} />
+              <Ionicons name="send" size={15} color={input.trim() ? bestTextOn(colors.primary) : colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>

@@ -24,7 +24,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { FONTS, GRADIENTS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
+import { FONTS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import {
   ActivityLevel,
@@ -123,7 +123,7 @@ const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
     <View style={styles.progressTrack}>
       <Animated.View style={[styles.progressFillWrap, barStyle]}>
         <LinearGradient
-          colors={[...GRADIENTS.primary]}
+          colors={[colors.primary, colors.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.progressFill}
