@@ -24,9 +24,10 @@ import { getClassSchedules, bookClass, joinWaitlist } from '../../services/membe
 import { ClassSchedule } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { FONTS, RADIUS } from '../../config/theme';
+import { FONTS, MOTION, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { bestTextOn } from '../../utils/color';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -50,13 +51,13 @@ const GUTTER = 18; // .scroll { padding: 0 18px 18px }
 const ROW_GAP = 10; // .class-card { margin-bottom: 10px }
 
 /**
- * `.class-book-btn` is always `color:#04211f` in the prototype regardless of
- * theme — a fixed near-black label made to sit on a saturated teal/lavender
- * fill, the same convention `AnimatedButton`'s local `ON_PRIMARY` constant
- * already uses for the same reason. `.day-chip.active .dc-n` reuses this
- * exact literal; `.dc-d` reuses it at 0.7 alpha (`rgba(4,33,31,0.7)`).
+ * `.class-book-btn`/`.day-chip.active .dc-n` are always dark text in the
+ * prototype, assuming a bright teal/lavender fill. Computed per-background
+ * with `bestTextOn` instead of hardcoded — the fill under this text varies
+ * (colors.primary for a booked/active state, the lavender accent for
+ * waitlist), and either could need light text instead for a tenant whose
+ * brand color is dark rather than bright.
  */
-const ON_ACCENT = '#04211f';
 
 /** `.class-cap-fill`'s default color — teal marks a booked class, red a full
  * one, and this indigo everything in between. */
@@ -171,10 +172,10 @@ const DayChip: React.FC<{ date: Date; active: boolean; onPress: () => void; colo
       },
     ]}
   >
-    <Text style={[s.dcD, { color: active ? `${ON_ACCENT}B3` : colors.textMuted }]}>
+    <Text style={[s.dcD, { color: active ? `${bestTextOn(colors.primary)}B3` : colors.textMuted }]}>
       {date.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase()}
     </Text>
-    <Text style={[s.dcN, { color: active ? ON_ACCENT : colors.text }]}>{date.getDate()}</Text>
+    <Text style={[s.dcN, { color: active ? bestTextOn(colors.primary) : colors.text }]}>{date.getDate()}</Text>
   </Pressable>
 );
 
@@ -195,8 +196,17 @@ const BookPill: React.FC<{
 
   const backgroundColor =
     variant === 'book' ? colors.primary : variant === 'waitlist' ? availableFillColor(colors) : colors.inset;
+  // 'book'/'waitlist' fill solid (colors.primary / the lavender accent) and
+  // need contrast-computed text; 'booked'/'waitlisted' sit on the neutral
+  // `colors.inset` and just borrow that same accent as a colored label.
   const textColor =
-    variant === 'booked' ? colors.primary : variant === 'waitlisted' ? availableFillColor(colors) : ON_ACCENT;
+    variant === 'booked'
+      ? colors.primary
+      : variant === 'waitlisted'
+      ? availableFillColor(colors)
+      : variant === 'book'
+      ? bestTextOn(colors.primary)
+      : bestTextOn(availableFillColor(colors));
   const borderColor =
     variant === 'booked'
       ? `${colors.primary}4D`
@@ -208,10 +218,10 @@ const BookPill: React.FC<{
     <AnimatedPressable
       disabled={disabled}
       onPressIn={() => {
-        scale.value = withSpring(0.92, { damping: 15, stiffness: 400 });
+        scale.value = withSpring(0.92, MOTION.pressSmall);
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+        scale.value = withSpring(1, MOTION.pressSmall);
       }}
       onPress={() => {
         if (disabled) return;
