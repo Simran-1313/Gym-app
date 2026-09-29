@@ -7,12 +7,15 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getNotifications, AppNotification } from '../../services/member.service';
 import { FONTS, RADIUS } from '../../config/theme';
+import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -98,8 +101,9 @@ const NotificationCard: React.FC<{ item: AppNotification; index: number }> = ({ 
 
 export const NotificationsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const colors = useThemeColors();
+  const onBack = navigation.canGoBack() ? () => navigation.goBack() : undefined;
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,12 +130,20 @@ export const NotificationsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Notifications" onBack={onBack} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   if (error) {
     return (
       <AnimatedScreen>
-        <View style={{ flex: 1, paddingTop: headerHeight, paddingHorizontal: GUTTER }}>
+        <ScreenHeader title="Notifications" onBack={onBack} />
+        <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: GUTTER }}>
           <EmptyState
             icon="warning-outline"
             title="Oops, something went wrong!"
@@ -149,11 +161,12 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title="Notifications" onBack={onBack} />
       <FlatList
         style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: headerHeight + 8, paddingBottom: insets.bottom + GUTTER + 10 },
+          { paddingTop: 8, paddingBottom: insets.bottom + GUTTER + 10 },
         ]}
         data={notifications}
         keyExtractor={(item) => item.id}

@@ -19,6 +19,7 @@ import { WorkoutDay, WorkoutExercise } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ScreenBackground } from '../../components/ui/ScreenBackground';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
@@ -315,7 +316,11 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   return (
     <ScreenBackground>
-      <View style={[s.shell, { paddingTop: insets.top + 56 }]}>{renderBody()}</View>
+      <ScreenHeader
+        title="My Workout Plan"
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
+      <View style={s.shell}>{renderBody()}</View>
     </ScreenBackground>
   );
 };

@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StaggerItem } from '../../components/ui/StaggerItem';
@@ -63,7 +64,7 @@ const visitCountByDay = (checkIns: CheckIn[]): Record<string, number> => {
 export const ChallengesScreen: React.FC = () => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
@@ -114,15 +115,19 @@ export const ChallengesScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="Challenges"
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
       <ScrollView
         style={s.root}
         contentContainerStyle={[
           s.content,
-          { paddingTop: headerHeight + SPACING.md, paddingBottom: insets.bottom + 40 },
+          { paddingTop: SPACING.md, paddingBottom: insets.bottom + 40 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} progressViewOffset={headerHeight} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {/* ── Streak stats: three columns split by hairline rules ── */}

@@ -887,19 +887,27 @@ export const HomeScreen: React.FC = () => {
         {/* ── Hydration ── */}
         <View style={styles.block}>
           <GlassCard>
-            <View style={styles.weekHead}>
-              <View style={styles.weekTitleRow}>
-                <View style={[styles.weekIcon, { backgroundColor: `${colors.tint.hydration}1F` }]}>
-                  <Ionicons name="water" size={13} color={colors.tint.hydration} />
-                </View>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Hydration</Text>
+            <View style={styles.weekTitleRow}>
+              <View style={[styles.weekIcon, { backgroundColor: `${colors.tint.hydration}1F` }]}>
+                <Ionicons name="water" size={13} color={colors.tint.hydration} />
               </View>
-              <Text style={[styles.hydrationValue, { color: colors.tint.hydration }]}>
-                {waterLogged} / {waterGoal} ml
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Hydration</Text>
+            </View>
+
+            {/* The reading gets its own line instead of being squeezed into
+                the title row — it's the thing this whole card is about, not
+                a caption on the title. */}
+            <View style={styles.hydrationReadoutRow}>
+              <Text style={[styles.hydrationValue, { color: colors.text }]} numberOfLines={1}>
+                {(waterLogged / 1000).toFixed(2)}
+                <Text style={[styles.hydrationValueUnit, { color: colors.textMuted }]}>L</Text>
+              </Text>
+              <Text style={[styles.hydrationGoal, { color: colors.textMuted }]} numberOfLines={1}>
+                of {(waterGoal / 1000).toFixed(1)}L goal
               </Text>
             </View>
 
-            <View style={[styles.hydrationTrack, { backgroundColor: colors.textFaint }]}>
+            <View style={[styles.hydrationTrack, { backgroundColor: colors.inset }]}>
               <View
                 style={[
                   styles.hydrationFill,
@@ -1038,7 +1046,23 @@ export const HomeScreen: React.FC = () => {
             </View>
 
             <View style={styles.bmiRow}>
-              <Text style={[styles.bmiValue, { color: colors.text }]}>{bmi}</Text>
+              {/* Fixed-width so the digit count (BMI can read "9.5" one moment
+                  and "24.7" the next as weight/height change) never nudges
+                  the steppers beside it — that width swing was the root
+                  cause of the +/- buttons visibly shifting per tap.
+                  tabular-nums keeps even same-length values from
+                  micro-jittering, since most fonts don't give every digit
+                  the same width by default. */}
+              <View style={styles.bmiHero}>
+                <Text
+                  style={[styles.bmiValue, { color: colors.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {bmi}
+                </Text>
+                <Text style={[styles.bmiUnit, { color: colors.textMuted }]}>kg/m²</Text>
+              </View>
 
               <View style={styles.bmiControls}>
                 {(
@@ -1046,36 +1070,61 @@ export const HomeScreen: React.FC = () => {
                     { label: 'Weight (kg)', value: weight, set: setWeight, min: 30, max: 250 },
                     { label: 'Height (cm)', value: height, set: setHeight, min: 100, max: 230 },
                   ] as const
-                ).map((c) => (
-                  <View key={c.label} style={styles.bmiControl}>
-                    <Text style={[styles.bmiControlLabel, { color: colors.textMuted }]}>
-                      {c.label}
-                    </Text>
-                    <View style={styles.bmiStepper}>
-                      <Pressable
-                        hitSlop={6}
-                        onPress={() => {
-                          Haptics.selectionAsync().catch(() => {});
-                          c.set((v) => Math.max(c.min, (v ?? c.min) - 1));
-                        }}
-                      >
-                        <Ionicons name="remove-circle-outline" size={22} color={colors.textSecondary} />
-                      </Pressable>
-                      <Text style={[styles.bmiControlValue, { color: colors.text }]}>
-                        {c.value}
+                ).map((c) => {
+                  const atMin = c.value <= c.min;
+                  const atMax = c.value >= c.max;
+                  return (
+                    <View key={c.label} style={styles.bmiControl}>
+                      <Text style={[styles.bmiControlLabel, { color: colors.textMuted }]}>
+                        {c.label}
                       </Text>
-                      <Pressable
-                        hitSlop={6}
-                        onPress={() => {
-                          Haptics.selectionAsync().catch(() => {});
-                          c.set((v) => Math.min(c.max, (v ?? c.max) + 1));
-                        }}
-                      >
-                        <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
-                      </Pressable>
+                      <View style={[styles.bmiStepper, { backgroundColor: colors.inset }]}>
+                        <Pressable
+                          hitSlop={8}
+                          disabled={atMin}
+                          onPress={() => {
+                            Haptics.selectionAsync().catch(() => {});
+                            c.set((v) => Math.max(c.min, (v ?? c.min) - 1));
+                          }}
+                          style={({ pressed }) => [
+                            styles.bmiStepBtn,
+                            pressed && !atMin && { backgroundColor: colors.cardPressed },
+                          ]}
+                        >
+                          <Ionicons
+                            name="remove"
+                            size={18}
+                            color={atMin ? colors.textFaint : colors.textSecondary}
+                          />
+                        </Pressable>
+                        <Text
+                          style={[styles.bmiControlValue, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {c.value}
+                        </Text>
+                        <Pressable
+                          hitSlop={8}
+                          disabled={atMax}
+                          onPress={() => {
+                            Haptics.selectionAsync().catch(() => {});
+                            c.set((v) => Math.min(c.max, (v ?? c.max) + 1));
+                          }}
+                          style={({ pressed }) => [
+                            styles.bmiStepBtn,
+                            pressed && !atMax && { backgroundColor: colors.cardPressed },
+                          ]}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={18}
+                            color={atMax ? colors.textFaint : colors.primary}
+                          />
+                        </Pressable>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             </View>
 
@@ -1347,7 +1396,21 @@ const styles = StyleSheet.create({
   coachText: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18.5 },
 
   /* Hydration */
-  hydrationValue: { fontFamily: FONTS.bodySemi, fontSize: 13 },
+  hydrationReadoutRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  hydrationValue: {
+    fontFamily: FONTS.displayBold,
+    fontSize: 26,
+    letterSpacing: -0.6,
+    fontVariant: ['tabular-nums'],
+  },
+  hydrationValueUnit: { fontFamily: FONTS.bodySemi, fontSize: 14 },
+  hydrationGoal: { fontFamily: FONTS.bodyMedium, fontSize: 12.5 },
   hydrationTrack: { height: 8, borderRadius: RADIUS.full, overflow: 'hidden' },
   hydrationFill: { height: '100%', borderRadius: RADIUS.full },
   hydrationBtns: { flexDirection: 'row', gap: 10, marginTop: SPACING.md },
@@ -1408,13 +1471,47 @@ const styles = StyleSheet.create({
   /* BMI */
   bmiBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },
   bmiBadgeText: { fontFamily: FONTS.bodySemi, fontSize: 11 },
-  bmiRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  bmiValue: { fontFamily: FONTS.displayBold, fontSize: 42, letterSpacing: -1.5 },
-  bmiControls: { flex: 1, gap: 10 },
+  bmiRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
+  // Fixed width: the widest realistic reading ("250.0") at this size/weight
+  // never needs more room than this, so the steppers beside it hold still.
+  bmiHero: { width: 96 },
+  bmiValue: {
+    fontFamily: FONTS.displayBold,
+    fontSize: 40,
+    letterSpacing: -1.5,
+    fontVariant: ['tabular-nums'],
+  },
+  bmiUnit: { fontFamily: FONTS.bodyMedium, fontSize: 12, marginTop: 2 },
+  bmiControls: { flex: 1, gap: 12 },
   bmiControl: {},
-  bmiControlLabel: { fontFamily: FONTS.body, fontSize: 11, marginBottom: 3 },
-  bmiStepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  bmiControlValue: { fontFamily: FONTS.displaySemi, fontSize: 16 },
+  bmiControlLabel: { fontFamily: FONTS.bodyMedium, fontSize: 11, marginBottom: 6 },
+  bmiStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 4,
+  },
+  // Fixed square touch targets — an Ionicon at a fixed `size` prop is already
+  // pixel-stable, but the *tap target* around it staying fixed too is what
+  // keeps the whole row's rhythm from feeling like it's breathing.
+  bmiStepBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Centered within a fixed-width slot (not just "whatever space is left
+  // between two icons") — weight swings from 2 digits to 3, height stays 3,
+  // and neither should visibly nudge the icons flanking it.
+  bmiControlValue: {
+    fontFamily: FONTS.displaySemi,
+    fontSize: 15,
+    fontVariant: ['tabular-nums'],
+    minWidth: 34,
+    textAlign: 'center',
+  },
   bmiScale: {
     flexDirection: 'row',
     height: 6,

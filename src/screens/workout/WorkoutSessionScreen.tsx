@@ -11,6 +11,7 @@ import { LogWorkoutPayload, WorkoutType } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
@@ -111,12 +112,7 @@ export const WorkoutSessionScreen: React.FC = () => {
   const [showBurst, setShowBurst] = useState(false);
 
   const currentExercise = exercises[exerciseIndex];
-
-  useEffect(() => {
-    navigation.setOptions({
-      title: phase === 'complete' ? 'Workout Complete' : currentExercise?.name ?? day.focus,
-    });
-  }, [navigation, phase, currentExercise, day.focus]);
+  const screenTitle = phase === 'complete' ? 'Workout Complete' : currentExercise?.name ?? day.focus;
 
   const finalizeSession = useCallback(
     async (endedEarly: boolean, setsCompleted: number) => {
@@ -314,9 +310,13 @@ export const WorkoutSessionScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title={screenTitle}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
       <ScrollView
         style={s.root}
-        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[s.scroll, { paddingTop: 12, paddingBottom: insets.bottom + 40 }]}
       >
         {phase === 'active' ? renderActive() : renderComplete()}
       </ScrollView>

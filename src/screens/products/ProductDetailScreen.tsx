@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -14,6 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FONTS, RADIUS } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
@@ -55,7 +55,6 @@ export const ProductDetailScreen: React.FC = () => {
   const route = useRoute<RouteProp<ProductsStackParams, 'ProductDetail'>>();
   const nav = useNavigation<NativeStackNavigationProp<ProductsStackParams>>();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const colors = useThemeColors();
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -63,10 +62,9 @@ export const ProductDetailScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [askTrainer, setAskTrainer] = useState(false);
 
-  // `.nav-title` reads "Product" in the prototype.
-  useLayoutEffect(() => {
-    nav.setOptions({ title: 'Product' });
-  }, [nav]);
+  // `.nav-title` reads "Product" in the prototype until the product itself
+  // loads, then the header shows the product's own name.
+  const headerTitle = product?.name ?? 'Product';
 
   const load = useCallback(async () => {
     try {
@@ -96,7 +94,11 @@ export const ProductDetailScreen: React.FC = () => {
   if (error || !product) {
     return (
       <AnimatedScreen>
-        <View style={[styles.centered, { paddingTop: headerHeight }]}>
+        <ScreenHeader
+          title={headerTitle}
+          onBack={nav.canGoBack() ? () => nav.goBack() : undefined}
+        />
+        <View style={styles.centered}>
           <EmptyState
             icon="warning-outline"
             title="Oops, something went wrong!"
@@ -113,11 +115,15 @@ export const ProductDetailScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title={headerTitle}
+        onBack={nav.canGoBack() ? () => nav.goBack() : undefined}
+      />
       <ScrollView
         style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: headerHeight + 8, paddingBottom: insets.bottom + GUTTER + 10 },
+          { paddingTop: 8, paddingBottom: insets.bottom + GUTTER + 10 },
         ]}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"

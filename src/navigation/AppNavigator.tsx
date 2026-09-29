@@ -44,7 +44,7 @@ import { WorkoutPlanScreen } from '../screens/workout/WorkoutPlanScreen';
 import { WorkoutSessionScreen } from '../screens/workout/WorkoutSessionScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { ActivityScreen } from '../screens/activity/ActivityScreen';
-import { MetricDetailScreen, METRIC_TITLES } from '../screens/activity/MetricDetailScreen';
+import { MetricDetailScreen } from '../screens/activity/MetricDetailScreen';
 import { ProductsScreen } from '../screens/products/ProductsScreen';
 import { ProductDetailScreen } from '../screens/products/ProductDetailScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
@@ -139,8 +139,8 @@ const ProductsNavigator: React.FC = () => {
 
   return (
     <ProductsStack.Navigator screenOptions={makeScreenOptions(colors)}>
-      <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ title: 'Products' }} />
-      <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: 'Product Details' }} />
+      <ProductsStack.Screen name="ProductList" component={ProductsScreen} options={{ headerShown: false }} />
+      <ProductsStack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
     </ProductsStack.Navigator>
   );
 };
@@ -239,17 +239,9 @@ export const AppNavigator: React.FC = () => {
   } else if (user.isOnboarded === false) {
     content = (
       <RootStack.Navigator screenOptions={dynamicScreenOptions}>
-        <RootStack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          options={{ title: 'Your Fitness Profile', headerLeft: () => null }}
-        />
+        <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ headerShown: false }} />
-        <RootStack.Screen
-          name="WorkoutPlan"
-          component={WorkoutPlanScreen}
-          options={{ title: 'My Workout Plan' }}
-        />
+        <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ headerShown: false }} />
       </RootStack.Navigator>
     );
   } else {
@@ -257,29 +249,17 @@ export const AppNavigator: React.FC = () => {
       <RootStack.Navigator screenOptions={dynamicScreenOptions}>
         <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
         <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ headerShown: false }} />
-        <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: 'My Workout Plan' }} />
-        <RootStack.Screen
-          name="WorkoutSession"
-          component={WorkoutSessionScreen}
-          options={({ route }) => ({ title: route.params.day.focus })}
-        />
-        <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Update Fitness Profile' }} />
-        <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
-        <RootStack.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity Dashboard' }} />
-        <RootStack.Screen
-          name="MetricDetail"
-          component={MetricDetailScreen}
-          options={({ route }) => ({ title: METRIC_TITLES[route.params.metric] })}
-        />
+        <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="WorkoutSession" component={WorkoutSessionScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Activity" component={ActivityScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="MetricDetail" component={MetricDetailScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="Products" component={ProductsNavigator} options={{ headerShown: false }} />
-        <RootStack.Screen name="Membership" component={MembershipScreen} options={{ title: 'Membership & Billing' }} />
-        <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirm & Pay' }} />
-        <RootStack.Screen name="Challenges" component={ChallengesScreen} options={{ title: 'Challenges' }} />
-        <RootStack.Screen
-          name="ChangePassword"
-          component={ChangePasswordScreen}
-          options={{ title: 'Change Password' }}
-        />
+        <RootStack.Screen name="Membership" component={MembershipScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Challenges" component={ChallengesScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
       </RootStack.Navigator>
     );
   }

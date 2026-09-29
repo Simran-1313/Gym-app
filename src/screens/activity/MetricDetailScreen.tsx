@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, LayoutChangeEvent } from 'react-native';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -11,6 +11,7 @@ import { AnalyticsDataPoint } from '../../types';
 import { FONTS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { AppleBarChart } from '../../components/ui/AppleBarChart';
@@ -78,11 +79,12 @@ type MetricDetailRoute = RouteProp<RootStackParams, 'MetricDetail'>;
 
 export const MetricDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const colors = useThemeColors();
   const { params } = useRoute<MetricDetailRoute>();
   const metric = params.metric;
   const meta = METRIC_META[metric];
+  const onBack = navigation.canGoBack() ? () => navigation.goBack() : undefined;
 
   const [period, setPeriod] = useState<Period>('HOURLY');
   const [chartPoints, setChartPoints] = useState<AnalyticsDataPoint[]>([]);
@@ -155,7 +157,14 @@ export const MetricDetailScreen: React.FC = () => {
     setPeriod(p);
   };
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title={METRIC_TITLES[metric]} onBack={onBack} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   const headlineTotal = sum(chartPoints);
   const headlineText = formatHeadline(metric, headlineTotal, chartUnit || '');
@@ -172,11 +181,12 @@ export const MetricDetailScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title={METRIC_TITLES[metric]} onBack={onBack} />
       <ScrollView
         style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: headerHeight + 12, paddingBottom: insets.bottom + GUTTER },
+          { paddingTop: 12, paddingBottom: insets.bottom + GUTTER },
         ]}
         showsVerticalScrollIndicator={false}
       >

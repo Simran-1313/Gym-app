@@ -8,6 +8,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -95,9 +96,13 @@ export const MembershipScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="Membership & Billing"
+        onBack={nav.canGoBack() ? () => nav.goBack() : undefined}
+      />
       <ScrollView
         style={s.root}
-        contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 110, paddingHorizontal: 16, gap: 14 }}
+        contentContainerStyle={{ paddingTop: SPACING.md, paddingBottom: insets.bottom + 110, paddingHorizontal: 16, gap: 14 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {isSample ? (

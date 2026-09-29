@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
@@ -38,6 +37,7 @@ import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { shade, solidFillFor } from '../../utils/color';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -79,8 +79,8 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: keyof typeof Ioni
 
 export const ActivityScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
+  const onBack = navigation.canGoBack() ? () => navigation.goBack() : undefined;
   const { theme } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
@@ -210,12 +210,20 @@ export const ActivityScreen: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${remainderSec.toString().padStart(2, '0')}`;
   };
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Activity Dashboard" onBack={onBack} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   if (error) {
     return (
       <AnimatedScreen>
-        <View style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: SPACING.lg, paddingTop: headerHeight }]}>
+        <ScreenHeader title="Activity Dashboard" onBack={onBack} />
+        <View style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: SPACING.lg }]}>
           <EmptyState icon="warning-outline" title="Oops, something went wrong!" subtitle={error} actionLabel="Try Again" onAction={loadData} />
         </View>
       </AnimatedScreen>
@@ -239,9 +247,10 @@ export const ActivityScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title="Activity Dashboard" onBack={onBack} />
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 12, paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.content, { paddingTop: 12, paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ═══ BENTO BOX: Rings + Water Tracker Side by Side ═══ */}

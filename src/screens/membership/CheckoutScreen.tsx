@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
@@ -62,9 +63,13 @@ export const CheckoutScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="Confirm & Pay"
+        onBack={nav.canGoBack() ? () => nav.goBack() : undefined}
+      />
       <ScrollView
         style={s.root}
-        contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40, paddingHorizontal: 16, gap: 16 }}
+        contentContainerStyle={{ paddingTop: SPACING.md, paddingBottom: insets.bottom + 40, paddingHorizontal: 16, gap: 16 }}
       >
         <GlassCard>
           <Row label="Plan" value={`${subscription.plan.name} · 1 month`} bold colors={colors} />

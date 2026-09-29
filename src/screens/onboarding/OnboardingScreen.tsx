@@ -20,7 +20,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
@@ -34,6 +33,7 @@ import {
 } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
@@ -156,12 +156,17 @@ const SectionHeader: React.FC<{
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
-  const { refreshUser, theme } = useAuth();
+  const { refreshUser, theme, user } = useAuth();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  // Reached two ways: the forced first-time flow (nothing to go back to —
+  // matches the old `headerLeft: () => null` route registration) and the
+  // "update later" flow from the main app (has a real back target).
+  const forcedOnboarding = !user?.isOnboarded;
+  const screenTitle = forcedOnboarding ? 'Your Fitness Profile' : 'Update Fitness Profile';
 
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
@@ -269,6 +274,16 @@ export const OnboardingScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title={screenTitle}
+        onBack={
+          forcedOnboarding
+            ? undefined
+            : navigation.canGoBack()
+            ? () => navigation.goBack()
+            : undefined
+        }
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -282,7 +297,7 @@ export const OnboardingScreen: React.FC = () => {
           </View>
         ) : (
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingTop: headerHeight + SPACING.md }]}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

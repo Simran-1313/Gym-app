@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
@@ -16,6 +17,7 @@ import { clearCookie } from '../../services/api';
 import { FONTS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { SuccessBurst } from '../../components/ui/SuccessBurst';
@@ -30,6 +32,7 @@ import { SuccessBurst } from '../../components/ui/SuccessBurst';
 export const ChangePasswordScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const colors = useThemeColors();
+  const navigation = useNavigation();
   const isFirstLogin = !!user?.isFirstLogin;
 
   const [current, setCurrent] = useState('');
@@ -85,6 +88,10 @@ export const ChangePasswordScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="Change Password"
+        onBack={isFirstLogin ? undefined : navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
       <SuccessBurst visible={showSuccess} />
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions, useNavigation } from '@react-navigation/native';
-import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +24,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FONTS, RADIUS } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
 import { StaggerItem } from '../../components/ui/StaggerItem';
@@ -136,7 +136,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, index, width, onPres
 export const ProductsScreen: React.FC = () => {
   const nav = useNavigation<NativeStackNavigationProp<ProductsStackParams>>();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const { width: windowWidth } = useWindowDimensions();
   const colors = useThemeColors();
 
@@ -151,11 +150,6 @@ export const ProductsScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [askProduct, setAskProduct] = useState<Product | null>(null);
-
-  // `.nav-title` reads "Gym Shop" in the prototype.
-  useLayoutEffect(() => {
-    nav.setOptions({ title: 'Gym Shop' });
-  }, [nav]);
 
   const cardWidth = Math.floor((windowWidth - GUTTER * 2 - GRID_GAP) / 2);
 
@@ -230,11 +224,15 @@ export const ProductsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="Products"
+        onBack={nav.canGoBack() ? () => nav.goBack() : undefined}
+      />
       <FlatList
         style={styles.root}
         contentContainerStyle={{
           paddingHorizontal: GUTTER,
-          paddingTop: headerHeight + 8,
+          paddingTop: 8,
           paddingBottom: insets.bottom + GUTTER + 10,
         }}
         columnWrapperStyle={styles.row}
@@ -246,7 +244,6 @@ export const ProductsScreen: React.FC = () => {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
-            progressViewOffset={headerHeight}
           />
         }
         showsVerticalScrollIndicator={false}

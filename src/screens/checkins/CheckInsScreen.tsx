@@ -19,6 +19,7 @@ import { FONTS, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { StaggerItem } from '../../components/ui/StaggerItem';
@@ -86,19 +87,6 @@ const METHOD: Record<string, { label: string; icon: keyof typeof Ionicons.glyphM
   QR: { label: 'QR Check-In', icon: 'shield-checkmark-outline' },
   BIOMETRIC: { label: 'Biometric Scan', icon: 'finger-print-outline' },
   MANUAL: { label: 'Manual Check-In', icon: 'document-text-outline' },
-};
-
-/* ─── Navbar (`.navbar`) ─── */
-
-const NavBar: React.FC<{ colors: ThemeColors }> = ({ colors }) => {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[s.navbar, { paddingTop: insets.top }]}>
-      <View style={s.navSpacer} />
-      <Text style={[s.navTitle, { color: colors.text }]}>Check-Ins</Text>
-      <View style={s.navSpacer} />
-    </View>
-  );
 };
 
 /* ─── Section label (`.section-label`) ─── */
@@ -255,7 +243,7 @@ export const CheckInsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
-      <NavBar colors={colors} />
+      <ScreenHeader title="Check-Ins" />
 
       <FlatList
         style={s.root}
@@ -296,19 +284,7 @@ export const CheckInsScreen: React.FC = () => {
 const s = StyleSheet.create({
   root: { flex: 1 },
   // .scroll { padding: 0 18px 18px }
-  content: { paddingHorizontal: GUTTER, paddingBottom: GUTTER },
-
-  // .navbar { padding: 46px 18px 8px } — the 46 is the status bar, so it comes
-  // from the safe-area inset instead of a fixed number.
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: GUTTER,
-    paddingBottom: 8,
-  },
-  navTitle: { fontSize: 16, fontFamily: FONTS.bodyBold }, // .nav-title
-  navSpacer: { width: 36 }, // .nav-spacer
+  content: { paddingHorizontal: GUTTER, paddingTop: 10, paddingBottom: GUTTER },
 
   // .section-label { font-size:10.5; weight:700; letter-spacing:.08em; margin:14px 2px 10px }
   sectionLabel: {

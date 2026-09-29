@@ -264,21 +264,25 @@ export const DietPlanScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── Daily Target ── */}
+        {/* ── Daily Target ──
+            The calorie readout and the three rings used to share one row
+            (`justifyContent:'space-between'`, neither side allowed to shrink
+            or wrap): on a narrow phone the two together need more width than
+            the card has, and since nothing could give, the third ring was
+            simply clipped by the card's edge. Stacking them — calories on
+            their own row, rings on a full-width row below — means the rings
+            always have the whole card's width to themselves, on any device,
+            with no cropping possible regardless of screen size. */}
         <GlassCard elevated style={s.targetCard} innerStyle={s.targetCardInner}>
-          <View style={s.targetTop}>
-            <View>
-              <Text style={[s.eyebrow, { color: colors.textMuted }]}>DAILY TARGET</Text>
-              <Text style={[s.targetValue, { color: colors.text }]}>
-                {content.calories.toLocaleString('en-IN')}{' '}
-                <Text style={[s.targetUnit, { color: colors.textMuted }]}>kcal</Text>
-              </Text>
-            </View>
-            <View style={s.ringsRow}>
-              <ProgressRing progress={pct.protein / 100} size={64} strokeWidth={6} color={colors.primary} value={`${pct.protein}%`} label="Protein" />
-              <ProgressRing progress={pct.carbs / 100} size={64} strokeWidth={6} color={colors.warning} value={`${pct.carbs}%`} label="Carbs" />
-              <ProgressRing progress={pct.fat / 100} size={64} strokeWidth={6} color={colors.lavender} value={`${pct.fat}%`} label="Fat" />
-            </View>
+          <Text style={[s.eyebrow, { color: colors.textMuted }]}>DAILY TARGET</Text>
+          <Text style={[s.targetValue, { color: colors.text }]}>
+            {content.calories.toLocaleString('en-IN')}{' '}
+            <Text style={[s.targetUnit, { color: colors.textMuted }]}>kcal</Text>
+          </Text>
+          <View style={s.ringsRow}>
+            <ProgressRing progress={pct.protein / 100} size={68} strokeWidth={6} color={colors.primary} value={`${pct.protein}%`} label="Protein" />
+            <ProgressRing progress={pct.carbs / 100} size={68} strokeWidth={6} color={colors.warning} value={`${pct.carbs}%`} label="Carbs" />
+            <ProgressRing progress={pct.fat / 100} size={68} strokeWidth={6} color={colors.lavender} value={`${pct.fat}%`} label="Fat" />
           </View>
           {!!updatedLabel && (
             <View style={s.updatedRow}>
@@ -362,11 +366,12 @@ const s = StyleSheet.create({
   // `.card.card-elevated { padding:18px; margin-bottom:16px }`
   targetCard: { marginBottom: 2 },
   targetCardInner: { padding: 18 },
-  targetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   eyebrow: { fontSize: 10.5, fontFamily: FONTS.bodyBold, letterSpacing: 0.8 },
   targetValue: { fontSize: 30, fontFamily: FONTS.bodyExtra, marginTop: 6 },
   targetUnit: { fontSize: 13, fontFamily: FONTS.bodySemi },
-  ringsRow: { flexDirection: 'row', gap: 12 },
+  // Full card width, evenly distributed — see the comment above the JSX for
+  // why this moved off the calorie readout's row.
+  ringsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
   updatedText: { fontSize: 11 },
 
