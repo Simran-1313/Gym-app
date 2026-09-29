@@ -150,17 +150,9 @@ const ChatNavigator: React.FC = () => {
 
   return (
     <ChatStack.Navigator screenOptions={makeScreenOptions(colors)}>
-      <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Chat' }} />
-      <ChatStack.Screen
-        name="ChatRoom"
-        component={ChatRoomScreen}
-        options={({ route }) => ({ title: route.params.roomName })}
-      />
-      <ChatStack.Screen
-        name="AiCoach"
-        component={AiCoachScreen}
-        options={{ title: 'FitCoach AI' }}
-      />
+      <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ headerShown: false }} />
+      <ChatStack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
+      <ChatStack.Screen name="AiCoach" component={AiCoachScreen} options={{ headerShown: false }} />
     </ChatStack.Navigator>
   );
 };
@@ -252,11 +244,7 @@ export const AppNavigator: React.FC = () => {
           component={OnboardingScreen}
           options={{ title: 'Your Fitness Profile', headerLeft: () => null }}
         />
-        <RootStack.Screen
-          name="DietPlan"
-          component={DietPlanScreen}
-          options={{ title: 'My Diet Plan', headerBackVisible: false }}
-        />
+        <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ headerShown: false }} />
         <RootStack.Screen
           name="WorkoutPlan"
           component={WorkoutPlanScreen}
@@ -268,7 +256,7 @@ export const AppNavigator: React.FC = () => {
     content = (
       <RootStack.Navigator screenOptions={dynamicScreenOptions}>
         <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-        <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ title: 'My Diet Plan' }} />
+        <RootStack.Screen name="DietPlan" component={DietPlanScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: 'My Workout Plan' }} />
         <RootStack.Screen
           name="WorkoutSession"

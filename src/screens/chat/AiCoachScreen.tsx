@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -13,14 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation } from '@react-navigation/native';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
 import { FONTS, RADIUS } from '../../config/theme';
-import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 /**
  * Ported from `#screen-ai-coach` in docs/UI_PROTOTYPE.html.
@@ -30,11 +29,11 @@ import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
  * `.ai-msg-row` (a 26px `.ai-avatar-sm` beside every assistant bubble, 88%
  * row max-width) and `.ai-cursor` (a 2×12 blinking bar, not a text glyph).
  *
- * The header's "Powered by your training data" and the lavender accent are
- * the prototype's fixed AI-Coach identity — distinct from the tenant's
- * brandable teal — so, as in ChatList/ChatRoom, this uses `colors.lavender`
- * (`var(--lavender)` in the prototype), which stays fixed regardless of the
- * gym's brand color, same as this screen's identity in the prototype.
+ * The header itself is now the shared ScreenHeader ("FitCoach AI", same
+ * treatment as every other screen) rather than the prototype's own avatar +
+ * lavender tagline — `colors.lavender` still carries the AI identity inside
+ * the conversation itself (the assistant avatar, the cursor), just not in
+ * the header chrome.
  *
  * The prototype's `.suggestion-row` sits above the composer on every turn,
  * reading as contextual follow-ups ("Give me a lighter option", etc.). This
@@ -62,27 +61,6 @@ const SUGGESTIONS = [
 let _msgId = 0;
 const nextId = () => String(++_msgId);
 
-// ── Header (`.navbar` avatar + "FitCoach AI" + tagline) ─────────────────────
-
-const AiHeaderTitle: React.FC<{ colors: ThemeColors }> = ({ colors }) => (
-  <View style={hs.row}>
-    <View style={[hs.avatar, { backgroundColor: `${colors.lavender}2E` }]}>
-      <Ionicons name="shield-checkmark-outline" size={15} color={colors.lavender} />
-    </View>
-    <View>
-      <Text style={[hs.name, { color: colors.text }]}>FitCoach AI</Text>
-      <Text style={[hs.sub, { color: colors.lavender }]}>Powered by your training data</Text>
-    </View>
-  </View>
-);
-
-const hs = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 13, fontFamily: FONTS.bodyBold },
-  sub: { fontSize: 10.5, marginTop: 1 },
-});
-
 // ── Blinking cursor (`.ai-cursor`) ───────────────────────────────────────────
 
 const BlinkCursor: React.FC<{ color: string }> = ({ color }) => {
@@ -106,14 +84,9 @@ const BlinkCursor: React.FC<{ color: string }> = ({ color }) => {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const AiCoachScreen: React.FC = () => {
-  const headerHeight = useHeaderHeight();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ headerTitle: () => <AiHeaderTitle colors={colors} /> });
-  }, [navigation, colors]);
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -292,10 +265,10 @@ export const AiCoachScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title="FitCoach AI" onBack={() => navigation.goBack()} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
         <FlatList
           ref={listRef}
@@ -305,7 +278,7 @@ export const AiCoachScreen: React.FC = () => {
           contentContainerStyle={[
             styles.listContent,
             isEmpty && styles.listContentEmpty,
-            { paddingBottom: 12, paddingTop: headerHeight + 12 },
+            { paddingBottom: 12, paddingTop: 12 },
           ]}
           ListHeaderComponent={
             isEmpty ? (

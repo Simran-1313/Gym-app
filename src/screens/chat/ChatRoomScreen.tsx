@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -32,6 +31,7 @@ import type { ChatStackParams } from '../../navigation/AppNavigator';
 import { EmojiPicker } from '../../components/chat/EmojiPicker';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
 /**
@@ -51,47 +51,6 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
 type ChatRoomRoute = RouteProp<ChatStackParams, 'ChatRoom'>;
 
-const getInitials = (name: string) =>
-  name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-
-// ── Header title (`.navbar` avatar + name + status) ─────────────────────────
-
-interface ChatHeaderProps {
-  name: string;
-  isGroup: boolean;
-  subtitle: string | null;
-  subtitleColor: string;
-  colors: ThemeColors;
-}
-
-const ChatHeaderTitle: React.FC<ChatHeaderProps> = ({ name, isGroup, subtitle, subtitleColor, colors }) => (
-  <View style={hs.row}>
-    {isGroup ? (
-      <LinearGradient colors={[colors.primarySolid, shade(colors.primarySolid, -0.18)]} style={hs.avatar}>
-        <Ionicons name="people" size={13} color="#FFFFFF" />
-      </LinearGradient>
-    ) : (
-      <View style={[hs.avatar, { backgroundColor: colors.inset }]}>
-        <Text style={[hs.avatarText, { color: colors.primary }]}>{getInitials(name)}</Text>
-      </View>
-    )}
-    <View style={hs.copy}>
-      <Text style={[hs.name, { color: colors.text }]} numberOfLines={1}>{name}</Text>
-      {subtitle ? (
-        <Text style={[hs.sub, { color: subtitleColor }]} numberOfLines={1}>{subtitle}</Text>
-      ) : null}
-    </View>
-  </View>
-);
-
-const hs = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: 220 },
-  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 11, fontFamily: FONTS.bodyBold },
-  copy: { flexShrink: 1 },
-  name: { fontSize: 13, fontFamily: FONTS.bodyBold },
-  sub: { fontSize: 10.5, marginTop: 1 },
-});
 
 // ── Tick ─────────────────────────────────────────────────────────────────────
 
@@ -296,7 +255,6 @@ export const ChatRoomScreen: React.FC = () => {
   const isDark = theme === 'dark';
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const navigation = useNavigation();
   const route = useRoute<ChatRoomRoute>();
   const { roomId, roomName } = route.params;
@@ -319,27 +277,10 @@ export const ChatRoomScreen: React.FC = () => {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<Awaited<ReturnType<typeof connectSocket>> | null>(null);
 
-  // ── Header (`.navbar`) — avatar + name + a truthful status line ─────────
-  const headerSubtitle = !isConnected
-    ? 'Reconnecting…'
-    : isGroupChat && roomMembers.length
-      ? `${roomMembers.length} member${roomMembers.length === 1 ? '' : 's'}`
-      : null;
-  const headerSubtitleColor = !isConnected ? colors.warning : colors.textMuted;
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: () => (
-        <ChatHeaderTitle
-          name={roomName}
-          isGroup={isGroupChat}
-          subtitle={headerSubtitle}
-          subtitleColor={headerSubtitleColor}
-          colors={colors}
-        />
-      ),
-    });
-  }, [navigation, roomName, isGroupChat, headerSubtitle, headerSubtitleColor, colors]);
+  // The header is now the shared, uniform ScreenHeader — no room for a
+  // status line there. The one functional piece of that old subtitle (a real
+  // disconnect happening right now) is already surfaced elsewhere, next to
+  // the input bar — nothing here needs replacing, just the header markup.
 
   // ── Load messages ─────────────────────────────────────────────────────────
 
@@ -685,10 +626,10 @@ export const ChatRoomScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title={roomName} onBack={() => navigation.goBack()} />
       <KeyboardAvoidingView
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -700,7 +641,7 @@ export const ChatRoomScreen: React.FC = () => {
           contentContainerStyle={[
             styles.messagesList,
             {
-              paddingTop: headerHeight + 12,
+              paddingTop: 12,
               paddingBottom: 12,
               flexGrow: 1,
               justifyContent: messages.length ? 'flex-end' : 'flex-start',

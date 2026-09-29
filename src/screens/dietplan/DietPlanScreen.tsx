@@ -21,6 +21,7 @@ import { RootStackParams } from '../../navigation/AppNavigator';
 import { normalizeDietPlanContent } from '../../utils/dietPlan';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ScreenBackground } from '../../components/ui/ScreenBackground';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
@@ -333,7 +334,13 @@ export const DietPlanScreen: React.FC = () => {
 
   return (
     <ScreenBackground>
-      <View style={[s.shell, { paddingTop: insets.top + 56 }]}>{renderBody()}</View>
+      <ScreenHeader
+        title="My Diet Plan"
+        // The onboarding flow reaches this screen with nothing to go back to
+        // (headerBackVisible: false on that route) — same rule here.
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
+      <View style={s.shell}>{renderBody()}</View>
     </ScreenBackground>
   );
 };

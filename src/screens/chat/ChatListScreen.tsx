@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl,
   SectionList,
@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,6 +24,7 @@ import { shade } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StaggerItem } from '../../components/ui/StaggerItem';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -208,14 +208,8 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
 export const ChatListScreen: React.FC = () => {
   const { user } = useAuth();
   const colors = useThemeColors();
-  const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ChatListNav>();
-
-  // `.nav-title` reads "Chat" in the prototype (the stack default is "Messages").
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: 'Chat' });
-  }, [navigation]);
 
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -311,12 +305,14 @@ export const ChatListScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader title="Chat" />
       <SectionList
+        style={styles.root}
         sections={error ? [] : sections}
         keyExtractor={(r) => r.id}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: headerHeight + 8, paddingBottom: insets.bottom + 110 },
+          { paddingTop: 8, paddingBottom: insets.bottom + 110 },
         ]}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
@@ -325,7 +321,6 @@ export const ChatListScreen: React.FC = () => {
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadRooms(); }}
             tintColor={colors.primary}
-            progressViewOffset={headerHeight}
           />
         }
         ListHeaderComponent={
@@ -386,6 +381,7 @@ export const ChatListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { paddingHorizontal: GUTTER, paddingBottom: GUTTER },
 
   // .search-bar { gap:8; radius:14; padding:11px 14px; margin-bottom:14px }

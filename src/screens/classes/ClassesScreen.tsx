@@ -30,6 +30,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { bestTextOn } from '../../utils/color';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
 import { StaggerItem } from '../../components/ui/StaggerItem';
@@ -112,35 +113,29 @@ const relativeDayLabel = (iso: string): string => {
   }
 };
 
-/* ─── NavBar (`.navbar`, right `.nav-icon` opens Bookings) ─── */
+/* ─── NavBar — the shared ScreenHeader, same as every other screen ─── */
 
 const NavBar: React.FC<{ colors: ThemeColors; onBookingsPress: () => void }> = ({
   colors,
   onBookingsPress,
-}) => {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[s.navbar, { paddingTop: insets.top }]}>
-      <View style={s.navIconSlot} />
-      <Text style={[s.navTitle, { color: colors.text }]}>Classes</Text>
+}) => (
+  <ScreenHeader
+    title="Classes"
+    right={
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
           onBookingsPress();
         }}
-        style={({ pressed }) => [
-          s.navIconSlot,
-          s.navIcon,
-          pressed && { backgroundColor: colors.inset, transform: [{ scale: 0.9 }] },
-        ]}
+        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel="My Bookings"
       >
-        <Ionicons name="calendar-outline" size={18} color={colors.text} />
+        <Ionicons name="calendar-outline" size={22} color={colors.text} />
       </Pressable>
-    </View>
-  );
-};
+    }
+  />
+);
 
 /* ─── Section label (`.section-label`) ─── */
 
@@ -535,23 +530,6 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   // .scroll { padding: 0 18px 18px }
   content: { paddingHorizontal: GUTTER },
-
-  // .navbar { padding: 46px 18px 8px } — the 46 is the status bar, so it
-  // comes from the safe-area inset instead of a fixed number.
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: GUTTER,
-    paddingBottom: 8,
-  },
-  navTitle: { fontSize: 16, fontFamily: FONTS.bodyBold }, // .nav-title
-  navIconSlot: { width: 36, height: 36 }, // .nav-icon / .nav-spacer
-  navIcon: {
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // .day-picker { gap:8px; padding:4px 2px 16px }
   dayPickerContent: { gap: 8, paddingTop: 4, paddingHorizontal: 2, paddingBottom: 16 },
