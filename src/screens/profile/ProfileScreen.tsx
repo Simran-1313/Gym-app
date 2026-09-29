@@ -1,19 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  FadeInUp,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
 import { getProfile, submitProfile } from '../../services/member.service';
-import { FONTS, RADIUS, SPACING } from '../../config/theme';
+import { uploadToCloudinary } from '../../services/cloudinary';
+import { FONTS, MOTION, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
@@ -67,10 +76,17 @@ const ToggleSwitch: React.FC<{ value: boolean; onToggle: () => void }> = ({ valu
   const x = useSharedValue(value ? 18 : 0);
 
   useEffect(() => {
-    x.value = withSpring(value ? 18 : 0, { damping: 18, stiffness: 260 });
+    x.value = withSpring(value ? 18 : 0, MOTION.settle);
   }, [value, x]);
 
   const knob = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  // Same shared value drives both: the track was snapping between colors.inset
+  // and colors.primary instantly while the knob glided, so the two halves of
+  // one control read as out of sync. Deriving the fill from `x` keeps them
+  // mathematically locked to a single motion.
+  const track = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(x.value, [0, 18], [colors.inset, colors.primary]),
+  }));
 
   return (
     <Pressable
@@ -80,9 +96,11 @@ const ToggleSwitch: React.FC<{ value: boolean; onToggle: () => void }> = ({ valu
       }}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
-      style={[s.track, { backgroundColor: value ? colors.primary : colors.inset }]}
+      hitSlop={9}
     >
-      <Animated.View style={[s.knob, knob]} />
+      <Animated.View style={[s.track, track]}>
+        <Animated.View style={[s.knob, knob]} />
+      </Animated.View>
     </Pressable>
   );
 };
@@ -117,7 +135,9 @@ const Stepper: React.FC<{
         >
           <Ionicons name="remove" size={17} color={colors.text} />
         </Pressable>
-        <Text style={[s.stepperVal, { color: colors.text }]}>{value}</Text>
+        <Text style={[s.stepperVal, { color: colors.text }]} numberOfLines={1}>
+          {value}
+        </Text>
         <Pressable
           onPress={() => step(1)}
           hitSlop={6}
@@ -187,6 +207,7 @@ export const ProfileScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const loadProfile = () => {
     setProfileError(null);
@@ -264,6 +285,68 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
+  const handleChangePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to set a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+
+    setUploadingAvatar(true);
+    try {
+      const { secure_url } = await uploadToCloudinary(result.assets[0].uri, 'avatars');
+      await updateProfile({ avatarUrl: secure_url });
+      await refreshUser();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (err: unknown) {
+      Alert.alert('Couldn’t update photo', err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    Alert.alert('Remove profile photo?', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setUploadingAvatar(true);
+          try {
+            await updateProfile({ avatarUrl: null });
+            await refreshUser();
+          } catch (err: unknown) {
+            Alert.alert('Couldn’t remove photo', err instanceof Error ? err.message : 'Update failed');
+          } finally {
+            setUploadingAvatar(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAvatarPress = () => {
+    if (uploadingAvatar) return;
+    Alert.alert('Profile Photo', undefined, [
+      ...(user?.avatarUrl
+        ? [
+            { text: 'Change Photo', onPress: handleChangePhoto },
+            { text: 'Remove Photo', style: 'destructive' as const, onPress: handleRemovePhoto },
+          ]
+        : [{ text: 'Choose Photo', onPress: handleChangePhoto }]),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
+
   const memberSince = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
     : null;
@@ -288,19 +371,19 @@ export const ProfileScreen: React.FC = () => {
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
-      {/* ── Navbar ── */}
-      <View style={[s.navbar, { paddingTop: insets.top + 8 }]}>
-        <View style={s.navIcon} />
-        <Text style={[s.navTitle, { color: colors.text }]}>Profile</Text>
-        <Pressable
-          onPress={() => (editing ? setEditing(false) : openEdit())}
-          style={({ pressed }) => [s.navIcon, pressed && { opacity: 0.6 }]}
-          accessibilityRole="button"
-          accessibilityLabel={editing ? 'Cancel editing' : 'Edit profile'}
-        >
-          <Ionicons name={editing ? 'close' : 'create-outline'} size={20} color={colors.text} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Profile"
+        right={
+          <Pressable
+            onPress={() => (editing ? setEditing(false) : openEdit())}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={editing ? 'Cancel editing' : 'Edit profile'}
+          >
+            <Ionicons name={editing ? 'close' : 'create-outline'} size={22} color={colors.text} />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         style={s.root}
@@ -384,7 +467,20 @@ export const ProfileScreen: React.FC = () => {
             {/* ── Member card ── */}
             <Animated.View entering={FadeInUp.duration(340)}>
               <GlassCard elevated innerStyle={s.memberCard}>
-                <FitnessAvatar name={user?.name} uri={user?.avatarUrl} size={54} />
+                <View style={s.avatarSlot}>
+                  <FitnessAvatar
+                    name={user?.name}
+                    uri={user?.avatarUrl}
+                    size={54}
+                    editable
+                    onPress={handleAvatarPress}
+                  />
+                  {uploadingAvatar ? (
+                    <View style={[s.avatarBusy, { backgroundColor: `${colors.background}CC` }]}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                  ) : null}
+                </View>
                 <View style={s.flex1}>
                   <View style={[s.tierBadge, { backgroundColor: colors.primarySoft }]}>
                     <Text style={[s.tierBadgeText, { color: colors.primary }]}>MEMBER</Text>
@@ -469,21 +565,23 @@ export const ProfileScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 18, gap: 12 },
+  content: { paddingHorizontal: 18, paddingTop: 12, gap: 12 },
   flex1: { flex: 1 },
 
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingBottom: 8,
-  },
-  navIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: 16, fontFamily: FONTS.bodyBold },
 
   // Member card
   memberCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 20 },
+  avatarSlot: { width: 54, height: 54 },
+  avatarBusy: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tierBadge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: RADIUS.full, marginBottom: 6 },
   tierBadgeText: { fontSize: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.3 },
   memberName: { fontSize: 16, fontFamily: FONTS.bodyExtra },
@@ -542,7 +640,15 @@ const s = StyleSheet.create({
     paddingVertical: 6,
   },
   stepperBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  stepperVal: { fontSize: 16, fontFamily: FONTS.bodyExtra },
+  // Fixed width + tabular-nums — same fix as Home's BMI card: without it,
+  // weight swinging between 2 and 3 digits nudges the +/- buttons beside it.
+  stepperVal: {
+    fontSize: 16,
+    fontFamily: FONTS.bodyExtra,
+    fontVariant: ['tabular-nums'],
+    minWidth: 30,
+    textAlign: 'center',
+  },
 
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: RADIUS.full, borderWidth: 1.5 },

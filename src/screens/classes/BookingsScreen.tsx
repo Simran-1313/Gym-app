@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getMyBookings, cancelBooking } from '../../services/member.service';
@@ -19,6 +20,7 @@ import { FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { ThemeColors } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { StaggerItem } from '../../components/ui/StaggerItem';
 import { GlassOverlay } from '../../components/ui/GlassOverlay';
@@ -137,9 +139,12 @@ const BookingRow: React.FC<{
   // static mock); tapping a still-confirmed booking is how the existing
   // cancel flow is kept reachable without adding a button the design doesn't
   // show.
+  // `reflow`: cancelling moves this exact row from Upcoming to Past (same
+  // `booking.id` key, so it's a reposition, not a remount) — without it the
+  // row and its now-shifted siblings would snap to their new spot in one frame.
   if (canCancel) {
     return (
-      <StaggerItem index={index}>
+      <StaggerItem index={index} reflow>
         <Pressable
           onPress={() => onCancelPress(booking)}
           accessibilityRole="button"
@@ -151,12 +156,17 @@ const BookingRow: React.FC<{
     );
   }
 
-  return <StaggerItem index={index}>{card}</StaggerItem>;
+  return (
+    <StaggerItem index={index} reflow>
+      {card}
+    </StaggerItem>
+  );
 };
 
 export const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const navigation = useNavigation();
 
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +217,10 @@ export const BookingsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <ScreenHeader
+        title="My Bookings"
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
       <GlassOverlay
         visible={!!cancelTarget}
         title="Cancel Booking"
@@ -221,7 +235,7 @@ export const BookingsScreen: React.FC = () => {
 
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 56, paddingBottom: insets.bottom + GUTTER }]}
+        contentContainerStyle={[styles.content, { paddingTop: 12, paddingBottom: insets.bottom + GUTTER }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >

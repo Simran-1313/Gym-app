@@ -163,7 +163,7 @@ const ClassesNavigator: React.FC = () => {
   return (
     <ClassesStack.Navigator screenOptions={makeScreenOptions(colors)}>
       <ClassesStack.Screen name="ClassSchedules" component={ClassesScreen} options={{ headerShown: false }} />
-      <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ title: 'My Bookings' }} />
+      <ClassesStack.Screen name="MyBookings" component={BookingsScreen} options={{ headerShown: false }} />
     </ClassesStack.Navigator>
   );
 };
