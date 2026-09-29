@@ -86,8 +86,12 @@ export const GlassOverlay: React.FC<Props> = ({
       </Animated.View>
 
       <Animated.View
+        // Same spring family both ways — a springy entrance followed by a
+        // linear-duration exit reads as two different objects, not one sheet
+        // being pulled up and let go. The exit is tuned snappier (no
+        // overshoot) since dismissal should read as decisive, not lingering.
         entering={SlideInDown.springify().damping(22).stiffness(240)}
-        exiting={SlideOutDown.duration(220)}
+        exiting={SlideOutDown.springify().damping(26).stiffness(300)}
         style={[
           styles.sheet,
           {

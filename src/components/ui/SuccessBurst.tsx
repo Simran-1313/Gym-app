@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { MOTION } from '../../config/theme';
 
 interface Props {
   visible: boolean;
@@ -23,7 +24,7 @@ export const SuccessBurst: React.FC<Props> = ({ visible, onDone }) => {
   useEffect(() => {
     if (visible) {
       scale.value = withSequence(
-        withSpring(1.2, { damping: 10, stiffness: 200 }),
+        withSpring(1.2, MOTION.bouncy),
         withTiming(1, { duration: 150 }),
       );
       opacity.value = withTiming(1, { duration: 200 });
