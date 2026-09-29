@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Pressable,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -16,11 +17,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+
 import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { FONTS, RADIUS } from '../../config/theme';
+import { FONTS, MOTION, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { shade } from '../../utils/color';
+import { shade, solidFillFor } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -49,7 +53,6 @@ const ROW_GAP = 9; // .thread-row { margin-bottom: 9px }
 const LAV_WASH = '24'; // 0.14
 const LAV_WASH_SOFT = '08'; // 0.03
 const LAV_BORDER = '38'; // 0.22
-const LAV_ICON_BG = '2E'; // 0.18
 
 function formatTime(iso: string) {
   const d = new Date(iso);
@@ -97,30 +100,54 @@ type ChatListNav = CompositeNavigationProp<
 
 /* ─── AI Coach banner (`.ai-banner`) ─── */
 
-const AiBanner: React.FC<{ colors: ThemeColors; onPress: () => void }> = ({ colors, onPress }) => (
-  <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-    <LinearGradient
-      colors={[`${colors.lavender}${LAV_WASH}`, `${colors.lavender}${LAV_WASH_SOFT}`]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0.3 }}
-      style={[styles.aiBanner, { borderColor: `${colors.lavender}${LAV_BORDER}` }]}
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const AiBanner: React.FC<{ colors: ThemeColors; onPress: () => void }> = ({ colors, onPress }) => {
+  // Solid, not a wash — a glyph tinted the same near-transparent lavender as
+  // its own background reads as pale and washed out, not "polished and
+  // intentional." White always clears WCAG AA on this (see solidFillFor).
+  const iconFill = solidFillFor(colors.lavender);
+  const scale = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <AnimatedPressable
+      style={pressStyle}
+      onPressIn={() => {
+        scale.value = withSpring(0.97, MOTION.press);
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, MOTION.press);
+      }}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Open FitCoach AI"
     >
-      <View style={[styles.aiBannerIcon, { backgroundColor: `${colors.lavender}${LAV_ICON_BG}` }]}>
-        <Ionicons name="shield-checkmark-outline" size={20} color={colors.lavender} />
-        <View style={[styles.aiSparkle, { backgroundColor: colors.background }]}>
-          <Ionicons name="sparkles" size={11} color={colors.warning} />
+      <LinearGradient
+        colors={[`${colors.lavender}${LAV_WASH}`, `${colors.lavender}${LAV_WASH_SOFT}`]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.3 }}
+        style={[styles.aiBanner, { borderColor: `${colors.lavender}${LAV_BORDER}` }]}
+      >
+        <View style={[styles.aiBannerIcon, { backgroundColor: iconFill }]}>
+          <Ionicons name="sparkles" size={21} color="#FFFFFF" />
         </View>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.aiBannerTitle, { color: colors.lavender }]}>FitCoach AI</Text>
-        <Text style={[styles.aiBannerSub, { color: colors.textSecondary }]}>
-          Ask about your plan, form, or recovery — anytime
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
-    </LinearGradient>
-  </TouchableOpacity>
-);
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.aiBannerTitle, { color: colors.lavender }]}>FitCoach AI</Text>
+          <Text style={[styles.aiBannerSub, { color: colors.textSecondary }]}>
+            Ask about your plan, form, or recovery — anytime
+          </Text>
+        </View>
+        <View style={[styles.aiChevWrap, { backgroundColor: `${colors.lavender}1F` }]}>
+          <Ionicons name="chevron-forward" size={14} color={colors.lavender} />
+        </View>
+      </LinearGradient>
+    </AnimatedPressable>
+  );
+};
 
 /* ─── Section label (`.section-label`) ─── */
 
@@ -402,34 +429,30 @@ const styles = StyleSheet.create({
   aiBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 13,
     padding: 15,
     marginBottom: 16,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
   },
-  // .ai-banner-icon { 42x42; radius:14 }
   aiBannerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  // .ai-sparkle { top:-3; right:-3; 14x14 } — a tiny opaque disc under the
-  // glyph stands in for the SVG's own transparent background.
-  aiSparkle: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  aiBannerTitle: { fontSize: 14, fontFamily: FONTS.bodyExtra, letterSpacing: -0.1 },
+  aiBannerSub: { fontSize: 11.5, marginTop: 2, fontFamily: FONTS.body, lineHeight: 15 },
+  aiChevWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  aiBannerTitle: { fontSize: 13, fontFamily: FONTS.bodyBold },
-  aiBannerSub: { fontSize: 11.5, marginTop: 2, fontFamily: FONTS.body },
 
   // .section-label { font-size:10.5; weight:700; letter-spacing:.08em; margin:14px 2px 10px }
   sectionLabel: {
