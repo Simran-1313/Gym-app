@@ -7,36 +7,55 @@ import { FONTS, FONT_SIZE } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 /**
- * The one screen header in the app — every screen with a back action and a
- * title uses this, not its own hand-rolled navbar. My Diet Plan is the
- * reference this was pulled out of (it previously got these exact metrics
- * from React Navigation's native header + `makeScreenOptions` in
- * AppNavigator.tsx): 56pt content row under the safe area, `colors.surfaceElevated`
- * background with a bottom hairline, a 24px back chevron in a 32pt tap
- * target, 6px to the title, `FONTS.displaySemi` at 17px/-0.3 tracking,
- * vertically centered, 16px side padding.
+ * The one screen header in the app, in two variants — same component, same
+ * source of truth, so neither drifts from the other over time.
  *
- * Built as a real component rather than left as native-header configuration
- * because the native header's title alignment differs by platform (iOS
- * left-aligns next to the back button, Android centers) — screens tested on
- * different platforms would drift apart even reading the same config. This
- * renders identically on both.
+ * `default` — a pushed screen with a back action (My Diet Plan is where this
+ * was pulled from): 56pt content row, `colors.surfaceElevated` background
+ * with a bottom hairline reading as a bar sitting *above* the content, a
+ * 24px back chevron, `FONTS.displaySemi` at 17px, centered in the row.
+ *
+ * `large` — a bottom-tab root (Classes, Chat, Check-In, Profile). These
+ * used to get the exact same compact bar as every pushed sub-screen, which
+ * made a tab's own top-level page read as just one more pushed screen —
+ * there was nothing left to tell a member "you're on a main section" versus
+ * "you're three taps deep in a flow." This is the same distinction iOS
+ * itself draws between a large-title root and a pushed detail screen: a
+ * bigger, bolder, left-aligned title that sits flush with the page
+ * (`colors.background`, no hairline, no bar) rather than floating a
+ * strip above it. Never takes a back action — a tab root has nowhere to
+ * go back to by definition.
  */
 export const SCREEN_HEADER_HEIGHT = 56;
+export const LARGE_SCREEN_HEADER_HEIGHT = 64;
 
 interface Props {
   title: string;
   /** Omit on a tab-root screen with nothing to go back to — the back slot
    *  collapses to an empty spacer so the title's left edge still lines up
-   *  with every other screen's. */
+   *  with every other screen's. Ignored entirely when `variant="large"`. */
   onBack?: () => void;
   /** A single right-side action (edit pencil, calendar icon, …). */
   right?: React.ReactNode;
+  variant?: 'default' | 'large';
 }
 
-export const ScreenHeader: React.FC<Props> = ({ title, onBack, right }) => {
+export const ScreenHeader: React.FC<Props> = ({ title, onBack, right, variant = 'default' }) => {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+
+  if (variant === 'large') {
+    return (
+      <View style={[styles.largeWrap, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+        <View style={styles.largeRow}>
+          <Text style={[styles.largeTitle, { color: colors.text }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {right ? <View style={styles.largeRightSlot}>{right}</View> : null}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -94,4 +113,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   rightSlot: { minWidth: 32, alignItems: 'flex-end', justifyContent: 'center' },
+
+  largeWrap: {},
+  largeRow: {
+    height: LARGE_SCREEN_HEADER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+  },
+  largeTitle: {
+    flex: 1,
+    fontSize: 32,
+    fontFamily: FONTS.displayExtra,
+    letterSpacing: -0.7,
+  },
+  largeRightSlot: { marginLeft: 12, paddingBottom: 2 },
 });

@@ -332,7 +332,7 @@ export const ChatListScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
-      <ScreenHeader title="Chat" />
+      <ScreenHeader title="Chat" variant="large" />
       <SectionList
         style={styles.root}
         sections={error ? [] : sections}

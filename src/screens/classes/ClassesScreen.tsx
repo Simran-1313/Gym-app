@@ -121,6 +121,7 @@ const NavBar: React.FC<{ colors: ThemeColors; onBookingsPress: () => void }> = (
 }) => (
   <ScreenHeader
     title="Classes"
+    variant="large"
     right={
       <Pressable
         onPress={() => {

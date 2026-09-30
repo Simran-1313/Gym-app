@@ -243,7 +243,7 @@ export const CheckInsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
-      <ScreenHeader title="Check-Ins" />
+      <ScreenHeader title="Check-Ins" variant="large" />
 
       <FlatList
         style={s.root}

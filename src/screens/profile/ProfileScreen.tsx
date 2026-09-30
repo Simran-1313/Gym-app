@@ -373,6 +373,7 @@ export const ProfileScreen: React.FC = () => {
 
       <ScreenHeader
         title="Profile"
+        variant="large"
         right={
           <Pressable
             onPress={() => (editing ? setEditing(false) : openEdit())}
