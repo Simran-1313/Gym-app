@@ -1,14 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { ScreenBackground } from './ScreenBackground';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -17,43 +8,14 @@ interface Props {
   fullScreen?: boolean;
 }
 
+/**
+ * The platform's own activity indicator, in the theme's muted ink. Loading is
+ * a wait, not a moment — so nothing bobs, pulses or scales; it just spins
+ * quietly until the content replaces it.
+ */
 export const LoadingSpinner: React.FC<Props> = ({ size = 'large', fullScreen = false }) => {
   const colors = useThemeColors();
-
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(0.6);
-
-  useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.12, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.6, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, [scale, opacity]);
-
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  const iconSize = size === 'large' ? 48 : 28;
-
-  const spinner = (
-    <Animated.View style={iconStyle}>
-      <Ionicons name="barbell" size={iconSize} color={colors.primary} />
-    </Animated.View>
-  );
+  const spinner = <ActivityIndicator size={size} color={colors.textMuted} />;
 
   if (fullScreen) {
     return (

@@ -21,9 +21,11 @@ import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
 import { submitProfile } from '../../services/member.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
-import { FONTS, RADIUS } from '../../config/theme';
+import { FONT_SIZE, FONTS, INPUT, INPUT_LABEL, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { FitnessAvatar } from '../ui/FitnessAvatar';
+import { GlassInput } from '../ui/GlassInput';
+import { AnimatedChip } from '../ui/AnimatedChip';
 import { FitnessGoal, MemberProfile } from '../../types';
 import { GOALS } from './profileGoals';
 
@@ -45,45 +47,32 @@ interface Props {
 const WEIGHT_RANGE = { min: 25, max: 300 };
 const HEIGHT_RANGE = { min: 90, max: 250 };
 
-/* ─────────────── Grouped-form primitives ─────────────── */
+/* ─────────────── Form primitives ─────────────── */
 
-const Section: React.FC<{ header?: string; footer?: string; children: React.ReactNode }> = ({
-  header,
+/** Section title + its fields, spaced on the same rhythm as the app's other forms. */
+const Section: React.FC<{ title: string; footer?: string; children: React.ReactNode }> = ({
+  title,
   footer,
   children,
 }) => {
   const colors = useThemeColors();
   return (
     <View style={s.section}>
-      {header ? <Text style={[s.sectionHeader, { color: colors.textMuted }]}>{header}</Text> : null}
-      <View style={[s.group, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        {React.Children.toArray(children)
-          .filter(Boolean)
-          .map((child, i) => (
-            <View key={i}>
-              {i > 0 ? <View style={[s.separator, { backgroundColor: colors.cardBorder }]} /> : null}
-              {child}
-            </View>
-          ))}
-      </View>
-      {footer ? <Text style={[s.sectionFooter, { color: colors.textMuted }]}>{footer}</Text> : null}
-    </View>
-  );
-};
-
-/** Label on the left, value/control filling the rest — iOS Contacts edit row. */
-const FieldRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
-  const colors = useThemeColors();
-  return (
-    <View style={s.row}>
-      <Text style={[s.rowLabel, { color: colors.text }]}>{label}</Text>
+      <Text style={[s.sectionTitle, { color: colors.text }]} accessibilityRole="header">
+        {title}
+      </Text>
       {children}
+      {footer ? <Text style={[s.footnote, { color: colors.textMuted }]}>{footer}</Text> : null}
     </View>
   );
 };
 
-/** Compact segmented −/+ control (UIStepper shape) beside a fixed-width tabular value. */
-const StepperRow: React.FC<{
+/**
+ * A number field with −/+ inside it. Same box as GlassInput (54pt, INPUT
+ * radius/border, label above) so it sits in a form without looking like a
+ * different control; the glyphs get full 44pt targets at either end.
+ */
+const StepperField: React.FC<{
   label: string;
   unit: string;
   value: number;
@@ -105,33 +94,44 @@ const StepperRow: React.FC<{
   const atMax = value >= max;
 
   return (
-    <FieldRow label={label}>
-      <Text style={[s.stepValue, { color: colors.text }]} numberOfLines={1}>
-        {value}
-        <Text style={[s.stepUnit, { color: colors.textSecondary }]}> {unit}</Text>
-      </Text>
-      <View style={[s.stepper, { backgroundColor: colors.inset }]}>
+    <View style={s.field}>
+      <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <View
+        style={[s.stepper, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: `${value} ${unit}` }}
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        onAccessibilityAction={(e) => {
+          if (disabled) return;
+          step(e.nativeEvent.actionName === 'increment' ? 1 : -1);
+        }}
+      >
         <Pressable
           onPress={() => step(-1)}
           disabled={disabled || atMin}
-          style={({ pressed }) => [s.stepperHalf, pressed && { opacity: 0.5 }]}
+          style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.5 }]}
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${label.toLowerCase()}`}
         >
-          <Ionicons name="remove" size={18} color={atMin ? colors.textFaint : colors.text} />
+          <Ionicons name="remove" size={20} color={atMin ? colors.textFaint : colors.text} />
         </Pressable>
-        <View style={[s.stepperDivider, { backgroundColor: colors.cardBorder }]} />
+        <Text style={[s.stepValue, { color: colors.text }]} numberOfLines={1}>
+          {value}
+          <Text style={[s.stepUnit, { color: colors.textSecondary }]}> {unit}</Text>
+        </Text>
         <Pressable
           onPress={() => step(1)}
           disabled={disabled || atMax}
-          style={({ pressed }) => [s.stepperHalf, pressed && { opacity: 0.5 }]}
+          style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.5 }]}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label.toLowerCase()}`}
         >
-          <Ionicons name="add" size={18} color={atMax ? colors.textFaint : colors.text} />
+          <Ionicons name="add" size={20} color={atMax ? colors.textFaint : colors.text} />
         </Pressable>
       </View>
-    </FieldRow>
+    </View>
   );
 };
 
@@ -355,113 +355,109 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
               <Pressable
                 onPress={openPhotoActions}
                 disabled={saving}
-                hitSlop={8}
                 style={({ pressed }) => [s.photoLink, pressed && { opacity: 0.5 }]}
                 accessibilityRole="button"
               >
                 <Text style={[s.photoLinkText, { color: colors.primary }]}>
-                  {previewUri ? 'Change Photo' : 'Add Photo'}
+                  {previewUri ? 'Change photo' : 'Add photo'}
                 </Text>
               </Pressable>
             </View>
 
             {/* ── Personal ── */}
             <Section
-              header="Personal"
+              title="Personal info"
               footer={user?.email ? 'Your email is used to sign in and can’t be changed here.' : undefined}
             >
-              <FieldRow label="Name">
-                <TextInput
-                  style={[s.input, { color: colors.text }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Your name"
-                  placeholderTextColor={colors.textFaint}
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  textContentType="name"
-                  returnKeyType="next"
-                  onSubmitEditing={() => phoneRef.current?.focus()}
-                  submitBehavior="submit"
-                  editable={!saving}
-                  selectionColor={colors.primary}
-                />
-              </FieldRow>
-              <FieldRow label="Phone">
-                <TextInput
-                  ref={phoneRef}
-                  style={[s.input, { color: colors.text }]}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="Add phone"
-                  placeholderTextColor={colors.textFaint}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  textContentType="telephoneNumber"
-                  editable={!saving}
-                  selectionColor={colors.primary}
-                />
-              </FieldRow>
+              <GlassInput
+                label="Name"
+                value={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                autoCapitalize="words"
+                autoComplete="name"
+                textContentType="name"
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current?.focus()}
+                submitBehavior="submit"
+                editable={!saving}
+                selectionColor={colors.primary}
+              />
+              <GlassInput
+                // React 19 passes `ref` as a plain prop, and GlassInput spreads its
+                // rest props onto the TextInput — its Props type just doesn't
+                // declare it yet, hence the spread instead of `ref={phoneRef}`.
+                ref={phoneRef}
+                label="Phone"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Add phone"
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                textContentType="telephoneNumber"
+                editable={!saving}
+                selectionColor={colors.primary}
+              />
               {user?.email ? (
-                <FieldRow label="Email">
-                  <Text style={[s.readonly, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {user.email}
-                  </Text>
-                </FieldRow>
+                <GlassInput
+                  label="Email"
+                  value={user.email}
+                  editable={false}
+                  selectTextOnFocus={false}
+                  style={{ color: colors.textSecondary }}
+                  accessibilityHint="Can’t be changed here"
+                  rightIcon={<Ionicons name="lock-closed-outline" size={INPUT.iconSize} color={colors.textFaint} />}
+                />
               ) : null}
             </Section>
 
             {profile ? (
               <>
                 {/* ── Body ── */}
-                <Section header="Body" footer="Used to calculate your BMI and tailor your plans.">
-                  <StepperRow
-                    label="Weight"
-                    unit="kg"
-                    value={weight}
-                    onChange={setWeight}
-                    disabled={saving}
-                    {...WEIGHT_RANGE}
-                  />
-                  <StepperRow
-                    label="Height"
-                    unit="cm"
-                    value={height}
-                    onChange={setHeight}
-                    disabled={saving}
-                    {...HEIGHT_RANGE}
-                  />
+                <Section title="Body" footer="Used to calculate your BMI and tailor your plans.">
+                  <View style={s.fieldRow}>
+                    <StepperField
+                      label="Weight"
+                      unit="kg"
+                      value={weight}
+                      onChange={setWeight}
+                      disabled={saving}
+                      {...WEIGHT_RANGE}
+                    />
+                    <StepperField
+                      label="Height"
+                      unit="cm"
+                      value={height}
+                      onChange={setHeight}
+                      disabled={saving}
+                      {...HEIGHT_RANGE}
+                    />
+                  </View>
                 </Section>
 
                 {/* ── Goal ── */}
                 <Section
-                  header="Goal"
+                  title="Goal"
                   footer={
                     fitnessChanged
                       ? 'Saving body or goal changes will refresh your workout and diet plans.'
                       : undefined
                   }
                 >
-                  {GOALS.map((g) => {
-                    const active = goal === g.key;
-                    return (
-                      <Pressable
-                        key={g.key}
-                        onPress={() => {
-                          if (active) return;
-                          Haptics.selectionAsync().catch(() => {});
-                          setGoal(g.key);
-                        }}
-                        disabled={saving}
-                        style={({ pressed }) => [s.row, pressed && { backgroundColor: colors.inset }]}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: active }}
-                      >
-                        <Text style={[s.goalLabel, { color: colors.text }]}>{g.label}</Text>
-                        {active ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
-                      </Pressable>
-                    );
-                  })}
+                  <View style={s.field}>
+                    <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>What are you training for?</Text>
+                    <View style={s.chips} accessibilityRole="radiogroup">
+                      {GOALS.map((g) => (
+                        <AnimatedChip
+                          key={g.key}
+                          label={g.label}
+                          selected={goal === g.key}
+                          onPress={() => setGoal(g.key)}
+                          disabled={saving}
+                        />
+                      ))}
+                    </View>
+                  </View>
                 </Section>
               </>
             ) : null}
@@ -474,9 +470,10 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
 
 /* ─────────────── Styles ─────────────── */
 
-const ROW_MIN_HEIGHT = 50;
 const INSET_X = 16;
 
+// Same scale as Onboarding / auth forms: 8 between a label and its control,
+// 16 between fields in a section, 24 between sections.
 const s = StyleSheet.create({
   fill: { flex: 1 },
 
@@ -493,70 +490,49 @@ const s = StyleSheet.create({
   navCancel: { fontSize: 17, fontFamily: FONTS.body },
   navDone: { fontSize: 17, fontFamily: FONTS.bodyBold },
 
-  content: { paddingHorizontal: INSET_X, paddingTop: 24 },
+  content: { paddingHorizontal: SPACING.gutter, paddingTop: SPACING.lg, gap: SPACING.lg },
 
-  avatarBlock: { alignItems: 'center', marginBottom: 28 },
-  photoLink: { marginTop: 12, paddingVertical: 4, paddingHorizontal: 8 },
-  photoLinkText: { fontSize: 16, fontFamily: FONTS.bodySemi },
+  avatarBlock: { alignItems: 'center', gap: SPACING.xs },
+  photoLink: {
+    minHeight: INPUT.hitTarget,
+    paddingHorizontal: SPACING.md,
+    justifyContent: 'center',
+  },
+  photoLinkText: { fontSize: FONT_SIZE.md, fontFamily: FONTS.bodySemi },
 
-  section: { marginBottom: 28 },
-  sectionHeader: {
-    fontSize: 12.5,
-    fontFamily: FONTS.bodySemi,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 7,
-    marginLeft: INSET_X,
-  },
-  sectionFooter: {
-    fontSize: 12.5,
-    fontFamily: FONTS.body,
-    lineHeight: 17,
-    marginTop: 7,
-    marginHorizontal: INSET_X,
-  },
-  group: {
-    borderRadius: RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  // Inset hairline, starting at the text column like UITableView's separators.
-  separator: { height: StyleSheet.hairlineWidth, marginLeft: INSET_X },
+  section: { gap: SPACING.md },
+  sectionTitle: { ...TYPOGRAPHY.heading, fontSize: 16 },
+  footnote: { ...TYPOGRAPHY.caption, marginTop: -SPACING.sm },
 
-  row: {
-    minHeight: ROW_MIN_HEIGHT,
+  field: { gap: INPUT.labelGap },
+  fieldLabel: INPUT_LABEL,
+  fieldRow: { flexDirection: 'row', gap: SPACING.sm },
+
+  stepper: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: INSET_X,
-    gap: 12,
+    height: INPUT.height,
+    borderRadius: INPUT.radius,
+    borderWidth: INPUT.borderWidth,
+    // Centres the 44pt targets vertically and horizontally inside the 54pt box.
+    paddingHorizontal: (INPUT.height - INPUT.hitTarget) / 2 - INPUT.borderWidth,
   },
-  rowLabel: { width: 72, fontSize: 16, fontFamily: FONTS.bodyMedium },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: FONTS.body,
-    paddingVertical: 14,
-    paddingHorizontal: 0,
+  stepBtn: {
+    width: INPUT.hitTarget,
+    height: INPUT.hitTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  readonly: { flex: 1, fontSize: 16, fontFamily: FONTS.body },
-
-  // Fixed width + tabular-nums so 2↔3-digit values never nudge the stepper.
+  // tabular-nums so 2↔3-digit values never shift the glyphs.
   stepValue: {
     flex: 1,
-    fontSize: 16,
+    textAlign: 'center',
+    fontSize: INPUT.fontSize,
     fontFamily: FONTS.bodySemi,
     fontVariant: ['tabular-nums'],
   },
-  stepUnit: { fontSize: 16, fontFamily: FONTS.body },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 34,
-    borderRadius: RADIUS.sm,
-    overflow: 'hidden',
-  },
-  stepperHalf: { width: 46, height: 34, alignItems: 'center', justifyContent: 'center' },
-  stepperDivider: { width: StyleSheet.hairlineWidth, height: 18 },
+  stepUnit: { fontSize: INPUT.fontSize, fontFamily: FONTS.body },
 
-  goalLabel: { flex: 1, fontSize: 16, fontFamily: FONTS.body },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
 });

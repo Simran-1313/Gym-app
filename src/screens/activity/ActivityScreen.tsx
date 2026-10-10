@@ -137,8 +137,9 @@ export const ActivityScreen: React.FC = () => {
 
   const handleMetricSelect = (metric: typeof activeMetric) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    // Switch the chart in place; the full breakdown is one tap away via
+    // "Details", rather than every chip throwing you onto another screen.
     setActiveMetric(metric);
-    navigation.navigate('MetricDetail', { metric });
   };
 
   const handleSegmentSelect = (mode: typeof viewMode) => {
@@ -357,6 +358,14 @@ export const ActivityScreen: React.FC = () => {
             {/* Header */}
             <View style={styles.analyticsHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>ANALYTICS</Text>
+              <Pressable
+                onPress={() => navigation.navigate('MetricDetail', { metric: activeMetric })}
+                hitSlop={10}
+                style={styles.detailsLink}
+              >
+                <Text style={[styles.detailsLinkText, { color: colors.primary }]}>Details</Text>
+                <Ionicons name="chevron-forward" size={13} color={colors.primary} />
+              </Pressable>
               <View style={[styles.periodSegment, { backgroundColor: colors.inset }]}>
                 {(['DAILY', 'MONTHLY'] as const).map((mode) => (
                   <TouchableOpacity
@@ -364,11 +373,11 @@ export const ActivityScreen: React.FC = () => {
                     onPress={() => handleSegmentSelect(mode)}
                     style={[
                       styles.periodBtn,
-                      viewMode === mode && { backgroundColor: colors.inset },
+                      viewMode === mode && { backgroundColor: colors.surface },
                     ]}
                   >
                     <Text style={[styles.periodText, { color: viewMode === mode ? colors.text : colors.textMuted }]}>
-                      {mode === 'DAILY' ? 'D' : 'M'}
+                      {mode === 'DAILY' ? 'Week' : 'Month'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -527,6 +536,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: SPACING.xs,
   },
+
+  detailsLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 'auto', marginRight: SPACING.sm },
+  detailsLinkText: { fontFamily: FONTS.bodySemi, fontSize: 12.5 },
 
   /* ── RINGS ── */
   ringsCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg },
@@ -691,7 +703,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   periodBtn: {
-    width: 30,
+    paddingHorizontal: 10,
     height: 26,
     borderRadius: RADIUS.sm,
     alignItems: 'center',

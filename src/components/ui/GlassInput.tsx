@@ -18,6 +18,8 @@ import { INPUT, INPUT_LABEL, INPUT_TEXT } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props extends TextInputProps {
+  /** React 19 passes `ref` as a plain prop; it lands on the inner TextInput via `rest`. */
+  ref?: React.Ref<TextInput>;
   label?: string;
   containerStyle?: StyleProp<ViewStyle>;
   leftIcon?: React.ReactNode;

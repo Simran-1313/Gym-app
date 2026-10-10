@@ -5,16 +5,17 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getActivityAnalytics } from '../../services/activity.service';
 import { AnalyticsDataPoint } from '../../types';
-import { FONTS } from '../../config/theme';
+import { FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { AppleBarChart } from '../../components/ui/AppleBarChart';
+import { AppleBarChart, METRIC_COLORS } from '../../components/ui/AppleBarChart';
 import { RootStackParams } from '../../navigation/AppNavigator';
 
 type Metric = 'CALORIES' | 'DURATION' | 'WATER';
@@ -29,9 +30,9 @@ const GUTTER = 18;
  * this is a 3-way Day/Week/Month segment, not a 4th fabricated option.
  */
 const SEGMENTS: { key: Period; label: string }[] = [
-  { key: 'HOURLY', label: 'D' },
-  { key: 'DAILY', label: 'W' },
-  { key: 'MONTHLY', label: 'M' },
+  { key: 'HOURLY', label: 'Day' },
+  { key: 'DAILY', label: 'Week' },
+  { key: 'MONTHLY', label: 'Month' },
 ];
 
 const PERIOD_CONTEXT: Record<Period, string> = {
@@ -48,21 +49,29 @@ export const METRIC_TITLES: Record<Metric, string> = {
 
 const METRIC_META: Record<Metric, { color: string; about: string }> = {
   CALORIES: {
-    color: '#F0B36B',
+    color: METRIC_COLORS.CALORIES,
     about:
       "Your daily calorie burn reflects energy spent through workouts and everyday movement — useful for judging whether you're in a deficit or surplus for your goals.",
   },
   DURATION: {
-    color: '#2DD4BF',
+    color: METRIC_COLORS.DURATION,
     about:
       'Active minutes track the time you spend in logged workouts and sessions — a measure of consistency and volume, not just intensity.',
   },
   WATER: {
-    color: '#6BB8F0',
+    color: METRIC_COLORS.WATER,
     about:
       'Staying hydrated supports recovery, performance, and everyday energy — logging your intake helps you build a consistent habit.',
   },
 };
+
+/** Switching metric happens here, in place — not by backing out to Activity
+ *  and drilling into a different screen. */
+const METRIC_TABS: { key: Metric; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'CALORIES', label: 'Move', icon: 'flame' },
+  { key: 'DURATION', label: 'Exercise', icon: 'fitness' },
+  { key: 'WATER', label: 'Hydration', icon: 'water' },
+];
 
 const sum = (points: AnalyticsDataPoint[]) => points.reduce((total, p) => total + p.value, 0);
 
@@ -151,13 +160,19 @@ export const MetricDetailScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
+  const handleMetricSelect = (m: Metric) => {
+    if (m === metric) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    navigation.setParams({ metric: m });
+  };
+
   const handleSegmentSelect = (p: Period) => {
     if (p === period) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setPeriod(p);
   };
 
-  if (loading) {
+  if (loading && chartPoints.length === 0) {
     return (
       <AnimatedScreen>
         <ScreenHeader title={METRIC_TITLES[metric]} onBack={onBack} />
@@ -194,6 +209,36 @@ export const MetricDetailScreen: React.FC = () => {
             Prototype's source-tag ("via Apple Health") is dropped entirely:
             this app has no wearable/HealthKit integration, so there is no
             real data source to attribute the number to. */}
+        <View style={styles.metricTabs}>
+          {METRIC_TABS.map((t) => {
+            const active = t.key === metric;
+            const tint = METRIC_COLORS[t.key];
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => handleMetricSelect(t.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.metricTab,
+                  {
+                    backgroundColor: active ? `${tint}1F` : pressed ? colors.cardPressed : colors.surface,
+                    borderColor: active ? `${tint}66` : colors.cardBorder,
+                  },
+                ]}
+              >
+                <Ionicons name={t.icon} size={15} color={active ? tint : colors.textMuted} />
+                <Text
+                  style={[styles.metricTabText, { color: active ? colors.text : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.headlineBlock}>
           <Text style={[styles.metricNum, { color: colors.text }]}>{headlineText}</Text>
           <Text style={[styles.metricContext, { color: colors.textMuted }]}>
@@ -289,7 +334,20 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: GUTTER },
 
-  headlineBlock: { marginTop: 12, marginHorizontal: 2, marginBottom: 4 },
+  metricTabs: { flexDirection: 'row', gap: 8 },
+  metricTab: {
+    flex: 1,
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+  },
+  metricTabText: { fontFamily: FONTS.bodySemi, fontSize: 13 },
+
+  headlineBlock: { marginTop: 20, marginHorizontal: 2, marginBottom: 4 },
   metricNum: {
     fontSize: 36,
     fontFamily: FONTS.displayExtra,

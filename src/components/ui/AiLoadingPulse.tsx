@@ -21,18 +21,9 @@ export const AiLoadingPulse: React.FC<Props> = ({
   size = 32,
 }) => {
   const colors = useThemeColors();
-  const scale = useSharedValue(1);
   const opacity = useSharedValue(0.7);
 
   useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.2, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
     opacity.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 600, easing: Easing.inOut(Easing.ease) }),
@@ -41,12 +32,10 @@ export const AiLoadingPulse: React.FC<Props> = ({
       -1,
       false,
     );
-  }, [scale, opacity]);
+  }, [opacity]);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
+  // Opacity only — the icon breathes in place; it never grows or moves.
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
     <View style={styles.wrap}>

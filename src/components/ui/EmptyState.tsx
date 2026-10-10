@@ -1,14 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { FONTS, RADIUS, SPACING } from '../../config/theme';
@@ -26,36 +18,16 @@ export const EmptyState: React.FC<Props> = ({ icon, title, subtitle, actionLabel
   const colors = useThemeColors();
   const onPrimary = '#FFFFFF';
 
-  const floatY = useSharedValue(0);
-
-  useEffect(() => {
-    floatY.value = withRepeat(
-      withSequence(
-        withTiming(-8, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-
-
-  }, [floatY]);
-
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: floatY.value }],
-  }));
-
-
   return (
     <View style={styles.container}>
       <View style={[styles.dashedBox, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
 
 
 
-        {/* Floating Icon Container */}
-        <Animated.View style={[styles.iconWrap, { backgroundColor: `${colors.primary}15` }, iconStyle]}>
+        {/* Still, not floating: an empty state is a resting state. */}
+        <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
           <Ionicons name={icon} size={38} color={colors.primary} />
-        </Animated.View>
+        </View>
 
         {/* Text Content */}
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>

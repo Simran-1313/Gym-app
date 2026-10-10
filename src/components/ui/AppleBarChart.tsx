@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
-import { useAuth } from '../../context/AuthContext';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+import { FONTS, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 export interface DataPoint {
@@ -78,97 +76,115 @@ const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[
   },
 };
 
-const themeColors: Record<Props['metricType'], string[]> = {
-  CALORIES: ['#F0B36B', '#E08A3C'],
-  DURATION: ['#5EEAD4', '#2DD4BF'],
-  WATER: ['#6BB8F0', '#3B82C4'],
+/** The same hues the activity rings use, so a metric reads as one colour everywhere. */
+export const METRIC_COLORS: Record<Props['metricType'], string> = {
+  CALORIES: '#F0B36B',
+  DURATION: '#2DD4BF',
+  WATER: '#6BB8F0',
+};
+
+/** Axis labels must fit on one line under a narrow bar: "06AM" → "6a". */
+const compactLabel = (label: string) => {
+  const m = /^0?(\d{1,2})\s*(AM|PM)$/i.exec(label.trim());
+  return m ? `${m[1]}${m[2][0].toLowerCase()}` : label;
+};
+
+/** Readable long form for the callout: "06AM" → "6 AM". */
+const longLabel = (label: string) => {
+  const m = /^0?(\d{1,2})\s*(AM|PM)$/i.exec(label.trim());
+  return m ? `${m[1]} ${m[2].toUpperCase()}` : label;
+};
+
+/** Beyond this many bars, only every Nth label is drawn so none collide. */
+const MAX_LABELS = 7;
+
+const formatY = (val: number) => {
+  if (val === 0) return '0';
+  if (val >= 1000) return `${(val / 1000).toFixed(val >= 10000 ? 0 : 1)}k`;
+  return `${Math.round(val)}`;
 };
 
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
-  const { theme } = useAuth();
-  const isDark = theme === 'dark';
-  const themeColorsDynamic = useThemeColors();
-
-  const data = (customData && customData.length > 0) ? customData : (mockData[metricType]?.[viewMode] ?? []);
-  const colors = themeColors[metricType] ?? ['#2DD4BF', '#14B8A6'];
+  const colors = useThemeColors();
+  const data = customData && customData.length > 0 ? customData : (mockData[metricType]?.[viewMode] ?? []);
+  const tint = METRIC_COLORS[metricType];
 
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const formatY = (val: number) => {
-    if (val === 0) return '0';
-    if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
-    return val.toString();
-  };
-
-  // Reset selected bar when filters change
+  // A new series means the old selection points at nothing meaningful.
   useEffect(() => {
     setSelectedIndex(null);
-  }, [metricType, viewMode]);
+  }, [metricType, viewMode, customData]);
+
+  const peakIndex = data.reduce((best, p, i) => (p.value > (data[best]?.value ?? -1) ? i : best), 0);
+  const calloutIndex = selectedIndex ?? peakIndex;
+  const callout = data[calloutIndex];
+  const labelEvery = Math.ceil(data.length / MAX_LABELS);
 
   return (
     <View style={styles.container}>
-      {/* Tooltip Header */}
-      <View style={styles.tooltipContainer}>
-        {selectedIndex !== null ? (
-          <Animated.View entering={FadeInDown.duration(200)}>
-            <Text style={[styles.tooltipLabel, { color: themeColorsDynamic.textSecondary }]}>
-              Selected: <Text style={[styles.tooltipValue, { color: colors[0] }]}>{data[selectedIndex]?.displayValue}</Text>
+      {/* Callout: the tapped bar, or the peak when nothing is tapped. Fixed
+          height so the chart below never shifts when it changes. */}
+      <View style={styles.callout}>
+        {callout ? (
+          <>
+            <Text style={[styles.calloutLabel, { color: colors.textMuted }]} numberOfLines={1}>
+              {selectedIndex === null ? 'Peak · ' : ''}
+              {longLabel(callout.label)}
             </Text>
-          </Animated.View>
-        ) : (
-          <Text style={[styles.chartTip, { color: themeColorsDynamic.textMuted }]}>Tap on any bar to inspect data</Text>
-        )}
+            <Text style={[styles.calloutValue, { color: colors.text }]} numberOfLines={1}>
+              {callout.displayValue}
+            </Text>
+          </>
+        ) : null}
       </View>
 
-      {/* Bars Grid */}
       <View style={styles.chartArea}>
-        <View style={styles.gridLinesContainer}>
-          {[1, 0.5, 0].map((multiplier, i) => (
-            <View key={i} style={styles.gridLineRow}>
-              <Text style={[styles.yAxisLabel, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
-                {formatY(Math.round(maxValue * multiplier))}
-              </Text>
-              <View style={[styles.gridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]} />
+        {/* Grid: three rules with their values, behind the bars. */}
+        <View style={styles.grid} pointerEvents="none">
+          {[1, 0.5, 0].map((m) => (
+            <View key={m} style={styles.gridRow}>
+              <View style={[styles.gridLine, { backgroundColor: colors.cardBorder }]} />
+              <Text style={[styles.yLabel, { color: colors.textFaint }]}>{formatY(maxValue * m)}</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.barsRow}>
           {data.map((point, index) => {
-            const heightPercent = maxValue > 0 ? (point.value / maxValue) * 100 : 0;
-            const isSelected = selectedIndex === index;
-
+            const pct = (point.value / maxValue) * 100;
+            const active = index === calloutIndex;
+            const showLabel = index % labelEvery === 0 || index === data.length - 1;
             return (
               <Pressable
                 key={`${point.label}-${index}`}
-                onPress={() => setSelectedIndex(index)}
+                onPress={() => setSelectedIndex(selectedIndex === index ? null : index)}
+                accessibilityLabel={`${longLabel(point.label)}, ${point.displayValue}`}
                 style={styles.barCol}
               >
-                <View style={styles.barContainer}>
+                <View style={styles.barSlot}>
                   {point.value > 0 ? (
                     <Animated.View
-                      layout={Layout.springify().damping(15)}
+                      layout={LinearTransition.duration(220)}
                       style={[
-                        styles.barFill,
-                        { height: `${Math.max(8, heightPercent)}%` },
+                        styles.bar,
+                        { height: `${Math.max(4, pct)}%`, backgroundColor: tint, opacity: active ? 1 : 0.4 },
                       ]}
-                    >
-                      <LinearGradient
-                        colors={colors as [string, string]}
-                        style={[StyleSheet.absoluteFill, { opacity: isSelected ? 1 : 0.55 }]}
-                      />
-                    </Animated.View>
+                    />
                   ) : (
-                    <View style={[styles.emptyBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+                    <View style={[styles.emptyBar, { backgroundColor: colors.inset }]} />
                   )}
                 </View>
-                <Text style={[
-                  styles.axisLabel, 
-                  { color: themeColorsDynamic.textMuted },
-                  isSelected && { color: themeColorsDynamic.text, fontFamily: FONTS.bodyBold }
-                ]}>
-                  {point.label}
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.xLabel,
+                    { color: active ? colors.text : colors.textMuted },
+                    active && { fontFamily: FONTS.bodySemi },
+                  ]}
+                >
+                  {showLabel || active ? compactLabel(point.label) : ' '}
                 </Text>
               </Pressable>
             );
@@ -179,94 +195,40 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
   );
 };
 
+const X_LABEL_H = 18;
+
 const styles = StyleSheet.create({
-  container: {
-    paddingVertical: SPACING.xs,
-  },
-  tooltipContainer: {
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  tooltipLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontFamily: FONTS.bodySemi,
-  },
-  tooltipValue: {
-    fontFamily: FONTS.bodyExtra,
-  },
-  chartTip: {
-    fontSize: FONT_SIZE.xs,
-    fontStyle: 'italic',
-  },
-  chartArea: {
-    height: 180,
-    justifyContent: 'flex-end',
-    position: 'relative',
-    marginVertical: SPACING.xs,
-  },
-  gridLinesContainer: {
-    ...StyleSheet.absoluteFill,
+  container: { paddingVertical: SPACING.xs },
+
+  callout: { height: 46, justifyContent: 'center', marginBottom: SPACING.sm },
+  calloutLabel: { fontFamily: FONTS.bodyMedium, fontSize: 12 },
+  calloutValue: { fontFamily: FONTS.displaySemi, fontSize: 20, letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginTop: 2 },
+
+  chartArea: { height: 180 },
+  grid: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: X_LABEL_H,
     justifyContent: 'space-between',
-    paddingBottom: 22, // Space for X-axis labels
-    zIndex: -1,
   },
-  gridLineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    width: '100%',
-  },
-  yAxisLabel: {
-    fontSize: 10,
+  gridRow: { flexDirection: 'row', alignItems: 'center' },
+  gridLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  // Values sit on the right edge, like Apple Health, so bars get the full width.
+  yLabel: { width: 34, textAlign: 'right', fontFamily: FONTS.bodyMedium, fontSize: 10, fontVariant: ['tabular-nums'] },
+
+  barsRow: { flex: 1, flexDirection: 'row', paddingRight: 38 },
+  barCol: { flex: 1, alignItems: 'center' },
+  barSlot: { flex: 1, width: '58%', maxWidth: 18, justifyContent: 'flex-end' },
+  bar: { width: '100%', borderRadius: RADIUS.sm },
+  emptyBar: { width: '100%', height: 3, borderRadius: RADIUS.full },
+  xLabel: {
+    height: X_LABEL_H,
+    lineHeight: X_LABEL_H,
     fontFamily: FONTS.bodyMedium,
-    width: 30, // Fixed width for alignment
-    textAlign: 'right',
-    marginRight: 6,
-    marginBottom: -4, // Adjust baseline slightly
-  },
-  gridLine: {
-    height: 1,
-    flex: 1, // Take remaining width
-    marginBottom: 4, // Align with text baseline
-  },
-  barsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: '100%',
-    width: '100%',
-    paddingHorizontal: SPACING.xs,
-    paddingLeft: 36, // Push past Y-axis labels (30 width + 6 margin)
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'flex-end',
-  },
-  barContainer: {
-    flex: 1,
-    width: '50%',
-    maxWidth: 16,
-    justifyContent: 'flex-end',
-    marginBottom: SPACING.xs,
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: RADIUS.full,
-    overflow: 'hidden',
-  },
-  emptyBar: {
-    width: '100%',
-    height: 4,
-    borderRadius: RADIUS.full,
-  },
-  axisLabel: {
-    fontSize: 10,
-    fontFamily: FONTS.bodyMedium,
-    marginTop: 2,
+    fontSize: 10.5,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
 });
-
