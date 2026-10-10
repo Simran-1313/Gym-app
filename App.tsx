@@ -19,6 +19,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { AuthProvider } from './src/context/AuthContext';
 import { PlansProvider } from './src/context/PlansContext';
+import { ActivityProvider } from './src/context/ActivityContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 
 export default function App() {
@@ -44,8 +45,10 @@ export default function App() {
       <SafeAreaProvider>
         <AuthProvider>
           <PlansProvider>
-            <StatusBar style="auto" />
-            <AppNavigator />
+            <ActivityProvider>
+              <StatusBar style="auto" />
+              <AppNavigator />
+            </ActivityProvider>
           </PlansProvider>
         </AuthProvider>
       </SafeAreaProvider>

@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { chatService, deletedLabel, ChatMessage, ChatRoom } from '../../services/chat.service';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { connectSocket } from '../../services/socket';
-import { FONTS, RADIUS } from '../../config/theme';
+import { COMPOSER, FONTS, RADIUS } from '../../config/theme';
 import { shade } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -902,16 +902,17 @@ const styles = StyleSheet.create({
   },
   chatInput: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Buttons stay on the baseline row as the composer grows.
+    alignItems: 'flex-end',
     gap: 9,
     paddingHorizontal: 16,
     paddingTop: 11,
   },
   // .chat-icon-btn { 39x39; radius:50% }
   chatIconBtn: {
-    width: 39,
-    height: 39,
-    borderRadius: 19.5,
+    width: COMPOSER.buttonSize,
+    height: COMPOSER.buttonSize,
+    borderRadius: COMPOSER.buttonSize / 2,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -921,16 +922,22 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 12.5,
+    paddingHorizontal: COMPOSER.paddingHorizontal,
+    paddingTop: COMPOSER.paddingVertical,
+    paddingBottom: COMPOSER.paddingVertical,
+    minHeight: COMPOSER.minHeight,
+    fontFamily: FONTS.body,
+    fontSize: COMPOSER.fontSize,
+    lineHeight: COMPOSER.lineHeight,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     maxHeight: 100,
   },
   // .send-btn { 39x39; radius:50% }
   sendBtn: {
-    width: 39,
-    height: 39,
-    borderRadius: 19.5,
+    width: COMPOSER.buttonSize,
+    height: COMPOSER.buttonSize,
+    borderRadius: COMPOSER.buttonSize / 2,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

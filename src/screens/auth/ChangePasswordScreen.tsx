@@ -14,7 +14,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/auth.service';
 import { clearCookie } from '../../services/api';
-import { FONTS, SPACING } from '../../config/theme';
+import { FONTS, INPUT, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -81,9 +81,9 @@ export const ChangePasswordScreen: React.FC = () => {
   };
 
   const fields = [
-    { key: 'current' as const, label: 'Current Password', value: current, onChange: setCurrent },
-    { key: 'next' as const, label: 'New Password', value: next, onChange: setNext },
-    { key: 'confirm' as const, label: 'Confirm New Password', value: confirm, onChange: setConfirm },
+    { key: 'current' as const, label: 'Current password', value: current, onChange: setCurrent },
+    { key: 'next' as const, label: 'New password', value: next, onChange: setNext },
+    { key: 'confirm' as const, label: 'Confirm new password', value: confirm, onChange: setConfirm },
   ];
 
   return (
@@ -115,17 +115,17 @@ export const ChangePasswordScreen: React.FC = () => {
                 autoCorrect={false}
                 textContentType={key === 'current' ? 'password' : 'newPassword'}
                 editable={!loading}
-                leftIcon={<Ionicons name="lock-closed-outline" size={16} color={colors.textFaint} />}
+                leftIcon={<Ionicons name="lock-closed-outline" size={INPUT.iconSize} color={colors.textFaint} />}
                 rightIcon={
                   <TouchableOpacity
                     onPress={() => setRevealed((r) => ({ ...r, [key]: !r[key] }))}
-                    hitSlop={10}
+                    style={s.eyeBtn}
                     accessibilityRole="button"
                     accessibilityLabel={`${revealed[key] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
                   >
                     <Ionicons
                       name={revealed[key] ? 'eye-off-outline' : 'eye-outline'}
-                      size={18}
+                      size={INPUT.iconSize}
                       color={colors.textFaint}
                     />
                   </TouchableOpacity>
@@ -154,7 +154,15 @@ export const ChangePasswordScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.md, gap: SPACING.xs },
-  eyebrow: { fontSize: 12.5, fontFamily: FONTS.body, lineHeight: 18, marginBottom: 6 },
+  scroll: { flexGrow: 1, padding: SPACING.lg, paddingTop: SPACING.md, gap: SPACING.md },
+  eyebrow: { fontSize: 14, fontFamily: FONTS.body, lineHeight: 20, marginBottom: 4 },
   btn: { marginTop: SPACING.sm },
+  // 44pt target; the negative margin keeps the glyph aligned to the field's padding.
+  eyeBtn: {
+    width: INPUT.hitTarget,
+    height: INPUT.hitTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -(INPUT.hitTarget - INPUT.iconSize) / 2,
+  },
 });

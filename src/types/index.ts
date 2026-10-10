@@ -298,6 +298,9 @@ export interface WaterSummary {
   totalMl: number;
   goalMl: number;
   logs: WaterLogEntry[];
+  /** Set by the service when the endpoint was unreachable and this is a
+   *  placeholder, so callers never overwrite real local state with it. */
+  isFallback?: boolean;
 }
 
 export type DeviceSyncProvider =

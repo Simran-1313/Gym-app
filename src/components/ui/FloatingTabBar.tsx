@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { FONTS, MOTION, RADIUS } from '../../config/theme';
+import { BLUR, FONTS, MOTION, RADIUS } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -135,8 +135,7 @@ export const FloatingTabBar: React.FC<BottomTabBarProps> = ({
           — a drop shadow on top of that is redundant, not load-bearing. */}
       <View style={[styles.bar, { borderColor: colors.cardBorder }]}>
         <BlurView
-          tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
-          intensity={isDark ? 60 : 70}
+          {...(isDark ? BLUR.dark : BLUR.light)}
           style={StyleSheet.absoluteFill}
         />
         {/* Blur alone is too transparent over the moving ambient bloom; this

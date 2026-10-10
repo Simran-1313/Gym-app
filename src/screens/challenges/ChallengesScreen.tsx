@@ -1,117 +1,104 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  LayoutChangeEvent,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { StaggerItem } from '../../components/ui/StaggerItem';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { FONTS, RADIUS, SPACING, TYPOGRAPHY } from '../../config/theme';
-import { getCheckIns } from '../../services/member.service';
-import { CheckIn } from '../../types';
+import { useActivity } from '../../context/ActivityContext';
+import {
+  STREAK_MILESTONES,
+  StreakMilestone,
+  dayKey,
+  nextMilestone,
+  startOfDay,
+  visitCountByDay,
+} from '../../utils/activity';
 
-/** Five weeks of history — as many columns as fit at phone width without a second axis. */
-const GRID_DAYS = 35;
+type Colors = ReturnType<typeof useThemeColors>;
+
 const MONTHLY_GOAL = 12; // ~3 sessions/week
 
-const MILESTONES = [
-  { days: 7, name: 'Bronze', icon: 'medal-outline' as const },
-  { days: 14, name: 'Silver', icon: 'medal-outline' as const },
-  { days: 30, name: 'Gold', icon: 'trophy-outline' as const },
-  { days: 60, name: 'Platinum', icon: 'trophy' as const },
-];
+/* Contribution graph geometry. Thirteen weeks is a quarter — the window the
+   shared store loads (90 days) — laid out GitHub-style: one column per week,
+   one row per weekday, Monday on top. */
+const GRAPH_WEEKS = 13;
+const TILE_GAP = 3;
+const DAY_LABEL_W = 16;
+const DAY_LABELS = ['M', '', 'W', '', 'F', '', ''];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const dayKey = (iso: string) => new Date(iso).toDateString();
-
-/** Longest run of consecutive calendar days ending today (or yesterday, if today isn't logged yet). */
-const computeStreaks = (checkIns: CheckIn[]) => {
-  const daysWithVisit = new Set(checkIns.map((c) => dayKey(c.checkedInAt)));
-  let current = 0;
-  const cursor = new Date();
-  // A missed *today* shouldn't break the streak until the day is actually over.
-  if (!daysWithVisit.has(cursor.toDateString())) cursor.setDate(cursor.getDate() - 1);
-  while (daysWithVisit.has(cursor.toDateString())) {
-    current += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  const sortedDays = [...daysWithVisit].map((d) => new Date(d).getTime()).sort((a, b) => a - b);
-  let best = sortedDays.length ? 1 : 0;
-  let run = 1;
-  for (let i = 1; i < sortedDays.length; i++) {
-    const gapDays = Math.round((sortedDays[i] - sortedDays[i - 1]) / 86400000);
-    run = gapDays === 1 ? run + 1 : 1;
-    best = Math.max(best, run);
-  }
-  return { current, best: Math.max(best, current) };
+/** Glyph per rung of the ladder: medals for the early rungs, trophies after. */
+const MILESTONE_ICON: Record<StreakMilestone['name'], keyof typeof Ionicons.glyphMap> = {
+  Bronze: 'medal-outline',
+  Silver: 'medal',
+  Gold: 'trophy-outline',
+  Platinum: 'trophy',
 };
 
-const visitCountByDay = (checkIns: CheckIn[]): Record<string, number> => {
-  const map: Record<string, number> = {};
-  for (const c of checkIns) {
-    const k = dayKey(c.checkedInAt);
-    map[k] = (map[k] ?? 0) + 1;
-  }
-  return map;
-};
+const formatDate = (d: Date) =>
+  d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 export const ChallengesScreen: React.FC = () => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const [loading, setLoading] = useState(true);
+  const { loaded, checkIns, refresh, stats } = useActivity();
   const [refreshing, setRefreshing] = useState(false);
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
 
-  const load = useCallback(async () => {
-    try {
-      // Best-effort recent window: there's no dedicated streak endpoint, so the
-      // streak and grid are derived from check-in history on the client.
-      const res = await getCheckIns(1, 90);
-      setCheckIns(res.checkIns);
-    } catch {
-      setCheckIns([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    load().finally(() => setLoading(false));
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+    try {
+      await refresh(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh]);
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  const { current, best } = stats.streak;
+  const visitsByDay = useMemo(() => visitCountByDay(checkIns), [checkIns]);
 
-  const { current, best } = computeStreaks(checkIns);
-  const visitsByDay = visitCountByDay(checkIns);
-  const nextMilestone = MILESTONES.find((m) => m.days > current) ?? null;
+  const sessionsThisMonth = useMemo(() => {
+    const monthStart = startOfDay(new Date());
+    monthStart.setDate(1);
+    return new Set(
+      checkIns
+        .filter((c) => new Date(c.checkedInAt) >= monthStart)
+        .map((c) => dayKey(c.checkedInAt)),
+    ).size;
+  }, [checkIns]);
 
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const sessionsThisMonth = new Set(
-    checkIns.filter((c) => new Date(c.checkedInAt) >= monthStart).map((c) => dayKey(c.checkedInAt)),
-  ).size;
+  if (!loaded) return <LoadingSpinner fullScreen />;
+
   const monthlyProgress = Math.min(1, sessionsThisMonth / MONTHLY_GOAL);
 
-  const gridDays = Array.from({ length: GRID_DAYS }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (GRID_DAYS - 1 - i));
-    return d;
-  });
-
-  const badgeProgress = nextMilestone ? Math.min(1, current / nextMilestone.days) : 1;
-  const daysToBadge = nextMilestone ? nextMilestone.days - current : 0;
+  // Badges are earned on the best run ever (a badge, once won, stays won);
+  // the next rung is the first one not yet earned, paced by the current run.
+  const target = STREAK_MILESTONES.find((m) => best < m.days) ?? null;
+  const targetProgress = target ? Math.min(1, current / target.days) : 1;
+  const daysToTarget = target ? Math.max(0, target.days - current) : 0;
+  const streakGoal = nextMilestone(current);
+  const streakProgress = streakGoal ? Math.min(1, current / streakGoal.days) : 1;
 
   return (
     <AnimatedScreen>
@@ -131,150 +118,380 @@ export const ChallengesScreen: React.FC = () => {
         }
       >
         {/* ── Streak stats: three columns split by hairline rules ── */}
-        <StaggerItem index={0}>
-          <GlassCard innerStyle={s.statsRow}>
-            <Stat value={String(current)} label="Day streak" colors={colors} />
-            <View style={[s.statDivider, { backgroundColor: colors.cardBorder }]} />
-            <Stat value={String(best)} label="Best streak" colors={colors} />
-            <View style={[s.statDivider, { backgroundColor: colors.cardBorder }]} />
-            <Stat value={String(sessionsThisMonth)} label="This month" colors={colors} />
-          </GlassCard>
-        </StaggerItem>
+        <GlassCard innerStyle={s.statsRow}>
+          <Stat value={String(current)} label="Day streak" colors={colors} />
+          <View style={[s.statDivider, { backgroundColor: colors.cardBorder }]} />
+          <Stat value={String(best)} label="Best streak" colors={colors} />
+          <View style={[s.statDivider, { backgroundColor: colors.cardBorder }]} />
+          <Stat value={String(sessionsThisMonth)} label="This month" colors={colors} />
+        </GlassCard>
 
-        {/* ── Next badge. A warm, always-dark celebratory surface, like the
-             prototype's .badge-hero — it reads as a trophy case, not a card. ── */}
-        <Animated.View entering={FadeInUp.duration(340).delay(60)}>
-          <LinearGradient
-            colors={['#16130D', '#0D0C0A', '#08090A']}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
-            style={[s.badgeHero, { borderColor: `${colors.warning}2E` }]}
-          >
-            <View style={s.badgeRow}>
-              <View style={[s.badgeIcon, { backgroundColor: `${colors.warning}24`, borderColor: `${colors.warning}4D` }]}>
-                <Ionicons name={nextMilestone?.icon ?? 'trophy'} size={24} color={colors.warning} />
-              </View>
-              <View style={s.badgeCopy}>
-                <Text style={s.badgeTitle}>
-                  {nextMilestone ? `${nextMilestone.name} Badge` : 'Platinum Streak'}
-                </Text>
-                <Text style={s.badgeSub}>
-                  {nextMilestone
-                    ? `${daysToBadge} more ${daysToBadge === 1 ? 'day' : 'days'} at this pace`
-                    : '60+ days — every milestone unlocked'}
-                </Text>
-              </View>
-            </View>
+        {/* ── Streak badges: the whole ladder, so what's next is always visible ── */}
+        <GlassCard>
+          <View style={s.cardHead}>
+            <Text style={[s.cardTitle, { color: colors.text }]}>Streak badges</Text>
+            <Text style={[s.cardMeta, { color: colors.textMuted }]}>
+              {STREAK_MILESTONES.filter((m) => best >= m.days).length} of {STREAK_MILESTONES.length}
+            </Text>
+          </View>
 
-            <View style={s.badgeTrack}>
-              <LinearGradient
-                colors={[colors.warning, '#FFD08A']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[s.badgeFill, { width: `${Math.max(3, badgeProgress * 100)}%` }]}
-              />
-            </View>
-          </LinearGradient>
-        </Animated.View>
+          <View style={s.ladder}>
+            {STREAK_MILESTONES.map((m) => {
+              const state = best >= m.days ? 'earned' : m === target ? 'next' : 'locked';
+              return (
+                <BadgeMedallion
+                  key={m.name}
+                  milestone={m}
+                  state={state}
+                  progress={state === 'next' ? targetProgress : 0}
+                  daysToGo={state === 'next' ? daysToTarget : 0}
+                  colors={colors}
+                />
+              );
+            })}
+          </View>
 
-        {/* ── Contribution grid: one square per day, tinted by session count ── */}
-        <StaggerItem index={2}>
-          <GlassCard>
-            <Text style={[s.gridLabel, { color: colors.textMuted }]}>LAST {GRID_DAYS} DAYS</Text>
-            <View style={s.grid}>
-              {gridDays.map((d, i) => {
-                const count = visitsByDay[d.toDateString()] ?? 0;
-                const isToday = i === gridDays.length - 1;
-                const bg =
-                  count === 0
-                    ? colors.inset
-                    : count === 1
-                      ? `${colors.primary}40`
-                      : count === 2
-                        ? `${colors.primary}99`
-                        : colors.primary;
-                return (
-                  <View
-                    key={d.toISOString()}
-                    style={[
-                      s.gridSq,
-                      { backgroundColor: bg },
-                      isToday && { borderWidth: 2, borderColor: colors.primary },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-            <View style={s.legendRow}>
-              <Text style={[s.legendText, { color: colors.textFaint }]}>Less</Text>
-              {[colors.inset, `${colors.primary}40`, `${colors.primary}99`, colors.primary].map((c, i) => (
-                <View key={i} style={[s.legendSq, { backgroundColor: c }]} />
-              ))}
-              <Text style={[s.legendText, { color: colors.textFaint }]}>More</Text>
-            </View>
-          </GlassCard>
-        </StaggerItem>
+          <View style={[s.rule, { backgroundColor: colors.cardBorder }]} />
+
+          <View style={s.nextRow}>
+            <Text style={[s.nextTitle, { color: colors.text }]}>
+              {target ? `Next: ${target.name}` : 'Every badge unlocked'}
+            </Text>
+            <Text style={[s.nextMeta, { color: colors.textMuted }]}>
+              {target ? `${current} / ${target.days} days` : `${best}-day best`}
+            </Text>
+          </View>
+          <View style={[s.track, { backgroundColor: colors.inset }]}>
+            <View
+              style={[
+                s.fill,
+                { backgroundColor: colors.primary, width: `${Math.max(2, targetProgress * 100)}%` },
+              ]}
+            />
+          </View>
+          <Text style={[s.nextSub, { color: colors.textSecondary }]}>
+            {target
+              ? current === 0
+                ? `Check in today to start a run toward ${target.name}.`
+                : `${daysToTarget} more ${daysToTarget === 1 ? 'day' : 'days'} in a row to earn ${target.name}.`
+              : `You've held a ${STREAK_MILESTONES[STREAK_MILESTONES.length - 1].days}+ day streak.`}
+          </Text>
+        </GlassCard>
+
+        {/* ── Contribution graph ── */}
+        <ContributionGraph visitsByDay={visitsByDay} colors={colors} />
 
         {/* ── Active challenges ── */}
         <View style={s.sectionRow}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>Active challenges</Text>
         </View>
 
-        <StaggerItem index={3}>
-          <GlassCard innerStyle={s.challengeRow}>
-            <View style={[s.chIcon, { backgroundColor: colors.primarySoft }]}>
-              <Ionicons name="barbell-outline" size={20} color={colors.primary} />
+        <GlassCard innerStyle={s.challengeRow}>
+          <View style={[s.chIcon, { backgroundColor: colors.primarySoft }]}>
+            <Ionicons name="barbell-outline" size={20} color={colors.primary} />
+          </View>
+          <View style={s.chBody}>
+            <Text style={[s.chTitle, { color: colors.text }]}>Monthly Consistency</Text>
+            <Text style={[s.chSub, { color: colors.textMuted }]}>
+              {sessionsThisMonth} of {MONTHLY_GOAL} sessions this month
+            </Text>
+            <View style={[s.chTrack, { backgroundColor: colors.inset }]}>
+              <View
+                style={[
+                  s.fill,
+                  { backgroundColor: colors.primary, width: `${Math.max(2, monthlyProgress * 100)}%` },
+                ]}
+              />
             </View>
-            <View style={s.chBody}>
-              <Text style={[s.chTitle, { color: colors.text }]}>Monthly Consistency</Text>
-              <Text style={[s.chSub, { color: colors.textMuted }]}>
-                {sessionsThisMonth} of {MONTHLY_GOAL} sessions this month
-              </Text>
-              <View style={[s.chTrack, { backgroundColor: colors.inset }]}>
-                <View style={[s.chFill, { backgroundColor: colors.primary, width: `${Math.max(2, monthlyProgress * 100)}%` }]} />
-              </View>
-            </View>
-            <View style={[s.chBadge, { backgroundColor: colors.primarySoft }]}>
-              <Text style={[s.chBadgeText, { color: colors.primary }]}>
-                {monthlyProgress >= 1 ? 'Done' : 'Active'}
-              </Text>
-            </View>
-          </GlassCard>
-        </StaggerItem>
+          </View>
+          <View style={[s.chBadge, { backgroundColor: colors.primarySoft }]}>
+            <Text style={[s.chBadgeText, { color: colors.primary }]}>
+              {monthlyProgress >= 1 ? 'Done' : 'Active'}
+            </Text>
+          </View>
+        </GlassCard>
 
-        <StaggerItem index={4}>
-          <GlassCard innerStyle={s.challengeRow}>
-            <View style={[s.chIcon, { backgroundColor: `${colors.tint.energy}24` }]}>
-              <Ionicons name="flame-outline" size={20} color={colors.tint.energy} />
+        <GlassCard innerStyle={s.challengeRow}>
+          <View style={[s.chIcon, { backgroundColor: `${colors.tint.energy}24` }]}>
+            <Ionicons name="flame-outline" size={20} color={colors.tint.energy} />
+          </View>
+          <View style={s.chBody}>
+            <Text style={[s.chTitle, { color: colors.text }]}>Keep the Streak</Text>
+            <Text style={[s.chSub, { color: colors.textMuted }]}>
+              {streakGoal
+                ? `${current} of ${streakGoal.days} days toward ${streakGoal.name}`
+                : `${current} days and counting`}
+            </Text>
+            <View style={[s.chTrack, { backgroundColor: colors.inset }]}>
+              <View
+                style={[
+                  s.fill,
+                  { backgroundColor: colors.tint.energy, width: `${Math.max(2, streakProgress * 100)}%` },
+                ]}
+              />
             </View>
-            <View style={s.chBody}>
-              <Text style={[s.chTitle, { color: colors.text }]}>Keep the Streak</Text>
-              <Text style={[s.chSub, { color: colors.textMuted }]}>
-                {nextMilestone
-                  ? `${current} of ${nextMilestone.days} days toward ${nextMilestone.name}`
-                  : `${current} days and counting`}
-              </Text>
-              <View style={[s.chTrack, { backgroundColor: colors.inset }]}>
-                <View style={[s.chFill, { backgroundColor: colors.tint.energy, width: `${Math.max(2, badgeProgress * 100)}%` }]} />
-              </View>
-            </View>
-            <View style={[s.chBadge, { backgroundColor: `${colors.tint.energy}24` }]}>
-              <Text style={[s.chBadgeText, { color: colors.tint.energy }]}>
-                {current > 0 ? 'Active' : 'Start'}
-              </Text>
-            </View>
-          </GlassCard>
-        </StaggerItem>
+          </View>
+          <View style={[s.chBadge, { backgroundColor: `${colors.tint.energy}24` }]}>
+            <Text style={[s.chBadgeText, { color: colors.tint.energy }]}>
+              {current > 0 ? 'Active' : 'Start'}
+            </Text>
+          </View>
+        </GlassCard>
       </ScrollView>
     </AnimatedScreen>
   );
 };
 
-const Stat: React.FC<{ value: string; label: string; colors: ReturnType<typeof useThemeColors> }> = ({
-  value,
-  label,
+/* ─────────────────────────── Badge medallion ─────────────────────────── */
+
+const MEDAL = 52;
+const RING_STROKE = 3;
+
+const BadgeMedallion: React.FC<{
+  milestone: StreakMilestone;
+  state: 'earned' | 'next' | 'locked';
+  progress: number;
+  daysToGo: number;
+  colors: Colors;
+}> = ({ milestone, state, progress, daysToGo, colors }) => {
+  const icon = MILESTONE_ICON[milestone.name];
+  const r = (MEDAL - RING_STROKE) / 2;
+  const circumference = 2 * Math.PI * r;
+
+  let caption: string;
+  if (state === 'earned') caption = 'Earned';
+  else if (state === 'next') caption = `${daysToGo} ${daysToGo === 1 ? 'day' : 'days'} to go`;
+  else caption = `${milestone.days} days`;
+
+  return (
+    <View
+      style={s.medalCol}
+      accessible
+      accessibilityLabel={`${milestone.name} badge, ${milestone.days}-day streak. ${caption}.`}
+    >
+      <View style={s.medalWrap}>
+        {state === 'earned' && (
+          <View style={[s.medal, { backgroundColor: colors.primarySolid }]}>
+            <Ionicons name={icon} size={22} color="#FFFFFF" />
+          </View>
+        )}
+
+        {state === 'next' && (
+          <View style={[s.medal, { backgroundColor: colors.primarySoft }]}>
+            <Svg width={MEDAL} height={MEDAL} style={StyleSheet.absoluteFill}>
+              <Circle
+                cx={MEDAL / 2}
+                cy={MEDAL / 2}
+                r={r}
+                stroke={colors.inset}
+                strokeWidth={RING_STROKE}
+                fill="none"
+              />
+              <Circle
+                cx={MEDAL / 2}
+                cy={MEDAL / 2}
+                r={r}
+                stroke={colors.primary}
+                strokeWidth={RING_STROKE}
+                strokeLinecap="round"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference * (1 - Math.max(0.02, progress))}
+                fill="none"
+                transform={`rotate(-90 ${MEDAL / 2} ${MEDAL / 2})`}
+              />
+            </Svg>
+            <Ionicons name={icon} size={22} color={colors.primary} />
+          </View>
+        )}
+
+        {state === 'locked' && (
+          <View
+            style={[
+              s.medal,
+              { backgroundColor: colors.inset, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.cardBorder },
+            ]}
+          >
+            <Ionicons name={icon} size={22} color={colors.textFaint} />
+            <View
+              style={[
+                s.lockPip,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.cardBorder },
+              ]}
+            >
+              <Ionicons name="lock-closed" size={9} color={colors.textMuted} />
+            </View>
+          </View>
+        )}
+      </View>
+
+      <Text
+        style={[s.medalName, { color: state === 'locked' ? colors.textMuted : colors.text }]}
+        numberOfLines={1}
+      >
+        {milestone.name}
+      </Text>
+      <Text
+        style={[s.medalCaption, { color: state === 'next' ? colors.primary : colors.textFaint }]}
+        numberOfLines={1}
+      >
+        {caption}
+      </Text>
+    </View>
+  );
+};
+
+/* ───────────────────────── Contribution graph ───────────────────────── */
+
+const ContributionGraph: React.FC<{ visitsByDay: Record<string, number>; colors: Colors }> = ({
+  visitsByDay,
   colors,
-}) => (
+}) => {
+  const [gridWidth, setGridWidth] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = Math.floor(e.nativeEvent.layout.width);
+    setGridWidth((prev) => (prev === w ? prev : w));
+  }, []);
+
+  const { weeks, today, activeDays } = useMemo(() => {
+    const todayStart = startOfDay(new Date());
+    // Monday of the current week (getDay: Sun=0 … Sat=6).
+    const mondayOffset = (todayStart.getDay() + 6) % 7;
+    const firstMonday = new Date(todayStart);
+    firstMonday.setDate(todayStart.getDate() - mondayOffset - (GRAPH_WEEKS - 1) * 7);
+
+    let active = 0;
+    const cols: { days: (Date | null)[]; monthLabel: string | null }[] = [];
+    let lastMonth = -1;
+    for (let w = 0; w < GRAPH_WEEKS; w++) {
+      const days: (Date | null)[] = [];
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(firstMonday);
+        date.setDate(firstMonday.getDate() + w * 7 + d);
+        if (date.getTime() > todayStart.getTime()) {
+          days.push(null); // future — no tile at all
+        } else {
+          days.push(date);
+          if ((visitsByDay[date.toDateString()] ?? 0) > 0) active += 1;
+        }
+      }
+      // Label a column when it's the first to show a new month (by its Monday).
+      const month = (days[0] as Date).getMonth();
+      cols.push({ days, monthLabel: month !== lastMonth ? MONTHS[month] : null });
+      lastMonth = month;
+    }
+    // The very first column always gets a label; drop it if the next column
+    // labels a new month too, so two names never collide.
+    if (cols.length > 1 && cols[1].monthLabel) cols[0].monthLabel = null;
+    return { weeks: cols, today: todayStart, activeDays: active };
+  }, [visitsByDay]);
+
+  const tile = gridWidth > 0 ? Math.floor((gridWidth - TILE_GAP * (GRAPH_WEEKS - 1)) / GRAPH_WEEKS) : 0;
+  const levels = [colors.inset, `${colors.primary}40`, `${colors.primary}73`, `${colors.primary}B3`, colors.primary];
+  const levelFor = (count: number) => levels[Math.min(4, count)];
+
+  const selectedDate = selected ? new Date(selected) : null;
+  const selectedCount = selected ? visitsByDay[selected] ?? 0 : 0;
+
+  return (
+    <GlassCard>
+      <View style={s.cardHead}>
+        <Text style={[s.cardTitle, { color: colors.text }]}>Check-in history</Text>
+        <Text style={[s.cardMeta, { color: colors.textMuted }]}>Last {GRAPH_WEEKS} weeks</Text>
+      </View>
+
+      <View style={s.graphRow}>
+        {/* Weekday labels, offset by the month-label row */}
+        <View style={{ width: DAY_LABEL_W, paddingTop: 16 }}>
+          {DAY_LABELS.map((l, i) => (
+            <View key={i} style={{ height: tile || 14, marginBottom: i < 6 ? TILE_GAP : 0, justifyContent: 'center' }}>
+              <Text style={[s.axisText, { color: colors.textFaint }]}>{l}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={s.graphBody} onLayout={onLayout}>
+          {tile > 0 && (
+            <>
+              <View style={[s.monthRow, { gap: TILE_GAP }]}>
+                {weeks.map((wk, i) => (
+                  <View key={i} style={{ width: tile }}>
+                    {wk.monthLabel && (
+                      <Text style={[s.axisText, s.monthText, { color: colors.textMuted }]} numberOfLines={1}>
+                        {wk.monthLabel}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: TILE_GAP }}>
+                {weeks.map((wk, wi) => (
+                  <View key={wi} style={{ gap: TILE_GAP }}>
+                    {wk.days.map((date, di) => {
+                      if (!date) return <View key={di} style={{ width: tile, height: tile }} />;
+                      const key = date.toDateString();
+                      const count = visitsByDay[key] ?? 0;
+                      const isToday = date.getTime() === today.getTime();
+                      const isSelected = key === selected;
+                      return (
+                        <Pressable
+                          key={di}
+                          onPress={() => setSelected((prev) => (prev === key ? null : key))}
+                          hitSlop={1}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${formatDate(date)}: ${count} ${count === 1 ? 'check-in' : 'check-ins'}`}
+                          style={[
+                            s.tile,
+                            {
+                              width: tile,
+                              height: tile,
+                              backgroundColor: levelFor(count),
+                              borderColor: count === 0 ? colors.cardBorder : 'transparent',
+                            },
+                            (isToday || isSelected) && {
+                              borderWidth: 1.5,
+                              borderColor: isSelected ? colors.text : colors.primary,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+
+      <View style={s.graphFoot}>
+        <Text style={[s.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+          {selectedDate
+            ? `${formatDate(selectedDate)} · ${selectedCount === 0 ? 'No check-ins' : `${selectedCount} ${selectedCount === 1 ? 'check-in' : 'check-ins'}`}`
+            : `${activeDays} active ${activeDays === 1 ? 'day' : 'days'} in the last ${GRAPH_WEEKS} weeks`}
+        </Text>
+        <View style={s.legendRow}>
+          <Text style={[s.legendText, { color: colors.textFaint }]}>Less</Text>
+          {levels.map((c, i) => (
+            <View
+              key={i}
+              style={[
+                s.legendSq,
+                { backgroundColor: c },
+                i === 0 && { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.cardBorder },
+              ]}
+            />
+          ))}
+          <Text style={[s.legendText, { color: colors.textFaint }]}>More</Text>
+        </View>
+      </View>
+    </GlassCard>
+  );
+};
+
+const Stat: React.FC<{ value: string; label: string; colors: Colors }> = ({ value, label, colors }) => (
   <View style={s.stat}>
     <Text style={[s.statValue, { color: colors.text }]}>{value}</Text>
     <Text style={[s.statLabel, { color: colors.textMuted }]}>{label}</Text>
@@ -293,37 +510,67 @@ const s = StyleSheet.create({
   statLabel: { fontFamily: FONTS.body, fontSize: 11, marginTop: 3 },
   statDivider: { width: StyleSheet.hairlineWidth, height: 30 },
 
-  /* Next badge */
-  badgeHero: { borderRadius: RADIUS.lg, borderWidth: 1, padding: SPACING.lg },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  badgeIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.md,
+  /* Card heading shared by the badge and history cards */
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  cardTitle: { fontFamily: FONTS.bodySemi, fontSize: 14 },
+  cardMeta: { fontFamily: FONTS.body, fontSize: 12 },
+
+  /* Badge ladder */
+  ladder: { flexDirection: 'row', justifyContent: 'space-between' },
+  medalCol: { flex: 1, alignItems: 'center' },
+  medalWrap: { width: MEDAL, height: MEDAL },
+  medal: {
+    width: MEDAL,
+    height: MEDAL,
+    borderRadius: MEDAL / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
-  badgeCopy: { flex: 1 },
-  // Always-dark surface, so this copy stays light in both themes.
-  badgeTitle: { fontFamily: FONTS.displaySemi, fontSize: 16, color: '#FFFFFF', letterSpacing: -0.2 },
-  badgeSub: { fontFamily: FONTS.body, fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 3 },
-  badgeTrack: {
-    height: 6,
-    borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    overflow: 'hidden',
-    marginTop: 16,
+  lockPip: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  badgeFill: { height: '100%', borderRadius: RADIUS.full },
+  medalName: { fontFamily: FONTS.bodySemi, fontSize: 12, marginTop: 8 },
+  medalCaption: { fontFamily: FONTS.body, fontSize: 10.5, marginTop: 2 },
 
-  /* Contribution grid */
-  gridLabel: { fontFamily: FONTS.bodySemi, fontSize: 10.5, letterSpacing: 1.2, marginBottom: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  gridSq: { width: '11.6%', aspectRatio: 1, borderRadius: 5 },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, justifyContent: 'flex-end' },
-  legendSq: { width: 10, height: 10, borderRadius: 3 },
-  legendText: { fontFamily: FONTS.body, fontSize: 10 },
+  rule: { height: StyleSheet.hairlineWidth, marginVertical: SPACING.md },
+  nextRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  nextTitle: { fontFamily: FONTS.bodySemi, fontSize: 13 },
+  nextMeta: { fontFamily: FONTS.body, fontSize: 12 },
+  nextSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 8 },
+  track: { height: 6, borderRadius: RADIUS.full, overflow: 'hidden', marginTop: 8 },
+  fill: { height: '100%', borderRadius: RADIUS.full },
+
+  /* Contribution graph */
+  graphRow: { flexDirection: 'row', gap: 4 },
+  graphBody: { flex: 1 },
+  monthRow: { flexDirection: 'row', height: 16, overflow: 'visible' },
+  monthText: { width: 32, position: 'absolute', left: 0, top: 0 },
+  axisText: { fontFamily: FONTS.body, fontSize: 10 },
+  tile: { borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },
+  graphFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+    marginTop: 12,
+  },
+  caption: { fontFamily: FONTS.body, fontSize: 11.5, flexShrink: 1 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendSq: { width: 10, height: 10, borderRadius: 2 },
+  legendText: { fontFamily: FONTS.body, fontSize: 10, marginHorizontal: 2 },
 
   /* Section heading */
   sectionRow: { marginTop: SPACING.xs },
@@ -336,7 +583,6 @@ const s = StyleSheet.create({
   chTitle: { fontFamily: FONTS.bodySemi, fontSize: 14 },
   chSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2 },
   chTrack: { height: 5, borderRadius: RADIUS.full, overflow: 'hidden', marginTop: 9 },
-  chFill: { height: '100%', borderRadius: RADIUS.full },
   chBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.full },
   chBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
 });

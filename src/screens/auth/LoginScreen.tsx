@@ -23,7 +23,7 @@ import Animated, {
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAuth } from '../../context/AuthContext';
-import { FONTS, SPACING } from '../../config/theme';
+import { FONTS, INPUT, INPUT_LABEL, INPUT_TEXT, SPACING } from '../../config/theme';
 import { isValidHex } from '../../utils/color';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 
@@ -207,9 +207,9 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.sub}>Sign in to continue your training</Text>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>EMAIL</Text>
+              <Text style={styles.fieldLabel}>Email</Text>
               <View style={[styles.inputWrap, { borderColor: fieldBorder('email') }]}>
-                <Ionicons name="mail-outline" size={16} color={INK.dim} />
+                <Ionicons name="mail-outline" size={INPUT.iconSize} color={INK.dim} />
                 <TextInput
                   style={styles.input}
                   value={email}
@@ -227,9 +227,9 @@ export const LoginScreen: React.FC = () => {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>PASSWORD</Text>
+              <Text style={styles.fieldLabel}>Password</Text>
               <View style={[styles.inputWrap, { borderColor: fieldBorder('password') }]}>
-                <Ionicons name="lock-closed-outline" size={16} color={INK.dim} />
+                <Ionicons name="lock-closed-outline" size={INPUT.iconSize} color={INK.dim} />
                 <TextInput
                   style={styles.input}
                   value={password}
@@ -246,13 +246,13 @@ export const LoginScreen: React.FC = () => {
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword((v) => !v)}
-                  hitSlop={10}
+                  style={styles.eyeBtn}
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 >
                   <Ionicons
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
+                    size={INPUT.iconSize}
                     color={INK.dim}
                   />
                 </TouchableOpacity>
@@ -265,7 +265,7 @@ export const LoginScreen: React.FC = () => {
 
             {error ? (
               <Animated.View entering={FadeIn.duration(180)} style={styles.errorBox}>
-                <Ionicons name="alert-circle-outline" size={15} color={INK.danger} />
+                <Ionicons name="alert-circle-outline" size={16} color={INK.danger} />
                 <Text style={styles.errorText}>{error}</Text>
               </Animated.View>
             ) : null}
@@ -326,30 +326,39 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 20,
   },
-  title: { fontFamily: FONTS.bodyExtra, fontSize: 20, color: INK.text, marginBottom: 4 },
-  sub: { fontFamily: FONTS.body, fontSize: 12.5, color: INK.muted, marginBottom: 22 },
+  title: { fontFamily: FONTS.bodyExtra, fontSize: 22, color: INK.text, marginBottom: 4 },
+  sub: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 20, color: INK.muted, marginBottom: 24 },
 
-  field: { marginBottom: 14 },
+  field: { marginBottom: 16 },
   fieldLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11.5,
+    ...INPUT_LABEL,
     color: INK.muted,
-    marginBottom: 7,
+    marginBottom: INPUT.labelGap,
   },
+  // Explicit height, not vertical padding: padding resolved to ~30pt-tall
+  // fields on Android because the platforms pad text differently.
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: INPUT.gap,
     backgroundColor: INK.surface,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 13 : 4,
+    borderWidth: INPUT.borderWidth,
+    borderRadius: INPUT.radius,
+    paddingHorizontal: INPUT.paddingHorizontal,
+    height: INPUT.height,
   },
-  input: { flex: 1, fontFamily: FONTS.body, fontSize: 13.5, color: INK.text, padding: 0 },
+  input: { ...INPUT_TEXT, color: INK.text },
+  // 44pt target; the negative margin keeps the glyph aligned to the field's padding.
+  eyeBtn: {
+    width: INPUT.hitTarget,
+    height: INPUT.hitTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -(INPUT.hitTarget - INPUT.iconSize) / 2,
+  },
 
-  links: { alignSelf: 'flex-end', marginTop: -4, marginBottom: 20 },
-  linkText: { fontFamily: FONTS.bodySemi, fontSize: 11.5, color: INK.teal },
+  links: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 20, paddingVertical: 4 },
+  linkText: { fontFamily: FONTS.bodySemi, fontSize: 13, color: INK.teal },
 
   errorBox: {
     flexDirection: 'row',
@@ -363,14 +372,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     marginBottom: 16,
   },
-  errorText: { flex: 1, fontFamily: FONTS.body, fontSize: 12, color: INK.danger },
+  errorText: { flex: 1, fontFamily: FONTS.body, fontSize: 13, lineHeight: 18, color: INK.danger },
 
-  foot: { textAlign: 'center', fontFamily: FONTS.body, fontSize: 11.5, color: INK.muted, marginTop: 20 },
+  foot: { textAlign: 'center', fontFamily: FONTS.body, fontSize: 13, color: INK.muted, marginTop: 20 },
   footLink: { fontFamily: FONTS.bodySemi, color: INK.teal },
   poweredBy: {
     textAlign: 'center',
     fontFamily: FONTS.body,
-    fontSize: 10,
+    fontSize: 11,
     color: INK.dim,
     marginTop: 14,
     letterSpacing: 0.4,

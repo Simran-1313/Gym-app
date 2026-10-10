@@ -114,14 +114,16 @@ const ChatStack = createNativeStackNavigator<ChatStackParams>();
 const RootStack = createNativeStackNavigator<RootStackParams>();
 const Tab = createBottomTabNavigator<TabParams>();
 
-const stackAnimation = Platform.OS === 'ios' ? 'fade_from_bottom' : 'slide_from_right';
+// One push transition on both platforms: the native horizontal slide,
+// which keeps the iOS edge-swipe back gesture.
+const stackAnimation = 'slide_from_right';
 
 // Sleek screen options — modern minimal header with reduced height feel
 const makeScreenOptions = (colors: ThemeColors) => ({
   headerStyle: { backgroundColor: 'transparent' },
   headerTransparent: true,
   contentStyle: { backgroundColor: 'transparent' },
-  animation: stackAnimation as 'fade_from_bottom' | 'slide_from_right',
+  animation: stackAnimation as 'slide_from_right',
   headerTintColor: colors.text,
   headerTitleStyle: {
     color: colors.text,

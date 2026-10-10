@@ -18,16 +18,14 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-import { getCheckIns } from '../../services/member.service';
 import {
-  getActivitySummary,
   getActivityAnalytics,
   logWorkout,
-  logWater,
   getSyncDeviceStatus,
 } from '../../services/activity.service';
+import { useActivity } from '../../context/ActivityContext';
+import { HydrationCard } from '../../components/activity/HydrationCard';
 import {
-  ActivitySummary,
   AnalyticsDataPoint,
   CheckIn,
   SyncDeviceStatus,
@@ -59,16 +57,6 @@ const hasCheckedInOnDay = (checkIns: CheckIn[], dayIndex: number): boolean => {
   });
 };
 
-const calcTotalMinutes = (checkIns: CheckIn[]): number => {
-  return checkIns.reduce((total, ci) => {
-    if (!ci.checkedOutAt) return total + 45;
-    const diff = new Date(ci.checkedOutAt).getTime() - new Date(ci.checkedInAt).getTime();
-    return total + Math.round(diff / 60000);
-  }, 0);
-};
-
-const estimateCalories = (totalMinutes: number): number => Math.round(totalMinutes * 8);
-
 const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: keyof typeof Ionicons.glyphMap; calPerMin: number }[] = [
   { type: 'HIIT', label: 'HIIT Training', icon: 'flame', calPerMin: 12 },
   { type: 'STRENGTH', label: 'Strength', icon: 'barbell', calPerMin: 8 },
@@ -90,11 +78,11 @@ export const ActivityScreen: React.FC = () => {
   const accentSolid = solidFillFor(colors.accent);
   const onAccent = '#FFFFFF';
 
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [summary, setSummary] = useState<ActivitySummary | null>(null);
+  // Check-ins, goals and water are the shared activity store's — the same
+  // numbers Home and Challenges show.
+  const { loaded, checkIns, summary, water, stats, refresh } = useActivity();
   const [chartPoints, setChartPoints] = useState<AnalyticsDataPoint[]>([]);
   const [deviceStatus, setDeviceStatus] = useState<SyncDeviceStatus | null>(null);
-  const [waterLoggedMl, setWaterLoggedMl] = useState(1250);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,25 +100,19 @@ export const ActivityScreen: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [checkInRes, summaryRes, analyticsRes, deviceRes] = await Promise.all([
-        getCheckIns(1, 15),
-        getActivitySummary(),
+      const [analyticsRes, deviceRes] = await Promise.all([
         getActivityAnalytics(activeMetric, viewMode),
         getSyncDeviceStatus(),
+        refresh(),
       ]);
-      setCheckIns(checkInRes.checkIns);
-      setSummary(summaryRes);
       setChartPoints(analyticsRes.points);
       setDeviceStatus(deviceRes);
-      if (summaryRes.metrics?.hydration?.consumedMl !== undefined) {
-        setWaterLoggedMl(summaryRes.metrics.hydration.consumedMl);
-      }
     } catch (err: any) {
       setError(err.message || 'Failed to load activity data');
     } finally {
       setLoading(false);
     }
-  }, [activeMetric, viewMode]);
+  }, [activeMetric, viewMode, refresh]);
 
   useFocusEffect(
     useCallback(() => {
@@ -164,19 +146,6 @@ export const ActivityScreen: React.FC = () => {
     setViewMode(mode);
   };
 
-  const handleAddWater = async (amountMl: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
-    const newTotal = Math.max(0, Math.min(2000, waterLoggedMl + amountMl));
-    if (newTotal === waterLoggedMl) return;
-    const diff = newTotal - waterLoggedMl;
-    setWaterLoggedMl(newTotal);
-    
-    if (newTotal >= 2000 && diff > 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    }
-    try { await logWater({ amountMl: diff }); } catch (e) { console.log('Water log API error:', e); }
-  };
-
   const handleWearableNotice = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     Alert.alert('Coming Soon 🚀', 'Smartwatch & Health App integration is currently under active development. Stay tuned!');
@@ -199,6 +168,7 @@ export const ActivityScreen: React.FC = () => {
         source: 'APP_TIMER',
       });
       Alert.alert('Workout Saved! 🔥', `Great job! You completed ${minutes}m of ${selectedWorkout.label} and burned ~${calories} kcal.`);
+      refresh(true);
       loadData();
     } catch (e) { console.log('Save workout error:', e); }
     finally { setIsWorkoutModalOpen(false); }
@@ -210,7 +180,7 @@ export const ActivityScreen: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${remainderSec.toString().padStart(2, '0')}`;
   };
 
-  if (loading) {
+  if (loading && !loaded) {
     return (
       <AnimatedScreen>
         <ScreenHeader title="Activity Dashboard" onBack={onBack} />
@@ -230,18 +200,16 @@ export const ActivityScreen: React.FC = () => {
     );
   }
 
-  const weeklyCheckIns = checkIns.filter(
-    (ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * 24 * 60 * 60 * 1000,
-  );
-  const weeklyVisits = weeklyCheckIns.length;
-  const totalMinutes = calcTotalMinutes(weeklyCheckIns);
-  const totalCalories = estimateCalories(totalMinutes);
-  const exerciseGoal = 300;
-  const calorieGoal = 2400;
-
-  const moveProgress = Math.min(1, totalCalories / calorieGoal);
-  const exerciseProgress = Math.min(1, totalMinutes / exerciseGoal);
-  const waterProgress = Math.min(1, waterLoggedMl / 2000);
+  const {
+    weeklyVisits,
+    weeklyMinutes: totalMinutes,
+    weeklyCalories: totalCalories,
+    exerciseGoal,
+    calorieGoal,
+    moveProgress,
+    exerciseProgress,
+    waterProgress,
+  } = stats;
 
   const activeColor = activeMetric === 'CALORIES' ? '#F0B36B' : activeMetric === 'DURATION' ? '#2DD4BF' : '#6BB8F0';
 
@@ -253,88 +221,34 @@ export const ActivityScreen: React.FC = () => {
         contentContainerStyle={[styles.content, { paddingTop: 12, paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ═══ BENTO BOX: Rings + Water Tracker Side by Side ═══ */}
-        <View style={styles.bentoBox}>
-          {/* Left: Activity Rings */}
-          <View style={styles.bentoLeft}>
-            <GlassCard glowColor={colors.accent} style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
-              <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>ACTIVITY</Text>
-              <View style={styles.ringsCenter}>
-                <AppleActivityRings
-                  moveProgress={moveProgress}
-                  exerciseProgress={exerciseProgress}
-                  standProgress={waterProgress}
-                  size={100}
-                />
+        {/* ═══ RINGS — the three goals, each with its reading beside it ═══ */}
+        <GlassCard innerStyle={styles.ringsCard}>
+          <AppleActivityRings
+            moveProgress={moveProgress}
+            exerciseProgress={exerciseProgress}
+            standProgress={waterProgress}
+            size={112}
+          />
+          <View style={styles.ringsLegend}>
+            {[
+              { icon: 'flame' as const, color: '#F0B36B', label: 'Move', value: `${totalCalories}`, goal: `/ ${calorieGoal} kcal` },
+              { icon: 'fitness' as const, color: '#2DD4BF', label: 'Exercise', value: `${totalMinutes}`, goal: `/ ${exerciseGoal} min` },
+              { icon: 'water' as const, color: '#6BB8F0', label: 'Hydrate', value: (water.totalMl / 1000).toFixed(1), goal: `/ ${(water.goalMl / 1000).toFixed(1)} L` },
+            ].map((r) => (
+              <View key={r.label} style={styles.ringsRow}>
+                <Ionicons name={r.icon} size={14} color={r.color} />
+                <Text style={[styles.ringsLabel, { color: colors.textSecondary }]}>{r.label}</Text>
+                <Text style={[styles.ringsValue, { color: colors.text }]} numberOfLines={1}>
+                  {r.value}
+                  <Text style={[styles.ringsGoal, { color: colors.textMuted }]}> {r.goal}</Text>
+                </Text>
               </View>
-              <View style={styles.bentoLegendRow}>
-                <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="flame" size={10} color="#F0B36B" /></View>
-                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Move</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="fitness" size={10} color="#2DD4BF" /></View>
-                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Exercise</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <View style={styles.bentoLegendDot}><Ionicons name="water" size={10} color="#6BB8F0" /></View>
-                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, fontFamily: FONTS.bodyMedium }}>Hydrate</Text>
-                </View>
-              </View>
-            </GlassCard>
+            ))}
           </View>
+        </GlassCard>
 
-          {/* Right: Water Tracker */}
-          <View style={styles.bentoRight}>
-            <GlassCard glowColor="#6BB8F0" style={styles.bentoCardFull} innerStyle={styles.bentoCardInner}>
-              <View style={styles.bentoHeaderRow}>
-                <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>HYDRATION</Text>
-                <Text style={[styles.bentoValue, { color: '#6BB8F0' }]}>{Math.min(2000, waterLoggedMl)} ml</Text>
-              </View>
-
-              {/* Vertical Water Bar */}
-              <View style={styles.bentoWaterBody}>
-                <View style={[styles.verticalProgressBarBg, { backgroundColor: colors.inset }]}>
-                  <View
-                    style={[
-                      styles.verticalProgressBarFill,
-                      {
-                        height: waterProgress > 0 ? `${Math.max(8, Math.min(100, waterProgress * 100))}%` : '0%',
-                      },
-                    ]}
-                  />
-                </View>
-                <View style={styles.bentoWaterControls}>
-                  {waterLoggedMl >= 2000 ? (
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <View style={{ backgroundColor: 'rgba(41, 182, 246, 0.15)', padding: 6, borderRadius: 12, alignItems: 'center', width: '100%' }}>
-                        <Ionicons name="water" size={20} color="#6BB8F0" />
-                        <Text style={{ color: '#6BB8F0', fontSize: 10, fontFamily: FONTS.bodyBold, textAlign: 'center', marginTop: 2 }}>
-                          Wah! 🎉{'\n'}Goal Met
-                        </Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      <Pressable
-                        style={[styles.bentoWaterBtn, { backgroundColor: 'rgba(41,182,246,0.15)' }]}
-                        onPress={() => handleAddWater(250)}
-                      >
-                        <Ionicons name="add" size={20} color="#6BB8F0" />
-                      </Pressable>
-                      <Pressable
-                        style={[styles.bentoWaterBtn, { backgroundColor: colors.inset }]}
-                        onPress={() => handleAddWater(500)}
-                      >
-                        <Ionicons name="water" size={18} color={colors.textSecondary} />
-                      </Pressable>
-                    </>
-                  )}
-                </View>
-              </View>
-            </GlassCard>
-          </View>
-        </View>
+        {/* ═══ HYDRATION — same card, same store as Home ═══ */}
+        <HydrationCard />
 
         {/* ═══ WEEKLY SNAPSHOT — 3-stat row ═══ */}
         <View>
@@ -466,7 +380,7 @@ export const ActivityScreen: React.FC = () => {
               {([
                 { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: '#F0B36B' },
                 { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'time' as const, color: '#2DD4BF' },
-                { key: 'WATER' as const, label: 'Hydration', value: `${(waterLoggedMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#6BB8F0' },
+                { key: 'WATER' as const, label: 'Hydration', value: `${(water.totalMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#6BB8F0' },
               ]).map((m) => {
                 const isActive = activeMetric === m.key;
                 return (
@@ -614,82 +528,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
 
-  /* ── BENTO BOX ── */
-  bentoBox: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  bentoLeft: { flex: 1 },
-  bentoRight: { flex: 1 },
-  bentoCardFull: {
-    flex: 1,
-    minHeight: 190,
-  },
-  bentoCardInner: {
-    flex: 1,
-    padding: SPACING.md,
-  },
-  bentoLabel: {
-    fontSize: 10,
-    fontFamily: FONTS.bodySemi,
-    letterSpacing: 0.6,
-  },
-  ringsCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bentoLegendRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 6,
-  },
-  bentoLegendDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bentoHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bentoValue: {
-    fontSize: 12,
-    fontFamily: FONTS.bodyExtra,
-  },
-  bentoWaterBody: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: SPACING.sm,
-  },
-  verticalProgressBarBg: {
-    flex: 1,
-    borderRadius: RADIUS.md,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  verticalProgressBarFill: {
-    width: '100%',
-    borderRadius: RADIUS.md,
-    backgroundColor: '#6BB8F0',
-  },
-  bentoWaterControls: {
-    gap: 8,
-    justifyContent: 'flex-end',
-  },
-  bentoWaterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  /* ── RINGS ── */
+  ringsCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg },
+  ringsLegend: { flex: 1, gap: 12 },
+  ringsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ringsLabel: { width: 62, fontFamily: FONTS.bodyMedium, fontSize: 12.5 },
+  ringsValue: { flex: 1, fontFamily: FONTS.displaySemi, fontSize: 16, fontVariant: ['tabular-nums'] },
+  ringsGoal: { fontFamily: FONTS.bodyMedium, fontSize: 11.5 },
 
   /* ── WEEKLY SNAPSHOT ── */
   snapshotHeader: {

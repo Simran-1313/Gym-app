@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import {
+  BLUR,
   FONTS,
   RADIUS,
   SPACING,
@@ -30,9 +31,17 @@ import {
   type ThemeColors,
 } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { ActiveSubscription, User, ActivitySummary, CheckIn, MemberProfile } from '../../types';
-import { getCheckIns, getProfile } from '../../services/member.service';
-import { getActivitySummary, logWater } from '../../services/activity.service';
+import { ActiveSubscription, User, MemberProfile } from '../../types';
+import { getProfile } from '../../services/member.service';
+import { useActivity } from '../../context/ActivityContext';
+import { HydrationCard } from '../../components/activity/HydrationCard';
+import {
+  calcTotalMinutes,
+  checkInsOn,
+  estimateCalories,
+  nextMilestone,
+  startOfDay,
+} from '../../utils/activity';
 import { RootStackParams, TabParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -72,23 +81,6 @@ const greetingIcon = (): keyof typeof Ionicons.glyphMap => {
   if (h < 12) return 'partly-sunny-outline';
   if (h < 17) return 'sunny-outline';
   return 'moon-outline';
-};
-
-const calcTotalMinutes = (checkIns: CheckIn[]): number =>
-  checkIns.reduce((total, ci) => {
-    // A session with no checkout is credited a nominal 45 minutes rather than
-    // zero, so an in-progress visit still moves the ring.
-    if (!ci.checkedOutAt) return total + 45;
-    const diff = new Date(ci.checkedOutAt).getTime() - new Date(ci.checkedInAt).getTime();
-    return total + Math.round(diff / 60000);
-  }, 0);
-
-const estimateCalories = (totalMinutes: number): number => Math.round(totalMinutes * 8);
-
-const startOfDay = (d: Date) => {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
 };
 
 /* ─────────────────────── Sub-components ─────────────────────── */
@@ -243,18 +235,6 @@ const EnergyDial: React.FC<{ progress: number }> = ({ progress }) => {
   );
 };
 
-/** Days to the next streak badge, matching ChallengesScreen's own milestone
- *  thresholds — the streak pill and the Challenges screen must agree on when
- *  "Bronze" unlocks, or the app is telling two different stories about it. */
-const STREAK_MILESTONES = [7, 14, 30, 60];
-const nextStreakBadge = (days: number): { label: string; remaining: number } | null => {
-  const names = ['Bronze', 'Silver', 'Gold', 'Platinum'];
-  for (let i = 0; i < STREAK_MILESTONES.length; i++) {
-    if (days < STREAK_MILESTONES[i]) return { label: names[i], remaining: STREAK_MILESTONES[i] - days };
-  }
-  return null;
-};
-
 /* ─────────────────────── Screen ─────────────────────── */
 
 export const HomeScreen: React.FC = () => {
@@ -266,10 +246,10 @@ export const HomeScreen: React.FC = () => {
   const onPrimary = '#FFFFFF';
 
   const [refreshing, setRefreshing] = useState(false);
-  const [waterLogged, setWaterLogged] = useState(0);
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [profile, setProfile] = useState<MemberProfile | null>(null);
+  // Check-ins, goals, water and streak come from the shared activity store,
+  // so this screen, Activity and Challenges always show the same numbers.
+  const { checkIns, summary, water, stats, refresh: refreshActivity } = useActivity();
 
   // The BMI card's weight/height steppers used to open on fake defaults
   // (75kg/175cm) regardless of the signed-in member's real stats — showing a
@@ -279,18 +259,9 @@ export const HomeScreen: React.FC = () => {
   const [weight, setWeight] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
 
-  const loadActivityData = useCallback(async () => {
+  const loadActivityData = useCallback(async (force = false) => {
     try {
-      const [checkInRes, summaryRes, profileRes] = await Promise.all([
-        getCheckIns(1, 30),
-        getActivitySummary(),
-        getProfile(),
-      ]);
-      setCheckIns(checkInRes.checkIns || []);
-      setSummary(summaryRes);
-      if (summaryRes.metrics?.hydration?.consumedMl !== undefined) {
-        setWaterLogged(summaryRes.metrics.hydration.consumedMl);
-      }
+      const [profileRes] = await Promise.all([getProfile(), refreshActivity(force)]);
       if (profileRes) {
         setProfile(profileRes);
         setWeight((w) => w ?? profileRes.weight);
@@ -299,7 +270,7 @@ export const HomeScreen: React.FC = () => {
     } catch (e) {
       console.log('Failed to fetch home activity data:', e);
     }
-  }, []);
+  }, [refreshActivity]);
 
   useFocusEffect(
     useCallback(() => {
@@ -313,25 +284,17 @@ export const HomeScreen: React.FC = () => {
 
   /* ── Derived activity figures ── */
 
-  const weeklyCheckIns = useMemo(
-    () =>
-      checkIns.filter(
-        (ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * 24 * 60 * 60 * 1000,
-      ),
-    [checkIns],
-  );
-
-  const weeklyVisits = weeklyCheckIns.length;
-  const totalMinutes = calcTotalMinutes(weeklyCheckIns);
-  const totalCalories = estimateCalories(totalMinutes);
-
-  const exerciseGoal = summary?.metrics?.exerciseDuration?.goal ?? 300;
-  const calorieGoal = summary?.metrics?.calories?.goal ?? 2400;
-  const waterGoal = summary?.metrics?.hydration?.goalMl ?? 2000;
-
-  const moveProgress = Math.min(1, totalCalories / calorieGoal);
-  const exerciseProgress = Math.min(1, totalMinutes / exerciseGoal);
-  const waterProgress = Math.min(1, waterLogged / waterGoal);
+  const {
+    weeklyVisits,
+    weeklyMinutes: totalMinutes,
+    weeklyCalories: totalCalories,
+    moveProgress,
+    exerciseProgress,
+    waterProgress,
+  } = stats;
+  const waterLogged = water.totalMl;
+  const waterGoal = water.goalMl;
+  const streak = stats.streak.current;
 
   // Composite readiness score. There is no wearable integration, so this is an
   // average of the three goals the backend does track — not a sensor reading.
@@ -350,16 +313,9 @@ export const HomeScreen: React.FC = () => {
   const dailySeries = useMemo(() => {
     const today = startOfDay(new Date());
     return Array.from({ length: 7 }, (_, i) => {
-      const from = new Date(today);
-      from.setDate(from.getDate() - (6 - i));
-      const to = new Date(from);
-      to.setDate(to.getDate() + 1);
-
-      const dayCheckIns = checkIns.filter((ci) => {
-        const t = new Date(ci.checkedInAt).getTime();
-        return t >= from.getTime() && t < to.getTime();
-      });
-      return estimateCalories(calcTotalMinutes(dayCheckIns));
+      const day = new Date(today);
+      day.setDate(day.getDate() - (6 - i));
+      return estimateCalories(calcTotalMinutes(checkInsOn(checkIns, day)));
     });
   }, [checkIns]);
 
@@ -375,36 +331,13 @@ export const HomeScreen: React.FC = () => {
     return labels.map((label, i) => {
       const day = new Date(monday);
       day.setDate(day.getDate() + i);
-      const next = new Date(day);
-      next.setDate(next.getDate() + 1);
-
-      const dayCheckIns = checkIns.filter((ci) => {
-        const t = new Date(ci.checkedInAt).getTime();
-        return t >= day.getTime() && t < next.getTime();
-      });
-      const minutes = calcTotalMinutes(dayCheckIns);
+      const minutes = calcTotalMinutes(checkInsOn(checkIns, day));
       return {
         label,
         progress: Math.min(1, minutes / 45),
         isToday: day.getTime() === today.getTime(),
       };
     });
-  }, [checkIns]);
-
-  /** Consecutive days ending today (or yesterday, if today isn't logged yet). */
-  const streak = useMemo(() => {
-    const daySet = new Set(
-      checkIns.map((ci) => startOfDay(new Date(ci.checkedInAt)).getTime()),
-    );
-    const cursor = startOfDay(new Date());
-    if (!daySet.has(cursor.getTime())) cursor.setDate(cursor.getDate() - 1);
-
-    let count = 0;
-    while (daySet.has(cursor.getTime())) {
-      count++;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return count;
   }, [checkIns]);
 
   // null until the real profile has loaded — see the weight/height state above.
@@ -465,28 +398,9 @@ export const HomeScreen: React.FC = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refreshUser(), loadActivityData()]);
+    await Promise.all([refreshUser(), loadActivityData(true)]);
     setRefreshing(false);
   }, [refreshUser, loadActivityData]);
-
-  const handleWaterIncrement = async (amount: number) => {
-    tap();
-    const newTotal = Math.max(0, Math.min(waterGoal, waterLogged + amount));
-    if (newTotal === waterLogged) return;
-    const diff = newTotal - waterLogged;
-    setWaterLogged(newTotal);
-
-    if (newTotal >= waterGoal && diff > 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    }
-
-    try {
-      await logWater({ amountMl: diff });
-      loadActivityData();
-    } catch (e) {
-      console.log('Water log API error from home:', e);
-    }
-  };
 
   // The hero's backdrop is a photograph: it cannot recolour, so that card is a
   // dark media surface in both themes and its copy is always light. The workout
@@ -508,8 +422,7 @@ export const HomeScreen: React.FC = () => {
       {/* ── Fixed top bar ── */}
       <View style={[styles.header, { paddingTop: headerTop }]}>
         <BlurView
-          tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
-          intensity={isDark ? 45 : 60}
+          {...(isDark ? BLUR.dark : BLUR.light)}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
@@ -612,8 +525,10 @@ export const HomeScreen: React.FC = () => {
               </Text>
               <Text style={[styles.streakSub, { color: colors.textMuted }]}>
                 {(() => {
-                  const next = nextStreakBadge(streak);
-                  return next ? `${next.remaining} day${next.remaining === 1 ? '' : 's'} to ${next.label}` : 'All badges unlocked';
+                  const next = nextMilestone(streak);
+                  if (!next) return 'All badges unlocked';
+                  const left = next.days - streak;
+                  return `${left} day${left === 1 ? '' : 's'} to ${next.name}`;
                 })()}
               </Text>
             </View>
@@ -886,78 +801,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* ── Hydration ── */}
         <View style={styles.block}>
-          <GlassCard>
-            <View style={styles.weekTitleRow}>
-              <View style={[styles.weekIcon, { backgroundColor: `${colors.tint.hydration}1F` }]}>
-                <Ionicons name="water" size={13} color={colors.tint.hydration} />
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Hydration</Text>
-            </View>
-
-            {/* The reading gets its own line instead of being squeezed into
-                the title row — it's the thing this whole card is about, not
-                a caption on the title. */}
-            <View style={styles.hydrationReadoutRow}>
-              <Text style={[styles.hydrationValue, { color: colors.text }]} numberOfLines={1}>
-                {(waterLogged / 1000).toFixed(2)}
-                <Text style={[styles.hydrationValueUnit, { color: colors.textMuted }]}>L</Text>
-              </Text>
-              <Text style={[styles.hydrationGoal, { color: colors.textMuted }]} numberOfLines={1}>
-                of {(waterGoal / 1000).toFixed(1)}L goal
-              </Text>
-            </View>
-
-            <View style={[styles.hydrationTrack, { backgroundColor: colors.inset }]}>
-              <View
-                style={[
-                  styles.hydrationFill,
-                  {
-                    width: `${Math.max(2, waterProgress * 100)}%`,
-                    backgroundColor: colors.tint.hydration,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.hydrationBtns}>
-              <Pressable
-                onPress={() => handleWaterIncrement(-250)}
-                disabled={waterLogged <= 0}
-                style={({ pressed }) => [
-                  styles.hydrationBtn,
-                  {
-                    backgroundColor: pressed ? colors.cardPressed : 'transparent',
-                    borderColor: colors.cardBorder,
-                    opacity: waterLogged <= 0 ? 0.4 : 1,
-                  },
-                ]}
-              >
-                <Ionicons name="remove" size={18} color={colors.textSecondary} />
-                <Text style={[styles.hydrationBtnText, { color: colors.textSecondary }]}>
-                  250 ml
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleWaterIncrement(250)}
-                disabled={waterLogged >= waterGoal}
-                style={({ pressed }) => [
-                  styles.hydrationBtn,
-                  {
-                    backgroundColor: pressed
-                      ? colors.cardPressed
-                      : `${colors.tint.hydration}1A`,
-                    borderColor: `${colors.tint.hydration}40`,
-                    opacity: waterLogged >= waterGoal ? 0.4 : 1,
-                  },
-                ]}
-              >
-                <Ionicons name="add" size={18} color={colors.tint.hydration} />
-                <Text style={[styles.hydrationBtnText, { color: colors.tint.hydration }]}>
-                  250 ml
-                </Text>
-              </Pressable>
-            </View>
-          </GlassCard>
+          <HydrationCard />
         </View>
 
         {/* ── Quick actions ── */}
@@ -1394,37 +1238,6 @@ const styles = StyleSheet.create({
   coachCopy: { flex: 1 },
   coachTitle: { fontFamily: FONTS.bodySemi, fontSize: 12.5, marginBottom: 2 },
   coachText: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18.5 },
-
-  /* Hydration */
-  hydrationReadoutRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginTop: 10,
-    marginBottom: 12,
-  },
-  hydrationValue: {
-    fontFamily: FONTS.displayBold,
-    fontSize: 26,
-    letterSpacing: -0.6,
-    fontVariant: ['tabular-nums'],
-  },
-  hydrationValueUnit: { fontFamily: FONTS.bodySemi, fontSize: 14 },
-  hydrationGoal: { fontFamily: FONTS.bodyMedium, fontSize: 12.5 },
-  hydrationTrack: { height: 8, borderRadius: RADIUS.full, overflow: 'hidden' },
-  hydrationFill: { height: '100%', borderRadius: RADIUS.full },
-  hydrationBtns: { flexDirection: 'row', gap: 10, marginTop: SPACING.md },
-  hydrationBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-  },
-  hydrationBtnText: { fontFamily: FONTS.bodySemi, fontSize: 13 },
 
   /* Quick actions */
   actionGrid: { flexDirection: 'row', gap: 9 },

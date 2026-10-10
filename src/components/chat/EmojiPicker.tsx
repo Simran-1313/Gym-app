@@ -18,7 +18,7 @@ import {
   getRecentEmojis,
   saveRecentEmoji,
 } from '../../constants/chatEmojis';
-import { DARK_COLORS, FONT_SIZE, FONTS, LIGHT_COLORS, RADIUS, SPACING } from '../../config/theme';
+import { BLUR, DARK_COLORS, FONT_SIZE, FONTS, INPUT_TEXT, LIGHT_COLORS, RADIUS, SEARCH, SPACING } from '../../config/theme';
 
 interface Props {
   visible: boolean;
@@ -90,8 +90,7 @@ export const EmojiPicker: React.FC<Props> = ({ visible, onClose, onSelect, isDar
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={styles.panel}>
         <BlurView
-          intensity={isDark ? 80 : 60}
-          tint={isDark ? 'dark' : 'light'}
+          {...(isDark ? BLUR.dark : BLUR.light)}
           style={StyleSheet.absoluteFill}
         />
         <View style={[styles.panelInner, {
@@ -103,7 +102,7 @@ export const EmojiPicker: React.FC<Props> = ({ visible, onClose, onSelect, isDar
             backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
             borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
           }]}>
-            <Ionicons name="search" size={14} color={colors.textMuted} />
+            <Ionicons name="search-outline" size={SEARCH.iconSize} color={colors.textMuted} />
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -115,7 +114,7 @@ export const EmojiPicker: React.FC<Props> = ({ visible, onClose, onSelect, isDar
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Ionicons name="close-circle" size={15} color={colors.textMuted} />
+                <Ionicons name="close-circle" size={SEARCH.iconSize} color={colors.textMuted} />
               </TouchableOpacity>
             )}
           </View>
@@ -224,16 +223,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginTop: 10,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    height: 36,
-    borderRadius: 10,
+    paddingHorizontal: SEARCH.paddingHorizontal,
+    height: SEARCH.height,
+    borderRadius: SEARCH.radius,
     borderWidth: 1,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.xs,
-    paddingVertical: 0,
-  },
+  searchInput: { ...INPUT_TEXT, fontSize: SEARCH.fontSize },
   tabsScroll: {
     flexGrow: 0,
     marginBottom: 4,

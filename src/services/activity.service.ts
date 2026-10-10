@@ -146,6 +146,7 @@ export const logWater = async (payload: LogWaterPayload): Promise<WaterSummary> 
       totalMl: payload.amountMl,
       goalMl: 3000,
       logs: [{ id: `wat_${Date.now()}`, amountMl: payload.amountMl, timestamp: new Date().toISOString() }],
+      isFallback: true,
     };
   }
 };
@@ -170,6 +171,7 @@ export const getWaterSummary = async (date?: string): Promise<WaterSummary> => {
       totalMl: 1250,
       goalMl: 3000,
       logs: [],
+      isFallback: true,
     };
   }
 };

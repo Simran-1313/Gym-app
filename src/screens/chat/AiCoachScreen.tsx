@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
-import { FONTS, RADIUS } from '../../config/theme';
+import { COMPOSER, FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -428,7 +428,8 @@ const styles = StyleSheet.create({
   // .chat-input { gap:9px; padding:11px 16px 14px }
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Buttons stay on the baseline row as the composer grows.
+    alignItems: 'flex-end',
     gap: 9,
     paddingHorizontal: 16,
     paddingTop: 11,
@@ -439,16 +440,22 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 12.5,
+    paddingHorizontal: COMPOSER.paddingHorizontal,
+    paddingTop: COMPOSER.paddingVertical,
+    paddingBottom: COMPOSER.paddingVertical,
+    minHeight: COMPOSER.minHeight,
+    fontFamily: FONTS.body,
+    fontSize: COMPOSER.fontSize,
+    lineHeight: COMPOSER.lineHeight,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     maxHeight: 120,
   },
   // .send-btn { 39x39; radius:50% }
   sendBtn: {
-    width: 39,
-    height: 39,
-    borderRadius: 19.5,
+    width: COMPOSER.buttonSize,
+    height: COMPOSER.buttonSize,
+    borderRadius: COMPOSER.buttonSize / 2,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

@@ -185,6 +185,13 @@ export const RADIUS = {
   full: 999,
 } as const;
 
+/** The one blur recipe for floating chrome (tab bar, top bars, popovers):
+ *  the system chrome material, slightly lighter in dark mode. */
+export const BLUR = {
+  dark: { tint: 'systemChromeMaterialDark' as const, intensity: 60 },
+  light: { tint: 'systemChromeMaterialLight' as const, intensity: 70 },
+};
+
 export const GLASS = {
   blurIntensity: 40,
   blurTint: 'dark' as const,
@@ -296,3 +303,78 @@ export const shadow = (isDark: boolean, level: 'sm' | 'md' | 'lg' = 'md') => {
     elevation: config.elevation,
   };
 };
+
+/**
+ * Text-field geometry. Fields used to size themselves with vertical padding,
+ * which iOS and Android resolve differently (Android adds font padding, iOS
+ * doesn't) — the login fields came out ~30pt tall on Android. An explicit
+ * `height` on the row, with the TextInput filling it and centring its text,
+ * renders the same box on both platforms. 54pt sits in the 48–56 band that
+ * both Material and the HIG treat as a comfortable single-line field, and
+ * matches the primary button so a form reads as one rhythm.
+ */
+export const INPUT = {
+  height: 54,
+  radius: RADIUS.md,
+  paddingHorizontal: 16,
+  fontSize: 16,
+  iconSize: 18,
+  borderWidth: 1.5,
+  gap: 10,
+  labelSize: 13,
+  labelGap: 8,
+  /** Multiline fields (notes, allergies) grow from this, text top-aligned. */
+  multilineMinHeight: 96,
+  multilinePaddingVertical: 14,
+  /** Minimum tap target for in-field controls (show/hide password, clear). */
+  hitTarget: 44,
+} as const;
+
+/** Field label: sentence case, never uppercase-transformed. */
+export const INPUT_LABEL = {
+  fontFamily: FONTS.bodySemi,
+  fontSize: INPUT.labelSize,
+  letterSpacing: 0.1,
+} as const;
+
+/**
+ * Applied to every single-line TextInput so text is optically centred in the
+ * row on Android (no extra font padding) as well as iOS.
+ */
+export const INPUT_TEXT = {
+  flex: 1,
+  height: '100%',
+  fontFamily: FONTS.body,
+  fontSize: INPUT.fontSize,
+  paddingVertical: 0,
+  paddingHorizontal: 0,
+  includeFontPadding: false,
+  textAlignVertical: 'center',
+} as const;
+
+/** Search bars: a pill, a step shorter than a form field. */
+export const SEARCH = {
+  height: 46,
+  radius: RADIUS.full,
+  paddingHorizontal: 16,
+  fontSize: 15,
+  iconSize: 17,
+  gap: 10,
+} as const;
+
+/** Chat composers: a growing pill with a 44pt floor, and 44pt round buttons beside it. */
+export const COMPOSER = {
+  minHeight: 44,
+  fontSize: 16,
+  lineHeight: 20,
+  paddingHorizontal: 16,
+  // (44 - 20 line - 2 border) / 2
+  paddingVertical: 11,
+  buttonSize: 44,
+} as const;
+
+/** Button heights, in the same family as INPUT.height. */
+export const BUTTON = {
+  height: INPUT.height,
+  ghostHeight: 44,
+} as const;

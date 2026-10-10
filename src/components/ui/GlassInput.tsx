@@ -14,7 +14,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { INPUT, INPUT_LABEL, INPUT_TEXT } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props extends TextInputProps {
@@ -32,6 +32,7 @@ export const GlassInput: React.FC<Props> = ({
   onFocus,
   onBlur,
   style,
+  multiline,
   ...rest
 }) => {
   const colors = useThemeColors();
@@ -50,11 +51,19 @@ export const GlassInput: React.FC<Props> = ({
   return (
     <View style={[styles.field, containerStyle]}>
       {label ? <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text> : null}
-      <Animated.View style={[styles.inputRow, borderStyle, { backgroundColor: colors.surface }]}>
+      <Animated.View
+        style={[
+          styles.inputRow,
+          multiline && styles.inputRowMultiline,
+          borderStyle,
+          { backgroundColor: colors.surface },
+        ]}
+      >
         {leftIcon}
         <TextInput
           {...rest}
-          style={[styles.input, { color: colors.text }, style]}
+          multiline={multiline}
+          style={[styles.input, multiline && styles.inputMultiline, { color: colors.text }, style]}
           placeholderTextColor={colors.textMuted}
           onFocus={(e) => {
             focused.value = withTiming(1, { duration: 200 });
@@ -75,25 +84,26 @@ export const GlassInput: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  field: { gap: SPACING.sm },
-  // `.field-label { font-size:11.5px; font-weight:700; text-transform:none but visually all-caps copy }`
-  label: {
-    fontSize: 11.5,
-    fontFamily: FONTS.bodyBold,
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
+  field: { gap: INPUT.labelGap },
+  label: INPUT_LABEL,
+  // Explicit height (not vertical padding) so iOS and Android render the same box.
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    paddingHorizontal: SPACING.md,
-    minHeight: 54,
-    gap: SPACING.sm,
+    borderRadius: INPUT.radius,
+    borderWidth: INPUT.borderWidth,
+    paddingHorizontal: INPUT.paddingHorizontal,
+    height: INPUT.height,
+    gap: INPUT.gap,
   },
-  input: { flex: 1, fontSize: FONT_SIZE.md, fontFamily: FONTS.body, paddingVertical: SPACING.sm },
+  inputRowMultiline: {
+    height: undefined,
+    minHeight: INPUT.multilineMinHeight,
+    alignItems: 'flex-start',
+    paddingVertical: INPUT.multilinePaddingVertical,
+  },
+  input: INPUT_TEXT,
+  inputMultiline: { height: undefined, minHeight: INPUT.multilineMinHeight - INPUT.multilinePaddingVertical * 2 - INPUT.borderWidth * 2, textAlignVertical: 'top' },
   focusGlow: {
     position: 'absolute',
     bottom: -2,

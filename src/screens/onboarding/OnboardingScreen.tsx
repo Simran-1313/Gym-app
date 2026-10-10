@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../context/AuthContext';
 import { submitProfile, getProfile } from '../../services/member.service';
-import { FONTS, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
+import { FONTS, INPUT_LABEL, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import {
   ActivityLevel,
@@ -365,7 +365,6 @@ export const OnboardingScreen: React.FC = () => {
               multiline
               numberOfLines={2}
               editable={!loading}
-              style={styles.textArea}
             />
           </GlassCard>
 
@@ -439,11 +438,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   // A label and the control it names belong together — 8 apart, while the
   // card's own 16 gap keeps one group clear of the next.
   group: { gap: SPACING.sm },
-  fieldLabel: { ...TYPOGRAPHY.label },
+  fieldLabel: { ...INPUT_LABEL },
   row: { flexDirection: 'row', gap: SPACING.sm },
   flex1: { flex: 1 },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  textArea: { minHeight: 80, textAlignVertical: 'top', paddingTop: SPACING.sm },
 
   footer: { gap: SPACING.md, marginTop: SPACING.xs },
   footerNote: { ...TYPOGRAPHY.caption, textAlign: 'center' as const, lineHeight: 18 },

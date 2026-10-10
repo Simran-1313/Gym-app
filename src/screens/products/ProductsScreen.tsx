@@ -21,7 +21,7 @@ import { getProducts } from '../../services/pos.service';
 import { Product } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { FONTS, RADIUS } from '../../config/theme';
+import { FONTS, INPUT_TEXT, RADIUS, SEARCH } from '../../config/theme';
 import { ProductsStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -260,7 +260,7 @@ export const ProductsScreen: React.FC = () => {
                 { backgroundColor: colors.surface, borderColor: colors.cardBorder },
               ]}
             >
-              <Ionicons name="search-outline" size={15} color={colors.textMuted} />
+              <Ionicons name="search-outline" size={SEARCH.iconSize} color={colors.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search products…"
@@ -278,7 +278,7 @@ export const ProductsScreen: React.FC = () => {
                   }}
                   hitSlop={8}
                 >
-                  <Ionicons name="close-circle" size={15} color={colors.textMuted} />
+                  <Ionicons name="close-circle" size={SEARCH.iconSize} color={colors.textMuted} />
                 </Pressable>
               ) : null}
             </View>
@@ -388,15 +388,14 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
+    gap: SEARCH.gap,
+    paddingHorizontal: SEARCH.paddingHorizontal,
+    height: SEARCH.height,
+    borderRadius: SEARCH.radius,
     borderWidth: 1,
     marginBottom: 14,
   },
-  /* `.search-bar input { font-size:13px }` */
-  searchInput: { flex: 1, fontSize: 13, fontFamily: FONTS.body, padding: 0 },
+  searchInput: { ...INPUT_TEXT, fontSize: SEARCH.fontSize },
 
   /* `.filter-row { gap:8; padding:2px 2px 16px }` */
   filterRowOuter: { marginHorizontal: -GUTTER },

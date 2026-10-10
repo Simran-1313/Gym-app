@@ -22,7 +22,7 @@ import * as Haptics from 'expo-haptics';
 
 import { chatService, deletedLabel, ChatRoom } from '../../services/chat.service';
 import { connectSocket } from '../../services/socket';
-import { FONTS, MOTION, RADIUS } from '../../config/theme';
+import { FONTS, INPUT_TEXT, MOTION, RADIUS, SEARCH } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { shade, solidFillFor } from '../../utils/color';
 import type { ThemeColors } from '../../config/theme';
@@ -353,7 +353,7 @@ export const ChatListScreen: React.FC = () => {
         ListHeaderComponent={
           <View>
             <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Ionicons name="search" size={15} color={colors.textMuted} />
+              <Ionicons name="search-outline" size={SEARCH.iconSize} color={colors.textMuted} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
@@ -363,7 +363,7 @@ export const ChatListScreen: React.FC = () => {
               />
               {!!search && (
                 <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={15} color={colors.textMuted} />
+                  <Ionicons name="close-circle" size={SEARCH.iconSize} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -415,14 +415,14 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
+    gap: SEARCH.gap,
+    paddingHorizontal: SEARCH.paddingHorizontal,
+    height: SEARCH.height,
+    borderRadius: SEARCH.radius,
     borderWidth: 1,
     marginBottom: 14,
   },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: FONTS.body, padding: 0 },
+  searchInput: { ...INPUT_TEXT, fontSize: SEARCH.fontSize },
 
   // .ai-banner { gap:12; padding:15px; margin-bottom:16px } — no radius: the
   // prototype never gives this class a `.card`, unlike every other tile here.

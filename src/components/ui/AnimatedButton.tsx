@@ -16,7 +16,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { FONTS, MOTION, RADIUS } from '../../config/theme';
+import { BUTTON, FONTS, MOTION, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { shade, solidFillFor } from '../../utils/color';
 
@@ -181,7 +181,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   btnInner: {
-    height: 50,
+    height: BUTTON.height,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
@@ -198,11 +198,11 @@ const s = StyleSheet.create({
   },
 
   ghostOuter: { borderWidth: 1, borderRadius: RADIUS.full, backgroundColor: 'transparent' },
-  ghostInner: { height: 44 },
+  ghostInner: { height: BUTTON.ghostHeight },
 
   // Labels
-  primaryLabel: { fontSize: 15, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
-  glassLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
+  primaryLabel: { fontSize: 16, fontFamily: FONTS.bodyBold, letterSpacing: 0.2 },
+  glassLabel: { fontSize: 16, fontFamily: FONTS.bodySemi },
   ghostLabel: { fontSize: 14, fontFamily: FONTS.bodySemi },
   disabled: { opacity: 0.45 },
 });
