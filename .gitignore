@@ -43,3 +43,8 @@ yarn-error.*
 
 .mcp.json
 .claude
+
+# AI tooling
+.agents/
+.serena/
+skills-lock.json
