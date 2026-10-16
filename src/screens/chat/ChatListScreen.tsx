@@ -328,7 +328,14 @@ export const ChatListScreen: React.FC = () => {
     return result;
   }, [filteredRooms]);
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Chat" variant="large" />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   return (
     <AnimatedScreen>
@@ -373,7 +380,7 @@ export const ChatListScreen: React.FC = () => {
             {error ? (
               <EmptyState
                 icon="warning-outline"
-                title="Oops, something went wrong!"
+                title="Couldn’t load your chats"
                 subtitle={error}
                 actionLabel="Try Again"
                 onAction={() => { setLoading(true); loadRooms(); }}

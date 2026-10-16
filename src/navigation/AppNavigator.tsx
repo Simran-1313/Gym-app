@@ -200,7 +200,7 @@ const MainTabs: React.FC = () => {
       <Tab.Screen
         name="Chat"
         component={ChatNavigator}
-        options={{ title: 'Messages', headerShown: false }}
+        options={{ title: 'Chat', headerShown: false }}
       />
       <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />

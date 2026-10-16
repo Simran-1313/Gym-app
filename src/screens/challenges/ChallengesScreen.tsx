@@ -88,7 +88,14 @@ export const ChallengesScreen: React.FC = () => {
     ).size;
   }, [checkIns]);
 
-  if (!loaded) return <LoadingSpinner fullScreen />;
+  if (!loaded) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Challenges" onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   const monthlyProgress = Math.min(1, sessionsThisMonth / MONTHLY_GOAL);
 

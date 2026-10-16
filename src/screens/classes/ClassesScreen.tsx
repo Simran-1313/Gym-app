@@ -440,7 +440,14 @@ export const ClassesScreen: React.FC = () => {
     return new Date(sc.startTime).toDateString() === selectedDate;
   });
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <NavBar colors={colors} onBookingsPress={() => nav.navigate('MyBookings')} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   const confirmSchedule = confirmTarget?.schedule;
   const confirmTime = confirmSchedule ? formatTimeParts(confirmSchedule.startTime) : null;
@@ -473,7 +480,7 @@ export const ClassesScreen: React.FC = () => {
         {error ? (
           <EmptyState
             icon="warning-outline"
-            title="Oops, something went wrong!"
+            title="Couldn’t load classes"
             subtitle={error}
             actionLabel="Try Again"
             onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}

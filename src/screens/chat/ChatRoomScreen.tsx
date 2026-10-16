@@ -608,18 +608,28 @@ export const ChatRoomScreen: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title={roomName} onBack={() => navigation.goBack()} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   if (error) {
     return (
-      <AnimatedScreen style={{ alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <EmptyState
-          icon="warning-outline"
-          title="Oops, something went wrong!"
-          subtitle={error}
-          actionLabel="Try Again"
-          onAction={() => { setLoading(true); loadMessages(); }}
-        />
+      <AnimatedScreen>
+        <ScreenHeader title={roomName} onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <EmptyState
+            icon="warning-outline"
+            title="Couldn’t load this conversation"
+            subtitle={error}
+            actionLabel="Try Again"
+            onAction={() => { setLoading(true); loadMessages(); }}
+          />
+        </View>
       </AnimatedScreen>
     );
   }

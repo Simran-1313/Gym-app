@@ -146,7 +146,7 @@ export const NotificationsScreen: React.FC = () => {
         <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: GUTTER }}>
           <EmptyState
             icon="warning-outline"
-            title="Oops, something went wrong!"
+            title="Couldn’t load notifications"
             subtitle={error}
             actionLabel="Try Again"
             onAction={() => {

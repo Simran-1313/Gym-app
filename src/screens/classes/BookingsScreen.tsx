@@ -210,7 +210,14 @@ export const BookingsScreen: React.FC = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="My Bookings" onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   const upcoming = bookings.filter((b) => isUpcoming(b.status));
   const past = bookings.filter((b) => !isUpcoming(b.status));
@@ -242,7 +249,7 @@ export const BookingsScreen: React.FC = () => {
         {error ? (
           <EmptyState
             icon="warning-outline"
-            title="Oops, something went wrong!"
+            title="Couldn’t load your bookings"
             subtitle={error}
             actionLabel="Try Again"
             onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}

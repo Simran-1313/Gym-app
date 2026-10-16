@@ -86,7 +86,14 @@ export const MembershipScreen: React.FC = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Membership & Billing" onBack={nav.canGoBack() ? () => nav.goBack() : undefined} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   const remaining = subscription ? daysLeft(subscription.endDate) : 0;
   const urgencyColor = remaining <= 3 ? colors.danger : remaining <= 7 ? colors.warning : colors.success;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
-import { FONTS, RADIUS, SPACING } from '../../config/theme';
+import { FONTS, RADIUS, SPACING, metricTint } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 export interface DataPoint {
@@ -77,11 +77,6 @@ const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[
 };
 
 /** The same hues the activity rings use, so a metric reads as one colour everywhere. */
-export const METRIC_COLORS: Record<Props['metricType'], string> = {
-  CALORIES: '#F0B36B',
-  DURATION: '#2DD4BF',
-  WATER: '#6BB8F0',
-};
 
 /** Axis labels must fit on one line under a narrow bar: "06AM" → "6a". */
 const compactLabel = (label: string) => {
@@ -107,7 +102,7 @@ const formatY = (val: number) => {
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
   const colors = useThemeColors();
   const data = customData && customData.length > 0 ? customData : (mockData[metricType]?.[viewMode] ?? []);
-  const tint = METRIC_COLORS[metricType];
+  const tint = metricTint(colors, metricType);
 
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

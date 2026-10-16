@@ -8,6 +8,10 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
+import { metricTint } from '../../config/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { shade } from '../../utils/color';
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface Props {
@@ -23,6 +27,13 @@ export const AppleActivityRings: React.FC<Props> = ({
   standProgress,
   size = 140,
 }) => {
+  // Same metric tints as the legend beside the rings, so they follow light
+  // mode; each ring runs from its tint to a slightly deeper shade.
+  const colors = useThemeColors();
+  const move = metricTint(colors, 'CALORIES');
+  const exercise = metricTint(colors, 'DURATION');
+  const water = metricTint(colors, 'WATER');
+
   const strokeWidth = size * 0.085;
   const center = size / 2;
 
@@ -69,16 +80,16 @@ export const AppleActivityRings: React.FC<Props> = ({
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#F0B36B" />
-            <Stop offset="100%" stopColor="#E08A3C" />
+            <Stop offset="0%" stopColor={move} />
+            <Stop offset="100%" stopColor={shade(move, -0.18)} />
           </LinearGradient>
           <LinearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#5EEAD4" />
-            <Stop offset="100%" stopColor="#2DD4BF" />
+            <Stop offset="0%" stopColor={exercise} />
+            <Stop offset="100%" stopColor={shade(exercise, -0.18)} />
           </LinearGradient>
           <LinearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#6BB8F0" />
-            <Stop offset="100%" stopColor="#3B82C4" />
+            <Stop offset="0%" stopColor={water} />
+            <Stop offset="100%" stopColor={shade(water, -0.18)} />
           </LinearGradient>
         </Defs>
 
@@ -87,7 +98,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r1}
-          stroke="#F0B36B22"
+          stroke={`${move}22`}
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -97,7 +108,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r2}
-          stroke="#2DD4BF22"
+          stroke={`${exercise}22`}
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -107,7 +118,7 @@ export const AppleActivityRings: React.FC<Props> = ({
           cx={center}
           cy={center}
           r={r3}
-          stroke="#6BB8F022"
+          stroke={`${water}22`}
           strokeWidth={strokeWidth}
           fill="transparent"
         />

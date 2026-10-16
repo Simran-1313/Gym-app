@@ -31,7 +31,7 @@ import {
   SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
-import { FONT_SIZE, FONTS, RADIUS, SPACING } from '../../config/theme';
+import { FONT_SIZE, FONTS, RADIUS, SPACING, metricTint } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { shade, solidFillFor } from '../../utils/color';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -195,7 +195,7 @@ export const ActivityScreen: React.FC = () => {
       <AnimatedScreen>
         <ScreenHeader title="Activity Dashboard" onBack={onBack} />
         <View style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: SPACING.lg }]}>
-          <EmptyState icon="warning-outline" title="Oops, something went wrong!" subtitle={error} actionLabel="Try Again" onAction={loadData} />
+          <EmptyState icon="warning-outline" title="Couldn’t load your activity" subtitle={error} actionLabel="Try Again" onAction={loadData} />
         </View>
       </AnimatedScreen>
     );
@@ -212,7 +212,7 @@ export const ActivityScreen: React.FC = () => {
     waterProgress,
   } = stats;
 
-  const activeColor = activeMetric === 'CALORIES' ? '#F0B36B' : activeMetric === 'DURATION' ? '#2DD4BF' : '#6BB8F0';
+  const activeColor = metricTint(colors, activeMetric);
 
   return (
     <AnimatedScreen>
@@ -232,9 +232,9 @@ export const ActivityScreen: React.FC = () => {
           />
           <View style={styles.ringsLegend}>
             {[
-              { icon: 'flame' as const, color: '#F0B36B', label: 'Move', value: `${totalCalories}`, goal: `/ ${calorieGoal} kcal` },
-              { icon: 'fitness' as const, color: '#2DD4BF', label: 'Exercise', value: `${totalMinutes}`, goal: `/ ${exerciseGoal} min` },
-              { icon: 'water' as const, color: '#6BB8F0', label: 'Hydrate', value: (water.totalMl / 1000).toFixed(1), goal: `/ ${(water.goalMl / 1000).toFixed(1)} L` },
+              { icon: 'flame' as const, color: metricTint(colors, 'CALORIES'), label: 'Move', value: `${totalCalories}`, goal: `/ ${calorieGoal} kcal` },
+              { icon: 'fitness' as const, color: metricTint(colors, 'DURATION'), label: 'Exercise', value: `${totalMinutes}`, goal: `/ ${exerciseGoal} min` },
+              { icon: 'water' as const, color: metricTint(colors, 'WATER'), label: 'Hydrate', value: (water.totalMl / 1000).toFixed(1), goal: `/ ${(water.goalMl / 1000).toFixed(1)} L` },
             ].map((r) => (
               <View key={r.label} style={styles.ringsRow}>
                 <Ionicons name={r.icon} size={14} color={r.color} />
@@ -325,11 +325,11 @@ export const ActivityScreen: React.FC = () => {
                 onPress={handleWearableNotice}
                 style={({ pressed }) => [
                   styles.comingSoonPill,
-                  { backgroundColor: isDark ? 'rgba(255,158,24,0.18)' : 'rgba(255,158,24,0.12)' },
+                  { backgroundColor: `${colors.warning}1F`, borderColor: `${colors.warning}59` },
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Text style={styles.comingSoonPillText}>Coming Soon</Text>
+                <Text style={[styles.comingSoonPillText, { color: colors.warning }]}>Coming Soon</Text>
               </Pressable>
             </View>
           </GlassCard>
@@ -387,9 +387,9 @@ export const ActivityScreen: React.FC = () => {
             {/* Metric Selector — 3 tappable metric cards */}
             <View style={styles.metricCardsRow}>
               {([
-                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: '#F0B36B' },
-                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'time' as const, color: '#2DD4BF' },
-                { key: 'WATER' as const, label: 'Hydration', value: `${(water.totalMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: '#6BB8F0' },
+                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: metricTint(colors, 'CALORIES') },
+                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'fitness' as const, color: metricTint(colors, 'DURATION') },
+                { key: 'WATER' as const, label: 'Hydration', value: `${(water.totalMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: metricTint(colors, 'WATER') },
               ]).map((m) => {
                 const isActive = activeMetric === m.key;
                 return (
@@ -461,10 +461,16 @@ export const ActivityScreen: React.FC = () => {
 
       {/* ═══ LIVE WORKOUT MODAL ═══ */}
       <Modal visible={isWorkoutModalOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#121821' : '#FFFFFF' }]}>
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+        {/* Same sheet treatment as GlassOverlay: scrim, overlay surface,
+            hairline, handle, and clearance for the home indicator. */}
+        <View style={[styles.modalBackdrop, { backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(15,23,42,0.35)' }]}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.overlay, borderColor: colors.overlayBorder, paddingBottom: insets.bottom + 26 },
+            ]}
+          >
+            <View style={[styles.modalHandle, { backgroundColor: colors.overlayBorder }]} />
 
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Live Workout ⏱️</Text>
@@ -657,12 +663,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,158,24,0.35)',
   },
   comingSoonPillText: {
     fontSize: 10,
     fontFamily: FONTS.bodyBold,
-    color: '#FBBF24',
   },
 
   /* ── AI INSIGHT ── */
@@ -776,22 +780,23 @@ const styles = StyleSheet.create({
   /* ── MODAL ── */
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    padding: SPACING.lg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: 18,
+    paddingTop: 10,
     gap: SPACING.md,
   },
   modalHandle: {
     width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(128,128,128,0.4)',
+    borderRadius: 4,
     alignSelf: 'center',
-    marginBottom: SPACING.xs,
+    marginTop: 6,
   },
   modalHeader: {
     flexDirection: 'row',

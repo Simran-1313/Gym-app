@@ -17,6 +17,7 @@ const TINTS_DARK = {
   recovery: '#4FD1B5',
   energy: '#F0B36B',
   hydration: '#6BB8F0',
+  exercise: '#2DD4BF',
 } as const;
 
 const TINTS_LIGHT = {
@@ -26,6 +27,7 @@ const TINTS_LIGHT = {
   recovery: '#0D9488',
   energy: '#C77A1E',
   hydration: '#1D7CC4',
+  exercise: '#0D9488',
 } as const;
 
 export const DARK_COLORS = {
@@ -165,6 +167,15 @@ export const LIGHT_COLORS = {
 export const COLORS = DARK_COLORS;
 
 export type ThemeColors = typeof DARK_COLORS | typeof LIGHT_COLORS;
+
+/** The three activity metrics' colors — rings legend, metric chips, bar chart
+ *  and Metric Detail all read these, so Move/Exercise/Hydration look the same
+ *  on every screen and follow light mode. */
+export const metricTint = (
+  colors: { tint: { energy: string; exercise: string; hydration: string } },
+  metric: 'CALORIES' | 'DURATION' | 'WATER',
+) =>
+  metric === 'CALORIES' ? colors.tint.energy : metric === 'DURATION' ? colors.tint.exercise : colors.tint.hydration;
 
 export const SPACING = {
   xs: 4,

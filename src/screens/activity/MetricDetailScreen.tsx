@@ -9,13 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getActivityAnalytics } from '../../services/activity.service';
 import { AnalyticsDataPoint } from '../../types';
-import { FONTS, RADIUS } from '../../config/theme';
+import { FONTS, RADIUS, metricTint } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { AppleBarChart, METRIC_COLORS } from '../../components/ui/AppleBarChart';
+import { AppleBarChart } from '../../components/ui/AppleBarChart';
 import { RootStackParams } from '../../navigation/AppNavigator';
 
 type Metric = 'CALORIES' | 'DURATION' | 'WATER';
@@ -47,19 +47,16 @@ export const METRIC_TITLES: Record<Metric, string> = {
   WATER: 'Water',
 };
 
-const METRIC_META: Record<Metric, { color: string; about: string }> = {
+const METRIC_META: Record<Metric, { about: string }> = {
   CALORIES: {
-    color: METRIC_COLORS.CALORIES,
     about:
       "Your daily calorie burn reflects energy spent through workouts and everyday movement — useful for judging whether you're in a deficit or surplus for your goals.",
   },
   DURATION: {
-    color: METRIC_COLORS.DURATION,
     about:
       'Active minutes track the time you spend in logged workouts and sessions — a measure of consistency and volume, not just intensity.',
   },
   WATER: {
-    color: METRIC_COLORS.WATER,
     about:
       'Staying hydrated supports recovery, performance, and everyday energy — logging your intake helps you build a consistent habit.',
   },
@@ -212,7 +209,7 @@ export const MetricDetailScreen: React.FC = () => {
         <View style={styles.metricTabs}>
           {METRIC_TABS.map((t) => {
             const active = t.key === metric;
-            const tint = METRIC_COLORS[t.key];
+            const tint = metricTint(colors, t.key);
             return (
               <Pressable
                 key={t.key}

@@ -220,7 +220,14 @@ export const ProductsScreen: React.FC = () => {
 
   const chips = useMemo(() => [null, ...categories], [categories]);
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title="Products" onBack={nav.canGoBack() ? () => nav.goBack() : undefined} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   return (
     <AnimatedScreen>
@@ -323,7 +330,7 @@ export const ProductsScreen: React.FC = () => {
             {error ? (
               <EmptyState
                 icon="warning-outline"
-                title="Oops, something went wrong!"
+                title="Couldn’t load products"
                 subtitle={error}
                 actionLabel="Try Again"
                 onAction={() => {

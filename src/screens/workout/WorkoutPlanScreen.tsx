@@ -158,7 +158,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>
-            {workout.error ? 'Oops, something went wrong!' : 'No workout plan yet'}
+            {workout.error ? 'Couldn’t load your workout plan' : 'No workout plan yet'}
           </Text>
           <Text style={[s.loadingText, { color: colors.textSecondary }]}>
             {workout.error ?? 'Generate a personalised training split from your fitness profile.'}

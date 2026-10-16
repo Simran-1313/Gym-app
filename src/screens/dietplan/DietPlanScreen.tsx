@@ -213,7 +213,7 @@ export const DietPlanScreen: React.FC = () => {
             />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>
-            {diet.error ? 'Oops, something went wrong!' : 'No diet plan yet'}
+            {diet.error ? 'Couldn’t load your diet plan' : 'No diet plan yet'}
           </Text>
           <Text style={[s.loadingText, { color: colors.textSecondary }]}>
             {diet.error ?? 'Generate a personalised 7-day diet plan from your fitness profile.'}

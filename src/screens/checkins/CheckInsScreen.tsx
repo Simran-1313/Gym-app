@@ -306,7 +306,7 @@ export const CheckInsScreen: React.FC = () => {
             error ? (
               <EmptyState
                 icon="warning-outline"
-                title="Couldn't load your sessions"
+                title="Couldn’t load your sessions"
                 subtitle={error}
                 actionLabel="Try Again"
                 onAction={retry}

@@ -265,6 +265,9 @@ export interface ActivitySummary {
     daysWithCheckIn: string[];
   };
   aiInsight: string;
+  /** Set by the service when the endpoint was unreachable and these numbers
+   *  are a placeholder — never shown to the member as their own. */
+  isFallback?: boolean;
 }
 
 export interface AnalyticsDataPoint {

@@ -40,6 +40,7 @@ export const getActivitySummary = async (): Promise<ActivitySummary> => {
       },
       aiInsight:
         "You're making steady progress this week! Keep pushing your active minutes to hit your fitness goals.",
+      isFallback: true,
     };
   }
 };

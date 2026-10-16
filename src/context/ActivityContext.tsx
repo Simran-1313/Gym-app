@@ -16,7 +16,9 @@ import {
   calcTotalMinutes,
   computeStreaks,
   estimateCalories,
+  finiteNum,
   lastSevenDays,
+  normalizeWater,
 } from '../utils/activity';
 import { useAuth } from './AuthContext';
 
@@ -76,7 +78,8 @@ const waterKey = (userId: string) => `activity.water.${userId}.${localDate()}`;
 const readLocalWater = async (userId: string): Promise<WaterState | null> => {
   try {
     const raw = await SecureStore.getItemAsync(waterKey(userId));
-    return raw ? (JSON.parse(raw) as WaterState) : null;
+    // An older build could persist NaN (stored as null) — normalise on read.
+    return raw ? normalizeWater(JSON.parse(raw), DEFAULT_WATER_GOAL) : null;
   } catch {
     return null;
   }
@@ -129,18 +132,22 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ]);
 
         if (checkInRes) setCheckIns(checkInRes.checkIns ?? []);
-        if (summaryRes) setSummary(summaryRes);
+        // A placeholder summary would show 1.25 L the member never drank and a
+        // canned insight as theirs; without a real one, goals use defaults and
+        // screens build the insight from real check-ins.
+        if (summaryRes && !summaryRes.isFallback) setSummary(summaryRes);
 
         // Never let a refetch overwrite taps that haven't reached the server.
         if (pendingWrites.current === 0) {
-          if (waterRes && !waterRes.isFallback) {
-            setWater({ totalMl: waterRes.totalMl, goalMl: waterRes.goalMl, logs: waterRes.logs ?? [] });
+          const server = waterRes && !waterRes.isFallback ? normalizeWater(waterRes, DEFAULT_WATER_GOAL) : null;
+          const summaryWater = summaryRes && !summaryRes.isFallback ? normalizeWater(summaryRes.metrics?.hydration, DEFAULT_WATER_GOAL) : null;
+          const goalMl = server?.goalMl ?? summaryWater?.goalMl ?? localWater?.goalMl ?? DEFAULT_WATER_GOAL;
+          if (server) {
+            setWater(server);
           } else if (localWater) {
-            setWater({ ...localWater, goalMl: waterRes?.goalMl ?? localWater.goalMl });
+            setWater({ ...localWater, goalMl });
           } else if (!dirtyToday.current) {
-            const goalMl = waterRes?.goalMl ?? summaryRes?.metrics?.hydration?.goalMl ?? DEFAULT_WATER_GOAL;
-            const totalMl = waterRes?.totalMl ?? summaryRes?.metrics?.hydration?.consumedMl ?? 0;
-            setWater({ totalMl, goalMl, logs: waterRes?.logs ?? [] });
+            setWater({ totalMl: summaryWater?.totalMl ?? 0, goalMl, logs: [] });
           }
         }
 
@@ -161,7 +168,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addWater = useCallback(
     (deltaMl: number) => {
       const prev = waterRef.current;
-      const nextTotal = Math.max(0, prev.totalMl + deltaMl);
+      const nextTotal = Math.max(0, finiteNum(prev.totalMl) + deltaMl);
       const applied = nextTotal - prev.totalMl;
       if (applied === 0) return;
 
@@ -182,8 +189,9 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           pendingWrites.current -= 1;
           // Reconcile with the server's total only once the queue has drained
           // — mid-burst, its answer is already behind the member's taps.
-          if (pendingWrites.current === 0 && res && !res.isFallback) {
-            setWater({ totalMl: res.totalMl, goalMl: res.goalMl, logs: res.logs ?? waterRef.current.logs });
+          const server = res && !res.isFallback ? normalizeWater(res, waterRef.current.goalMl, { requireTotal: true }) : null;
+          if (pendingWrites.current === 0 && server) {
+            setWater({ ...server, logs: server.logs.length ? server.logs : waterRef.current.logs });
           }
         })
         .catch(() => {
@@ -222,7 +230,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       calorieGoal,
       moveProgress: Math.min(1, weeklyCalories / calorieGoal),
       exerciseProgress: Math.min(1, weeklyMinutes / exerciseGoal),
-      waterProgress: Math.min(1, water.totalMl / Math.max(1, water.goalMl)),
+      waterProgress: Math.min(1, finiteNum(water.totalMl) / Math.max(1, finiteNum(water.goalMl, DEFAULT_WATER_GOAL))),
       streak: computeStreaks(checkIns),
     };
   }, [checkIns, summary, water.totalMl, water.goalMl]);

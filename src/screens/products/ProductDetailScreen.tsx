@@ -89,7 +89,14 @@ export const ProductDetailScreen: React.FC = () => {
     nav.dispatch(CommonActions.navigate({ name: 'MainTabs', params: { screen: 'Chat' } }));
   }, [nav]);
 
-  if (loading) return <LoadingSpinner fullScreen />;
+  if (loading) {
+    return (
+      <AnimatedScreen>
+        <ScreenHeader title={headerTitle} onBack={nav.canGoBack() ? () => nav.goBack() : undefined} />
+        <LoadingSpinner fullScreen />
+      </AnimatedScreen>
+    );
+  }
 
   if (error || !product) {
     return (
@@ -101,7 +108,7 @@ export const ProductDetailScreen: React.FC = () => {
         <View style={styles.centered}>
           <EmptyState
             icon="warning-outline"
-            title="Oops, something went wrong!"
+            title="Couldn’t load this product"
             subtitle={error ?? 'Product not found'}
             actionLabel="Try Again"
             onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }}
