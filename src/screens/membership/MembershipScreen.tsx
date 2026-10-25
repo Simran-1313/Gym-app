@@ -158,7 +158,7 @@ export const MembershipScreen: React.FC = () => {
             </GlassCard>
           </StaggerItem>
         ) : (
-          <EmptyState icon="card-outline" title="No active membership" subtitle="Contact the front desk to set up your plan." />
+          <EmptyState icon="card-outline" title="No active membership" subtitle="Your plan, renewal date and billing will appear here once the front desk sets you up." />
         )}
 
         <StaggerItem index={1}>

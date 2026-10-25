@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getMyBookings, cancelBooking } from '../../services/member.service';
@@ -17,6 +17,7 @@ import { ClassBooking } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FONTS, RADIUS } from '../../config/theme';
+import { solidFillFor } from '../../utils/color';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { ThemeColors } from '../../config/theme';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -129,8 +130,11 @@ const BookingRow: React.FC<{
         </Text>
       </View>
 
-      <View style={[s.statusPill, { backgroundColor: cfg.neutral ? colors.inset : `${cfg.color}${WASH}` }]}>
-        <Text style={[s.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+      {/* Solid fill + white text: a 9.5px coloured label on a faint wash of
+          the same colour was too low-contrast to read. `solidFillFor` deepens
+          each status colour just enough for white to clear AA. */}
+      <View style={[s.statusPill, { backgroundColor: cfg.neutral ? colors.inset : solidFillFor(cfg.color) }]}>
+        <Text style={[s.statusText, { color: cfg.neutral ? colors.textSecondary : '#FFFFFF' }]}>{cfg.label}</Text>
       </View>
     </GlassCard>
   );
@@ -257,8 +261,10 @@ export const BookingsScreen: React.FC = () => {
         ) : bookings.length === 0 ? (
           <EmptyState
             icon="bookmark-outline"
-            title="No bookings yet"
-            subtitle="Book a class from the Classes tab to see it here."
+            title="No classes booked yet"
+            subtitle="Reserve a spot in a class and it’ll wait for you here, with a reminder before it starts."
+            actionLabel="Browse Classes"
+            onAction={() => navigation.dispatch(CommonActions.navigate({ name: 'MainTabs', params: { screen: 'Classes' } }))}
           />
         ) : (
           <>

@@ -313,9 +313,9 @@ export const CheckInsScreen: React.FC = () => {
               />
             ) : (
               <EmptyState
-                icon="time-outline"
-                title="No sessions yet"
-                subtitle="Your gym visits will appear here once you check in."
+                icon="barbell-outline"
+                title="Your first session awaits"
+                subtitle="Check in at the gym and each visit lands here, with its duration and your streak."
               />
             )
           }

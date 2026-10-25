@@ -178,7 +178,7 @@ export const NotificationsScreen: React.FC = () => {
           <EmptyState
             icon="notifications-off-outline"
             title="All caught up!"
-            subtitle="Any updates or class announcements will appear here."
+            subtitle="Class updates, reminders and gym announcements will show up here."
           />
         }
         refreshControl={

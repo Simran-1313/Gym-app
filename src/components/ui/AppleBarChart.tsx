@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { FONTS, RADIUS, SPACING, metricTint } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { finiteNum } from '../../utils/activity';
 
 export interface DataPoint {
   label: string;
@@ -90,6 +91,14 @@ const longLabel = (label: string) => {
   return m ? `${m[1]} ${m[2].toUpperCase()}` : label;
 };
 
+const TIME_LABEL = /^0?(\d{1,2})\s*(AM|PM)$/i;
+
+const EMPTY_COPY: Record<Props['metricType'], string> = {
+  CALORIES: 'No calories burned',
+  DURATION: 'No active minutes',
+  WATER: 'No water logged',
+};
+
 /** Beyond this many bars, only every Nth label is drawn so none collide. */
 const MAX_LABELS = 7;
 
@@ -101,8 +110,17 @@ const formatY = (val: number) => {
 
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
   const colors = useThemeColors();
-  const data = customData && customData.length > 0 ? customData : (mockData[metricType]?.[viewMode] ?? []);
+  const raw = customData && customData.length > 0 ? customData : (mockData[metricType]?.[viewMode] ?? []);
+  // The API has sent numeric strings before; a string value made every bar
+  // fall through to the empty marker.
+  const data = raw.map((p) => ({ ...p, value: Math.max(0, finiteNum(p.value)) }));
   const tint = metricTint(colors, metricType);
+  const allZero = data.every((p) => p.value === 0);
+  // An hour-by-hour day is mostly empty hours. It gets a list of the hours
+  // that had something under the chart, so a single workout isn't one thin
+  // bar lost among 23 empty slots.
+  const hourly = data.length > 0 && data.filter((p) => TIME_LABEL.test(p.label.trim())).length >= data.length / 2;
+  const activeHours = hourly ? data.map((p, i) => ({ ...p, i })).filter((p) => p.value > 0) : [];
 
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -114,7 +132,7 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
 
   const peakIndex = data.reduce((best, p, i) => (p.value > (data[best]?.value ?? -1) ? i : best), 0);
   const calloutIndex = selectedIndex ?? peakIndex;
-  const callout = data[calloutIndex];
+  const callout = allZero && selectedIndex === null ? null : data[calloutIndex];
   const labelEvery = Math.ceil(data.length / MAX_LABELS);
 
   return (
@@ -122,7 +140,16 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
       {/* Callout: the tapped bar, or the peak when nothing is tapped. Fixed
           height so the chart below never shifts when it changes. */}
       <View style={styles.callout}>
-        {callout ? (
+        {allZero ? (
+          <>
+            <Text style={[styles.calloutLabel, { color: colors.textMuted }]}>
+              {hourly ? 'Today' : 'This period'}
+            </Text>
+            <Text style={[styles.calloutValue, { color: colors.textSecondary }]}>
+              {EMPTY_COPY[metricType]} yet
+            </Text>
+          </>
+        ) : callout ? (
           <>
             <Text style={[styles.calloutLabel, { color: colors.textMuted }]} numberOfLines={1}>
               {selectedIndex === null ? 'Peak · ' : ''}
@@ -146,6 +173,12 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
           ))}
         </View>
 
+        {/* One continuous baseline instead of a dot per empty slot. */}
+        <View
+          pointerEvents="none"
+          style={[styles.baseline, { backgroundColor: colors.textFaint }]}
+        />
+
         <View style={styles.barsRow}>
           {data.map((point, index) => {
             const pct = (point.value / maxValue) * 100;
@@ -158,18 +191,20 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
                 accessibilityLabel={`${longLabel(point.label)}, ${point.displayValue}`}
                 style={styles.barCol}
               >
-                <View style={styles.barSlot}>
+                <View style={[styles.barSlot, hourly && styles.barSlotDense]}>
                   {point.value > 0 ? (
                     <Animated.View
                       layout={LinearTransition.duration(220)}
                       style={[
                         styles.bar,
-                        { height: `${Math.max(4, pct)}%`, backgroundColor: tint, opacity: active ? 1 : 0.4 },
+                        {
+                          height: `${pct}%`,
+                          backgroundColor: tint,
+                          opacity: active || allZero ? 1 : 0.62,
+                        },
                       ]}
                     />
-                  ) : (
-                    <View style={[styles.emptyBar, { backgroundColor: colors.inset }]} />
-                  )}
+                  ) : null}
                 </View>
                 <Text
                   numberOfLines={1}
@@ -186,6 +221,31 @@ export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customDat
           })}
         </View>
       </View>
+
+      {activeHours.length > 0 ? (
+        <View style={styles.hours}>
+          {activeHours.map((h) => {
+            const active = h.i === calloutIndex;
+            return (
+              <Pressable
+                key={`${h.label}-${h.i}`}
+                onPress={() => setSelectedIndex(selectedIndex === h.i ? null : h.i)}
+                style={[
+                  styles.hourChip,
+                  {
+                    backgroundColor: active ? `${tint}22` : colors.inset,
+                    borderColor: active ? `${tint}66` : 'transparent',
+                  },
+                ]}
+              >
+                <View style={[styles.hourDot, { backgroundColor: tint }]} />
+                <Text style={[styles.hourTime, { color: colors.textSecondary }]}>{longLabel(h.label)}</Text>
+                <Text style={[styles.hourValue, { color: colors.text }]}>{h.displayValue}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -216,8 +276,31 @@ const styles = StyleSheet.create({
   barsRow: { flex: 1, flexDirection: 'row', paddingRight: 38 },
   barCol: { flex: 1, alignItems: 'center' },
   barSlot: { flex: 1, width: '58%', maxWidth: 18, justifyContent: 'flex-end' },
-  bar: { width: '100%', borderRadius: RADIUS.sm },
-  emptyBar: { width: '100%', height: 3, borderRadius: RADIUS.full },
+  // 24 hourly bars are only ~10px wide each; fill more of the column.
+  barSlotDense: { width: '78%' },
+  // A real value never shrinks to nothing, however small next to the peak.
+  bar: { width: '100%', minHeight: 6, borderRadius: RADIUS.sm },
+  baseline: {
+    position: 'absolute',
+    left: 0,
+    right: 38,
+    bottom: X_LABEL_H,
+    height: StyleSheet.hairlineWidth * 2,
+    opacity: 0.6,
+  },
+  hours: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SPACING.md },
+  hourChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+  },
+  hourDot: { width: 6, height: 6, borderRadius: 3 },
+  hourTime: { fontFamily: FONTS.bodyMedium, fontSize: 12, fontVariant: ['tabular-nums'] },
+  hourValue: { fontFamily: FONTS.bodySemi, fontSize: 12, fontVariant: ['tabular-nums'] },
   xLabel: {
     height: X_LABEL_H,
     lineHeight: X_LABEL_H,

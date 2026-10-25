@@ -27,7 +27,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FONTS, MOTION, RADIUS } from '../../config/theme';
 import type { ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { bestTextOn } from '../../utils/color';
+import { solidFillFor } from '../../utils/color';
 import { ClassesStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -52,12 +52,10 @@ const GUTTER = 18; // .scroll { padding: 0 18px 18px }
 const ROW_GAP = 10; // .class-card { margin-bottom: 10px }
 
 /**
- * `.class-book-btn`/`.day-chip.active .dc-n` are always dark text in the
- * prototype, assuming a bright teal/lavender fill. Computed per-background
- * with `bestTextOn` instead of hardcoded — the fill under this text varies
- * (colors.primary for a booked/active state, the lavender accent for
- * waitlist), and either could need light text instead for a tenant whose
- * brand color is dark rather than bright.
+ * `.class-book-btn`/`.day-chip.active .dc-n` are dark text on a bright fill in
+ * the prototype. Here they're always white, on fills deepened by
+ * `solidFillFor` (or `primarySolid`) until white is readable — one consistent
+ * look for any tenant's brand color.
  */
 
 /** `.class-cap-fill`'s default color — teal marks a booked class, red a full
@@ -190,26 +188,17 @@ const BookPill: React.FC<{
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const disabled = variant === 'booked' || variant === 'waitlisted' || loading || !onPress;
 
-  const backgroundColor =
-    variant === 'book' ? colors.primarySolid : variant === 'waitlist' ? availableFillColor(colors) : colors.inset;
-  // 'book' fills solid teal, always with white text. 'waitlist' fills the
-  // lavender accent, which is light enough that a computed dark/light pick
-  // still applies. 'booked'/'waitlisted' sit on the neutral `colors.inset`
-  // and just borrow that same accent as a colored label.
-  const textColor =
-    variant === 'booked'
-      ? colors.primary
-      : variant === 'waitlisted'
-      ? availableFillColor(colors)
-      : variant === 'book'
-      ? '#FFFFFF'
-      : bestTextOn(availableFillColor(colors));
-  const borderColor =
-    variant === 'booked'
-      ? `${colors.primary}4D`
-      : variant === 'waitlisted'
-      ? `${availableFillColor(colors)}4D`
-      : 'transparent';
+  // Every pill is a solid fill carrying white text. The raw accents (bright
+  // teal, lavender) are too light for white — and a dark/light text pick put
+  // near-black on lavender — so each fill is deepened by `solidFillFor` until
+  // white clears AA. Teal says "you're in / book", lavender "waitlist"; the
+  // settled states ('booked', 'waitlisted') add a check so they don't read as
+  // the action itself.
+  const teal = colors.primarySolid;
+  const lavender = solidFillFor(availableFillColor(colors));
+  const backgroundColor = variant === 'book' || variant === 'booked' ? teal : lavender;
+  const textColor = '#FFFFFF';
+  const settled = variant === 'booked' || variant === 'waitlisted';
 
   return (
     <AnimatedPressable
@@ -228,15 +217,18 @@ const BookPill: React.FC<{
       style={[
         animStyle,
         s.bookBtn,
-        { backgroundColor, borderColor, borderWidth: borderColor === 'transparent' ? 0 : 1 },
+        { backgroundColor },
       ]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={textColor} />
       ) : (
-        <Text style={[s.bookBtnText, { color: textColor }]} numberOfLines={1}>
-          {label}
-        </Text>
+        <>
+          {settled ? <Ionicons name="checkmark" size={12} color={textColor} /> : null}
+          <Text style={[s.bookBtnText, { color: textColor }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </>
       )}
     </AnimatedPressable>
   );
@@ -491,8 +483,8 @@ export const ClassesScreen: React.FC = () => {
             {filteredSchedules.length === 0 ? (
               <EmptyState
                 icon="calendar-outline"
-                title="No Classes Today"
-                subtitle={`There are no classes scheduled for ${selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric'}) : 'this day'}.`}
+                title="A rest day on the schedule"
+                subtitle={`No classes are running on ${selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric'}) : 'this day'}. Pick another day to find one.`}
                 actionLabel="Browse other days"
                 onAction={() => setSelectedDate(uniqueDates.length > 0 ? uniqueDates[0].toDateString() : null)}
               />
@@ -592,6 +584,8 @@ const s = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: RADIUS.full,
     minWidth: 64,
+    flexDirection: 'row',
+    gap: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -391,9 +391,15 @@ export const ChatListScreen: React.FC = () => {
         ListEmptyComponent={
           !error ? (
             <EmptyState
-              icon="chatbubbles-outline"
-              title="No chats found"
-              subtitle={search ? 'Try a different search' : 'Your gym chats will appear here'}
+              icon={search ? 'search-outline' : 'chatbubbles-outline'}
+              title={search ? 'No chats match' : 'No conversations yet'}
+              subtitle={
+                search
+                  ? `Nothing found for “${search.trim()}”. Check the spelling or try a trainer’s name.`
+                  : 'Messages with your trainers and gym team will appear here.'
+              }
+              secondaryLabel={search ? 'Clear search' : undefined}
+              onSecondary={search ? () => setSearch('') : undefined}
             />
           ) : null
         }

@@ -24,6 +24,7 @@ import { uploadToCloudinary } from '../../services/cloudinary';
 import { FONT_SIZE, FONTS, INPUT, INPUT_LABEL, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { FitnessAvatar } from '../ui/FitnessAvatar';
+import { PhotoActionSheet } from './PhotoActionSheet';
 import { GlassInput } from '../ui/GlassInput';
 import { AnimatedChip } from '../ui/AnimatedChip';
 import { FitnessGoal, MemberProfile } from '../../types';
@@ -150,6 +151,7 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
   const [goal, setGoal] = useState<FitnessGoal | undefined>(undefined);
   const [photo, setPhoto] = useState<PhotoDraft>({ kind: 'keep' });
   const [saving, setSaving] = useState(false);
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
 
   const phoneRef = useRef<TextInput>(null);
 
@@ -164,6 +166,7 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
     setGoal(profile?.fitnessGoal);
     setPhoto({ kind: 'keep' });
     setSaving(false);
+    setPhotoSheetOpen(false);
     // Only on open — re-seeding mid-edit (e.g. after refreshUser) would wipe input.
   }, [visible]);
 
@@ -189,6 +192,12 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
 
   const requestClose = () => {
     if (saving) return;
+    // Android back lands here (the Modal swallows BackHandler); close the
+    // photo sheet first rather than the whole editor.
+    if (photoSheetOpen) {
+      setPhotoSheetOpen(false);
+      return;
+    }
     if (!dirty) {
       onClose();
       return;
@@ -227,15 +236,8 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
 
   const openPhotoActions = () => {
     if (saving) return;
-    Alert.alert('Profile Photo', undefined, [
-      ...(previewUri
-        ? [
-            { text: 'Change Photo', onPress: pickPhoto },
-            { text: 'Remove Photo', style: 'destructive' as const, onPress: removePhoto },
-          ]
-        : [{ text: 'Choose Photo', onPress: pickPhoto }]),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setPhotoSheetOpen(true);
   };
 
   /* ── Save ── */
@@ -351,7 +353,7 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
           >
             {/* ── Avatar ── */}
             <View style={s.avatarBlock}>
-              <FitnessAvatar name={trimmedName || user?.name} uri={previewUri} size={96} onPress={openPhotoActions} />
+              <FitnessAvatar name={trimmedName || user?.name} uri={previewUri} size={96} editable onPress={openPhotoActions} accessibilityLabel="Change profile photo" />
               <Pressable
                 onPress={openPhotoActions}
                 disabled={saving}
@@ -463,6 +465,15 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
             ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <PhotoActionSheet
+          visible={photoSheetOpen}
+          name={trimmedName || user?.name}
+          uri={previewUri}
+          onChoose={pickPhoto}
+          onRemove={removePhoto}
+          onClose={() => setPhotoSheetOpen(false)}
+        />
       </View>
     </Modal>
   );

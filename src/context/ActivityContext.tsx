@@ -107,6 +107,9 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const pendingWrites = useRef(0);
   const writeQueue = useRef<Promise<unknown>>(Promise.resolve());
   const dirtyToday = useRef(false);
+  // Bumped on every tap. A fetch that started before a tap carries a total
+  // from before it, so its answer must not land on top of the tap.
+  const tapVersion = useRef(0);
 
   const setWater = useCallback(
     (next: WaterState) => {
@@ -124,6 +127,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!force && Date.now() - lastLoadAt.current < STALE_MS) return;
 
       const run = (async () => {
+        const startVersion = tapVersion.current;
         const [checkInRes, summaryRes, waterRes, localWater] = await Promise.all([
           getCheckIns(1, CHECKIN_HISTORY).catch(() => null),
           getActivitySummary().catch(() => null),
@@ -138,7 +142,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (summaryRes && !summaryRes.isFallback) setSummary(summaryRes);
 
         // Never let a refetch overwrite taps that haven't reached the server.
-        if (pendingWrites.current === 0) {
+        if (pendingWrites.current === 0 && tapVersion.current === startVersion) {
           const server = waterRes && !waterRes.isFallback ? normalizeWater(waterRes, DEFAULT_WATER_GOAL) : null;
           const summaryWater = summaryRes && !summaryRes.isFallback ? normalizeWater(summaryRes.metrics?.hydration, DEFAULT_WATER_GOAL) : null;
           const goalMl = server?.goalMl ?? summaryWater?.goalMl ?? localWater?.goalMl ?? DEFAULT_WATER_GOAL;
@@ -173,6 +177,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (applied === 0) return;
 
       dirtyToday.current = true;
+      tapVersion.current += 1;
       const timestamp = new Date().toISOString();
       const logs =
         applied > 0
@@ -187,11 +192,15 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .then(() => logWater({ amountMl: applied, timestamp }))
         .then((res) => {
           pendingWrites.current -= 1;
-          // Reconcile with the server's total only once the queue has drained
-          // — mid-burst, its answer is already behind the member's taps.
+          // The count on screen is what the member tapped; a write's answer
+          // never moves it. Once the queue has drained and the server agrees
+          // on the total, adopt its log ids and goal. If it disagrees (a
+          // dropped or misapplied write), keep the member's number rather
+          // than jumping the opposite way to the tap.
           const server = res && !res.isFallback ? normalizeWater(res, waterRef.current.goalMl, { requireTotal: true }) : null;
-          if (pendingWrites.current === 0 && server) {
-            setWater({ ...server, logs: server.logs.length ? server.logs : waterRef.current.logs });
+          const local = waterRef.current;
+          if (pendingWrites.current === 0 && server && server.totalMl === local.totalMl) {
+            setWater({ ...local, goalMl: server.goalMl, logs: server.logs.length ? server.logs : local.logs });
           }
         })
         .catch(() => {

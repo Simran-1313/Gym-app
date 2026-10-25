@@ -344,9 +344,11 @@ export const ProductsScreen: React.FC = () => {
         ListEmptyComponent={
           !error ? (
             <EmptyState
-              icon="bag-outline"
-              title="No products available"
-              subtitle="Check back later for gym supplements and merchandise."
+              icon="bag-handle-outline"
+              title="The shelves are being stocked"
+              subtitle="Supplements, apparel and gear from your gym will show up here. Looking for something specific? Your trainer can help."
+              actionLabel="Ask a Trainer"
+              onAction={openMessages}
             />
           ) : null
         }

@@ -25,6 +25,7 @@ import { GlassOverlay } from '../../components/ui/GlassOverlay';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FitnessAvatar } from '../../components/ui/FitnessAvatar';
 import { EditProfileSheet } from '../../components/profile/EditProfileSheet';
+import { AvatarPreview } from '../../components/profile/AvatarPreview';
 import { goalLabel } from '../../components/profile/profileGoals';
 import { MemberProfile } from '../../types';
 
@@ -141,6 +142,7 @@ export const ProfileScreen: React.FC = () => {
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -158,6 +160,17 @@ export const ProfileScreen: React.FC = () => {
   const openEdit = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setEditOpen(true);
+  };
+
+  // With a photo, tapping it shows it large; without one there's nothing to
+  // look at, so the tap goes straight to adding one.
+  const onAvatarPress = () => {
+    if (!user?.avatarUrl) {
+      openEdit();
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setPreviewOpen(true);
   };
 
   const handleLogout = async () => {
@@ -203,6 +216,15 @@ export const ProfileScreen: React.FC = () => {
         }}
       />
 
+      <AvatarPreview
+        visible={previewOpen}
+        uri={user?.avatarUrl}
+        name={user?.name}
+        subtitle={memberSince ? `Member since ${memberSince}` : null}
+        onClose={() => setPreviewOpen(false)}
+        onEdit={() => setEditOpen(true)}
+      />
+
       <ScreenHeader
         title="Profile"
         variant="large"
@@ -230,9 +252,10 @@ export const ProfileScreen: React.FC = () => {
                   <FitnessAvatar
                     name={user?.name}
                     uri={user?.avatarUrl}
-                    size={54}
-                    editable
-                    onPress={openEdit}
+                    size={64}
+                    editable={!user?.avatarUrl}
+                    onPress={onAvatarPress}
+                    accessibilityLabel={user?.avatarUrl ? 'View profile photo' : 'Add profile photo'}
                   />
                 </View>
                 <View style={s.flex1}>
@@ -323,7 +346,7 @@ const s = StyleSheet.create({
 
   // Member card
   memberCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 20 },
-  avatarSlot: { width: 54, height: 54 },
+  avatarSlot: { width: 64, height: 64 },
   tierBadge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: RADIUS.full, marginBottom: 6 },
   tierBadgeText: { fontSize: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.3 },
   memberName: { fontSize: 16, fontFamily: FONTS.bodyExtra },
