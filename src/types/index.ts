@@ -7,40 +7,117 @@ export interface Tenant {
   isActive: boolean;
 }
 
-export interface ActiveSubscription {
+export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FROZEN';
+
+export interface Installment {
   id: string;
-  userId: string;
-  planId: string;
+  label: string;
+  dueDate: string | null;
+  amount: number;
+  paidAmount: number;
+  balance: number;
+  status: 'PAID' | 'PARTIAL' | 'DUE' | 'OVERDUE' | 'UPCOMING' | string;
+  isOverdue: boolean;
+}
+
+/** A membership as GET /member/subscription returns it. */
+export interface MemberSubscription {
+  id: string;
+  planId: string | null;
+  planName: string;
   startDate: string;
   endDate: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FROZEN';
+  durationDays: number;
+  durationMonths: number | null;
+  status: SubscriptionStatus;
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
-  plan: {
-    id: string;
-    name: string;
-    price: number;
-    durationDays: number;
-  };
+  agreedAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  isFullyPaid: boolean;
+  freezeStartDate: string | null;
+  freezeEndDate: string | null;
+  installments: Installment[];
+}
+
+export type FreezeRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface FreezeRequest {
+  id: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string | null;
+  status: FreezeRequestStatus;
+  responseNote: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface GymContact {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+}
+
+export interface Membership {
+  subscription: MemberSubscription | null;
+  /** The last one, when nothing is current — so the app can say when it ended. */
+  lastSubscription: MemberSubscription | null;
+  freezeRequest: FreezeRequest | null;
+  canRequestFreeze: boolean;
+  gym: GymContact;
 }
 
 export interface Invoice {
   id: string;
   invoiceNumber: string;
-  amount: number;
-  currency: string;
-  status: 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
-  planName: string;
-  issuedAt: string;
+  description: string | null;
+  subtotal: number;
+  gstRate: number;
+  gstAmount: number;
+  total: number;
+  status: 'PAID' | 'PENDING' | 'CANCELLED' | string;
   paymentMethod: string | null;
+  issuedAt: string;
+  /** Signed, public PDF link — opens in the browser without a session. */
+  url: string;
 }
 
-export interface PaymentOrder {
-  orderId: string;
-  amount: number;
-  currency: string;
-  key: string;
-  gstAmount: number;
-  baseAmount: number;
+export interface MembershipPlanSummary {
+  id: string;
+  name: string;
+  price: number;
+  durationDays: number;
+}
+
+/** What the gym's Clasendra plan includes. Screens for a feature it lacks stay hidden. */
+export type PlanFeatureKey =
+  | 'leads'
+  | 'pos'
+  | 'classes'
+  | 'followUps'
+  | 'staffAttendance'
+  | 'chat'
+  | 'pushNotifications'
+  | 'emailAutomation'
+  | 'analytics'
+  | 'biometric'
+  | 'aiFeatures'
+  | 'whatsapp'
+  | 'apiAccess';
+
+export type PlanFeatures = Partial<Record<PlanFeatureKey, boolean>>;
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  /** `data.type` says what it's about: CLASS_WAITLIST_PROMOTED, FREEZE_APPROVED, ADMIN_BROADCAST… */
+  data: { type?: string; [key: string]: unknown } | null;
+  readAt: string | null;
+  createdAt: string;
 }
 
 export interface User {
@@ -53,7 +130,6 @@ export interface User {
   isFirstLogin: boolean;
   isOnboarded: boolean;
   createdAt: string;
-  activeSubscription?: ActiveSubscription | null;
   tenant?: Tenant;
 }
 
@@ -129,16 +205,28 @@ export interface AiPlan extends AiPlanMeta {
   content: DietPlanContent | WorkoutPlanContent;
 }
 
+/**
+ * A weekly class slot, as the app uses it. The API sends the slot as
+ * dayOfWeek + "HH:MM" plus the next session's startsAt/endsAt;
+ * member.service maps those to startTime/endTime (ISO instants) here.
+ */
 export interface ClassSchedule {
   id: string;
   classId: string;
+  dayOfWeek: number;
+  /** Next session start, ISO. */
   startTime: string;
+  /** Next session end, ISO. */
   endTime: string;
   capacity: number;
   bookedCount: number;
+  availableSlots: number;
   isBooked: boolean;
-  /** True once the member has joined the waitlist for a full class (§4.6/§4.7 of the mobile app spec). */
-  isWaitlisted?: boolean;
+  /** On the waitlist for this full class; promoted automatically when a place opens. */
+  isWaitlisted: boolean;
+  waitlistPosition: number | null;
+  waitlistCount: number;
+  myBookingId: string | null;
   class: {
     id: string;
     name: string;
@@ -151,19 +239,24 @@ export interface ClassSchedule {
   };
 }
 
+export type BookingStatus = 'BOOKED' | 'WAITLISTED' | 'ATTENDED' | 'NO_SHOW' | 'CANCELLED';
+
 export interface ClassBooking {
   id: string;
   scheduleId: string;
-  status: 'CONFIRMED' | 'ATTENDED' | 'NO_SHOW' | 'CANCELLED' | 'WAITLISTED';
-  createdAt: string;
+  status: BookingStatus;
+  /** When the member booked (or joined the waitlist). */
+  bookedAt: string;
   schedule: {
     id: string;
+    /** The slot's next session, ISO — what "upcoming" bookings are shown at. */
     startTime: string;
     endTime: string;
     class: {
       id: string;
       name: string;
       durationMinutes: number;
+      trainer?: { id: string; name: string } | null;
     };
   };
 }
@@ -252,12 +345,34 @@ export interface WorkoutSession extends LogWorkoutPayload {
   createdAt: string;
 }
 
+export interface ActivityGoals {
+  weeklyCaloriesGoal: number;
+  weeklyActiveMinutesGoal: number;
+  dailyWaterGoal: number;
+  daysPerWeek: number;
+}
+
+/**
+ * GET /member/activity/summary. Activity is logged workouts plus gym visits,
+ * counted in India time; `week` is Monday to Sunday.
+ */
 export interface ActivitySummary {
   summaryDate: string;
+  goals: ActivityGoals;
   metrics: {
     calories: { burned: number; goal: number; unit: string; progress: number };
     exerciseDuration: { minutes: number; goal: number; unit: string; progress: number };
     hydration: { consumedMl: number; goalMl: number; unit: string; progress: number };
+  };
+  week: {
+    start: string;
+    end: string;
+    visits: number;
+    visitDays: string[];
+    workouts: number;
+    activeMinutes: number;
+    caloriesBurned: number;
+    progress: { visits: number; activeMinutes: number; calories: number };
   };
   weeklyCheckIns: {
     count: number;
@@ -265,9 +380,6 @@ export interface ActivitySummary {
     daysWithCheckIn: string[];
   };
   aiInsight: string;
-  /** Set by the service when the endpoint was unreachable and these numbers
-   *  are a placeholder — never shown to the member as their own. */
-  isFallback?: boolean;
 }
 
 export interface AnalyticsDataPoint {
@@ -301,9 +413,6 @@ export interface WaterSummary {
   totalMl: number;
   goalMl: number;
   logs: WaterLogEntry[];
-  /** Set by the service when the endpoint was unreachable and this is a
-   *  placeholder, so callers never overwrite real local state with it. */
-  isFallback?: boolean;
 }
 
 export type DeviceSyncProvider =

@@ -15,6 +15,8 @@ import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import { getProfile } from '../../services/member.service';
+import { getMembership } from '../../services/subscription.service';
+import { GoalsSheet } from '../../components/activity/GoalsSheet';
 import { FONTS, MOTION, RADIUS, SPACING } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { RootStackParams } from '../../navigation/AppNavigator';
@@ -134,13 +136,15 @@ const bmiOf = (weightKg?: number, heightCm?: number): number | null => {
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const insets = useSafeAreaInsets();
-  const { user, logout, theme, toggleTheme } = useAuth();
+  const { user, logout, theme, toggleTheme, hasFeature } = useAuth();
   const isDark = theme === 'dark';
   const colors = useThemeColors();
 
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
 
+  const [planName, setPlanName] = useState<string | null>(null);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -156,6 +160,13 @@ export const ProfileScreen: React.FC = () => {
   };
 
   useEffect(loadProfile, []);
+
+  // The badge names the member's plan; no plan, or a failed read, says MEMBER.
+  useEffect(() => {
+    getMembership()
+      .then((m) => setPlanName(m.subscription?.planName ?? null))
+      .catch(() => {});
+  }, []);
 
   const openEdit = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -195,6 +206,7 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
+      <GoalsSheet visible={goalsOpen} onClose={() => setGoalsOpen(false)} />
       <GlassOverlay
         visible={showLogoutConfirm}
         title="Log Out?"
@@ -260,7 +272,9 @@ export const ProfileScreen: React.FC = () => {
                 </View>
                 <View style={s.flex1}>
                   <View style={[s.tierBadge, { backgroundColor: colors.primarySoft }]}>
-                    <Text style={[s.tierBadgeText, { color: colors.primary }]}>MEMBER</Text>
+                    <Text style={[s.tierBadgeText, { color: colors.primary }]} numberOfLines={1}>
+                      {(planName ?? 'Member').toUpperCase()}
+                    </Text>
                   </View>
                   <Text style={[s.memberName, { color: colors.text }]} numberOfLines={1}>
                     {user?.name ?? 'Member'}
@@ -295,9 +309,14 @@ export const ProfileScreen: React.FC = () => {
         <Animated.View entering={FadeInUp.duration(340).delay(140)}>
           <GlassCard innerStyle={s.settingsCard}>
             <SettingsRow first icon="card-outline" label="Membership & Billing" onPress={() => navigation.navigate('Membership')} />
-            <SettingsRow icon="nutrition-outline" label="My Diet Plan" onPress={() => navigation.navigate('DietPlan')} />
-            <SettingsRow icon="barbell-outline" label="My Workout Plan" onPress={() => navigation.navigate('WorkoutPlan')} />
+            {hasFeature('aiFeatures') ? (
+              <>
+                <SettingsRow icon="nutrition-outline" label="My Diet Plan" onPress={() => navigation.navigate('DietPlan')} />
+                <SettingsRow icon="barbell-outline" label="My Workout Plan" onPress={() => navigation.navigate('WorkoutPlan')} />
+              </>
+            ) : null}
             <SettingsRow icon="pulse-outline" label="Activity Dashboard" onPress={() => navigation.navigate('Activity')} />
+            <SettingsRow icon="options-outline" label="Activity Goals" onPress={() => setGoalsOpen(true)} />
             <SettingsRow icon="person-outline" label="Update Fitness Profile" onPress={() => navigation.navigate('Onboarding')} />
             <SettingsRow icon="trophy-outline" label="Challenges & Badges" onPress={() => navigation.navigate('Challenges')} />
           </GlassCard>
@@ -306,8 +325,10 @@ export const ProfileScreen: React.FC = () => {
         {/* ── Settings group 2 ── */}
         <Animated.View entering={FadeInUp.duration(340).delay(200)}>
           <GlassCard innerStyle={s.settingsCard}>
-            <SettingsRow first icon="bag-handle-outline" label="Gym Shop" onPress={() => navigation.navigate('Products')} />
-            <SettingsRow icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
+            {hasFeature('pos') ? (
+              <SettingsRow first icon="bag-handle-outline" label="Gym Shop" onPress={() => navigation.navigate('Products')} />
+            ) : null}
+            <SettingsRow first={!hasFeature('pos')} icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
             <SettingsRow icon="lock-closed-outline" label="Change Password" onPress={() => navigation.navigate('ChangePassword')} />
             <SettingsRow
               icon={isDark ? 'moon-outline' : 'sunny-outline'}

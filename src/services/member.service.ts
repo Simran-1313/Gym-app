@@ -3,6 +3,8 @@ import {
   AiPlan,
   AiPlanMeta,
   ApiResponse,
+  AppNotification,
+  BookingStatus,
   CheckIn,
   ClassBooking,
   ClassSchedule,
@@ -11,35 +13,106 @@ import {
   Meta,
 } from '../types';
 
+// ─── Classes ──────────────────────────────────────────────────────────────────
+// The API describes a weekly slot (dayOfWeek + "18:30") and sends the next
+// session as startsAt/endsAt. Screens work in instants, so the mapping to the
+// app's ClassSchedule / ClassBooking lives here and nowhere else.
+
+type RawClass = ClassSchedule['class'] & { capacity?: number };
+
+interface RawSchedule {
+  id: string;
+  classId: string;
+  dayOfWeek: number;
+  startsAt: string;
+  endsAt: string;
+  capacity?: number;
+  bookedCount: number;
+  availableSlots: number;
+  isBooked: boolean;
+  isWaitlisted?: boolean;
+  waitlistPosition?: number | null;
+  waitlistCount?: number;
+  myBookingId?: string | null;
+  class: RawClass;
+}
+
+interface RawBooking {
+  id: string;
+  classScheduleId: string;
+  status: BookingStatus;
+  bookedAt: string;
+  startsAt: string;
+  endsAt: string;
+  classSchedule: { id: string; class: ClassBooking['schedule']['class'] };
+}
+
+const toSchedule = (r: RawSchedule): ClassSchedule => ({
+  id: r.id,
+  classId: r.classId,
+  dayOfWeek: r.dayOfWeek,
+  startTime: r.startsAt,
+  endTime: r.endsAt,
+  capacity: r.capacity ?? r.class.capacity ?? 0,
+  bookedCount: r.bookedCount,
+  availableSlots: r.availableSlots,
+  isBooked: r.isBooked,
+  isWaitlisted: Boolean(r.isWaitlisted),
+  waitlistPosition: r.waitlistPosition ?? null,
+  waitlistCount: r.waitlistCount ?? 0,
+  myBookingId: r.myBookingId ?? null,
+  class: {
+    id: r.class.id,
+    name: r.class.name,
+    description: r.class.description ?? null,
+    durationMinutes: r.class.durationMinutes,
+    trainer: r.class.trainer ?? null,
+  },
+});
+
+const toBooking = (r: RawBooking): ClassBooking => ({
+  id: r.id,
+  scheduleId: r.classScheduleId,
+  status: r.status,
+  bookedAt: r.bookedAt,
+  schedule: {
+    id: r.classSchedule.id,
+    startTime: r.startsAt,
+    endTime: r.endsAt,
+    class: r.classSchedule.class,
+  },
+});
+
 export const getClassSchedules = async (): Promise<ClassSchedule[]> => {
-  const res = await api.get<ApiResponse<{ schedules: ClassSchedule[] }>>('/member/classes/schedules');
+  const res = await api.get<ApiResponse<{ schedules: RawSchedule[] }>>('/member/classes/schedules');
   if (!res.data.success || !res.data.data) throw new Error('Failed to fetch schedules');
-  return res.data.data.schedules;
+  return res.data.data.schedules.map(toSchedule);
 };
 
 export const getMyBookings = async (): Promise<ClassBooking[]> => {
-  const res = await api.get<ApiResponse<{ bookings: ClassBooking[] }>>('/member/classes/bookings');
+  const res = await api.get<ApiResponse<{ bookings: RawBooking[] }>>('/member/classes/bookings');
   if (!res.data.success || !res.data.data) throw new Error('Failed to fetch bookings');
-  return res.data.data.bookings;
+  return res.data.data.bookings.map(toBooking);
 };
 
 export const bookClass = async (scheduleId: string): Promise<ClassBooking> => {
-  const res = await api.post<ApiResponse<{ booking: ClassBooking }>>(
+  const res = await api.post<ApiResponse<{ booking: RawBooking }>>(
     `/member/classes/${scheduleId}/book`,
   );
   if (!res.data.success || !res.data.data) throw new Error(res.data.message ?? 'Booking failed');
-  return res.data.data.booking;
+  return toBooking(res.data.data.booking);
 };
 
-/** Joins the waitlist for a full class — same endpoint shape as `bookClass`, distinguished by the `/waitlist` suffix per §4.6 of the mobile app spec. */
+/** Joins the queue for a full class. The member is booked in, and told, when a place opens. */
 export const joinWaitlist = async (scheduleId: string): Promise<ClassBooking> => {
-  const res = await api.post<ApiResponse<{ booking: ClassBooking }>>(
+  const res = await api.post<ApiResponse<{ booking: RawBooking }>>(
     `/member/classes/${scheduleId}/waitlist`,
   );
   if (!res.data.success || !res.data.data) throw new Error(res.data.message ?? 'Could not join the waitlist');
-  return res.data.data.booking;
+  return toBooking(res.data.data.booking);
 };
 
+/** Cancels a booking, or leaves the waitlist. */
 export const cancelBooking = async (bookingId: string): Promise<void> => {
   const res = await api.delete<ApiResponse<null>>(`/member/classes/bookings/${bookingId}`);
   if (!res.data.success) throw new Error(res.data.message ?? 'Cancel failed');
@@ -133,51 +206,28 @@ export const getProfile = async (): Promise<MemberProfile | null> => {
   }
 };
 
-export interface AppNotification {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  readAt: string | null;
-  createdAt: string;
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface NotificationsResult {
+  notifications: AppNotification[];
+  unreadCount: number;
+  meta: Meta;
 }
 
-export const getNotifications = async (): Promise<AppNotification[]> => {
-  try {
-    const res = await api.get<ApiResponse<{ notifications: AppNotification[] }>>('/member/notifications');
-    if (res.data.success && res.data.data) {
-      return res.data.data.notifications;
-    }
-    throw new Error();
-  } catch {
-    // fallback mock notifications for visual completeness
-    return [
-      {
-        id: '1',
-        title: 'Membership Activated! 🎉',
-        body: 'Welcome to Clasendra. Your membership is now active.',
-        type: 'SYSTEM',
-        readAt: null,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        title: 'Class Confirmed: HIIT Blast 🏋️',
-        body: 'Your HIIT booking for tomorrow 7:00 AM is confirmed.',
-        type: 'CLASS',
-        readAt: null,
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        id: '3',
-        title: 'New Diet Plan Generated 🍎',
-        body: 'Your AI diet plan is updated according to your weight loss goals.',
-        type: 'DIET',
-        readAt: new Date().toISOString(),
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-      }
-    ];
-  }
+export const getNotifications = async (page = 1, limit = 20): Promise<NotificationsResult> => {
+  const res = await api.get<ApiResponse<NotificationsResult>>('/member/notifications', {
+    params: { page, limit },
+  });
+  if (!res.data.success || !res.data.data) throw new Error('Failed to load notifications');
+  return res.data.data;
+};
+
+export const markNotificationRead = async (id: string): Promise<void> => {
+  await api.patch(`/member/notifications/${id}/read`);
+};
+
+export const markAllNotificationsRead = async (): Promise<void> => {
+  await api.post('/member/notifications/read-all');
 };
 
 export interface DeviceTokenPayload {

@@ -233,7 +233,7 @@ const RoomItem: React.FC<RoomItemProps> = ({ room, currentUserId, colors, index,
 };
 
 export const ChatListScreen: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasFeature } = useAuth();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ChatListNav>();
@@ -375,7 +375,7 @@ export const ChatListScreen: React.FC = () => {
               )}
             </View>
 
-            <AiBanner colors={colors} onPress={() => navigation.navigate('AiCoach')} />
+            {hasFeature('aiFeatures') ? <AiBanner colors={colors} onPress={() => navigation.navigate('AiCoach')} /> : null}
 
             {error ? (
               <EmptyState

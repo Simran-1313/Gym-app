@@ -129,6 +129,7 @@ export const MetricDetailScreen: React.FC = () => {
       setChartUnit(res.unit);
     } catch (err) {
       console.log('[MetricDetailScreen] chart load error:', err);
+      setChartPoints([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric]);
@@ -142,6 +143,7 @@ export const MetricDetailScreen: React.FC = () => {
       setWeeklyUnit(res.unit);
     } catch (err) {
       console.log('[MetricDetailScreen] weekly load error:', err);
+      setWeeklyPoints([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric]);
