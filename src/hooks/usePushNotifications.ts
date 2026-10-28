@@ -97,7 +97,6 @@ export const usePushNotifications = (isAuthenticated: boolean) => {
         const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
         console.log('====================================');
-        console.log('FCM Device Token:', token);
         console.log('====================================');
         console.log(`[PushNotifications] Fetched push token for platform: ${platform}`);
 
@@ -107,7 +106,7 @@ export const usePushNotifications = (isAuthenticated: boolean) => {
 
         // Watch for token refreshes
         tokenListener.current = Notifications.addPushTokenListener(async (pushToken: NotificationsType.DevicePushToken) => {
-          console.log('[PushNotifications] Token refreshed:', pushToken.data);
+          console.log('[PushNotifications] Token refreshed');
           try {
             await registerDeviceToken({
               token: pushToken.data,

@@ -1,36 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  Easing,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
-import { submitProfile, getProfile } from '../../services/member.service';
+import { usePlans } from '../../context/PlansContext';
+import { getProfile } from '../../services/member.service';
+import { saveProfile } from '../../services/profileSave';
+import { confirmOnline, useConnectivity } from '../../services/network';
 import { FONTS, INPUT_LABEL, RADIUS, SPACING, TYPOGRAPHY, ThemeColors } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import {
-  ActivityLevel,
-  DietPreference,
-  FitnessGoal,
-  Gender,
-} from '../../types';
+import { ActivityLevel, DietPreference, FitnessGoal, Gender } from '../../types';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -39,11 +33,38 @@ import { GlassInput } from '../../components/ui/GlassInput';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AnimatedChip } from '../../components/ui/AnimatedChip';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
+import {
+  draftFromProfile,
+  EMPTY_DRAFT,
+  FieldErrors,
+  firstInvalidStep,
+  ONBOARDING_STEPS,
+  OnboardingDraft,
+  toProfileInput,
+  validateStep,
+} from '../../utils/onboardingProfile';
+import { clearDraft, loadDraft, saveDraft } from '../../utils/onboardingDraftStore';
 
-type Option<T extends string> = { value: T; label: string };
+/**
+ * "Tell us about yourself" — three short steps instead of one long form:
+ *   1. Goal (one tap, advances by itself)
+ *   2. Body (age, height, weight; gender optional)
+ *   3. Food & activity (activity pre-set to the common case; allergies optional)
+ *
+ * Everything the member enters is kept as a local draft, so a dropped
+ * connection, an expired session or an app restart never costs them the form.
+ * Saving waits only for the *profile* to be stored — the diet plan carries on
+ * in the background (PlansContext) and shows up on the Diet Plan screen.
+ */
 
-/** age, weight, height, gender, goal, diet, activity — drives the progress bar. */
-const REQUIRED_FIELDS = 7;
+type Option<T extends string> = { value: T; label: string; hint?: string; icon?: keyof typeof Ionicons.glyphMap };
+
+const GOAL_OPTIONS: Option<FitnessGoal>[] = [
+  { value: 'WEIGHT_LOSS', label: 'Lose weight', hint: 'Burn fat with a calorie deficit', icon: 'flame-outline' },
+  { value: 'MUSCLE_GAIN', label: 'Build muscle', hint: 'Get stronger with a protein-rich surplus', icon: 'barbell-outline' },
+  { value: 'FITNESS', label: 'Stay fit', hint: 'Feel healthier and keep a balanced diet', icon: 'heart-outline' },
+  { value: 'ENDURANCE', label: 'Improve endurance', hint: 'Fuel longer runs, rides and classes', icon: 'bicycle-outline' },
+];
 
 const GENDER_OPTIONS: Option<Gender>[] = [
   { value: 'MALE', label: 'Male' },
@@ -51,28 +72,100 @@ const GENDER_OPTIONS: Option<Gender>[] = [
   { value: 'OTHER', label: 'Other' },
 ];
 
-const GOAL_OPTIONS: Option<FitnessGoal>[] = [
-  { value: 'WEIGHT_LOSS', label: 'Weight Loss' },
-  { value: 'MUSCLE_GAIN', label: 'Muscle Gain' },
-  { value: 'FITNESS', label: 'General Fitness' },
-  { value: 'ENDURANCE', label: 'Endurance' },
-];
-
 const DIET_OPTIONS: Option<DietPreference>[] = [
   { value: 'VEG', label: 'Vegetarian' },
+  { value: 'NON_VEG', label: 'Non-veg' },
   { value: 'VEGAN', label: 'Vegan' },
-  { value: 'NON_VEG', label: 'Non-Veg' },
   { value: 'KETO', label: 'Keto' },
 ];
 
 const ACTIVITY_OPTIONS: Option<ActivityLevel>[] = [
-  { value: 'SEDENTARY', label: 'Sedentary' },
-  { value: 'LIGHT', label: 'Light' },
-  { value: 'MODERATE', label: 'Moderate' },
-  { value: 'VERY_ACTIVE', label: 'Active' },
+  { value: 'SEDENTARY', label: 'Mostly sitting', hint: 'Desk job, little exercise' },
+  { value: 'LIGHT', label: 'Lightly active', hint: 'Exercise 1–2 days a week' },
+  { value: 'MODERATE', label: 'Active', hint: 'Exercise 3–5 days a week' },
+  { value: 'VERY_ACTIVE', label: 'Very active', hint: 'Hard training 6–7 days a week' },
 ];
 
-function OptionSelector<T extends string>({
+const STEP_TITLES = ['What’s your main goal?', 'A bit about you', 'Food & activity'] as const;
+const STEP_SUBTITLES = [
+  'We’ll shape your diet and training around it.',
+  'Used to work out your daily calories.',
+  'So every meal in your plan is one you’ll actually eat.',
+] as const;
+
+/** How long a save may take before we tell the member it's still working. */
+const SLOW_SAVE_MS = 8000;
+/* ── Building blocks ── */
+
+const StepProgress: React.FC<{ step: number; colors: ThemeColors }> = ({ step, colors }) => (
+  <View style={baseStyles.progressWrap} accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of ${ONBOARDING_STEPS.length}`}>
+    <View style={baseStyles.progressBars}>
+      {ONBOARDING_STEPS.map((s, i) => (
+        <View
+          key={s}
+          style={[
+            baseStyles.progressBar,
+            { backgroundColor: i <= step ? colors.primary : colors.surfaceBorder },
+          ]}
+        />
+      ))}
+    </View>
+    <Text style={[baseStyles.progressLabel, { color: colors.textMuted }]}>
+      Step {step + 1} of {ONBOARDING_STEPS.length}
+    </Text>
+  </View>
+);
+
+function ChoiceCard<T extends string>({
+  option,
+  selected,
+  onPress,
+  disabled,
+  colors,
+}: {
+  option: Option<T>;
+  selected: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+  colors: ThemeColors;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected, disabled }}
+      accessibilityLabel={option.hint ? `${option.label}. ${option.hint}` : option.label}
+      style={({ pressed }) => [
+        baseStyles.choiceCard,
+        {
+          backgroundColor: selected ? colors.primarySoft : colors.surface,
+          borderColor: selected ? colors.primary : colors.surfaceBorder,
+          opacity: pressed ? 0.85 : 1,
+        },
+      ]}
+    >
+      {option.icon ? (
+        <View style={[baseStyles.choiceIcon, { backgroundColor: selected ? colors.primarySolid : colors.inset }]}>
+          <Ionicons name={option.icon} size={20} color={selected ? colors.white : colors.textSecondary} />
+        </View>
+      ) : null}
+      <View style={baseStyles.choiceText}>
+        <Text style={[baseStyles.choiceLabel, { color: colors.text }]}>{option.label}</Text>
+        {option.hint ? (
+          <Text style={[baseStyles.choiceHint, { color: colors.textSecondary }]}>{option.hint}</Text>
+        ) : null}
+      </View>
+      <Ionicons
+        name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+        size={22}
+        color={selected ? colors.primary : colors.textMuted}
+      />
+    </Pressable>
+  );
+}
+
+function ChipRow<T extends string>({
   options,
   selected,
   onSelect,
@@ -83,12 +176,8 @@ function OptionSelector<T extends string>({
   onSelect: (v: T) => void;
   disabled?: boolean;
 }) {
-  const { theme } = useAuth();
-  const colors = useThemeColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
   return (
-    <View style={styles.optionsRow}>
+    <View style={baseStyles.chipRow} accessibilityRole="radiogroup">
       {options.map((opt, i) => (
         <AnimatedChip
           key={opt.value}
@@ -103,346 +192,534 @@ function OptionSelector<T extends string>({
   );
 }
 
-const FormProgress: React.FC<{ progress: number }> = ({ progress }) => {
-  const { theme } = useAuth();
-  const colors = useThemeColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+const UnitSuffix: React.FC<{ unit: string; colors: ThemeColors }> = ({ unit, colors }) => (
+  <Text style={[baseStyles.unit, { color: colors.textMuted }]}>{unit}</Text>
+);
 
-  const width = useSharedValue(0);
-
-  useEffect(() => {
-    // Ease-out so the bar settles instead of stopping dead on each field.
-    width.value = withTiming(progress, { duration: 450, easing: Easing.out(Easing.cubic) });
-  }, [progress, width]);
-
-  const barStyle = useAnimatedStyle(() => ({
-    width: `${width.value * 100}%`,
-  }));
-
-  return (
-    <View style={styles.progressTrack}>
-      <Animated.View style={[styles.progressFillWrap, barStyle]}>
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.progressFill}
-        />
-      </Animated.View>
-    </View>
-  );
-};
-
-/** Icon + title, so each card announces what it's asking for. */
-const SectionHeader: React.FC<{
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  color: string;
-  tint: string;
-}> = ({ icon, title, color, tint }) => {
-  const { theme } = useAuth();
-  const colors = useThemeColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  return (
-  <View style={styles.sectionHeader}>
-    <View style={[styles.sectionIcon, { backgroundColor: `${tint}1F` }]}>
-      <Ionicons name={icon} size={16} color={tint} />
-    </View>
-    <Text style={[styles.sectionTitle, { color }]}>{title}</Text>
-  </View>
-  );
-};
+/* ── Screen ── */
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
-  const { refreshUser, theme, user } = useAuth();
+  const { user, refreshUser, markOnboarded } = useAuth();
+  const { trackGeneration } = usePlans();
+  const { isOffline } = useConnectivity();
   const insets = useSafeAreaInsets();
-  const isDark = theme === 'dark';
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  // Reached two ways: the forced first-time flow (nothing to go back to —
-  // matches the old `headerLeft: () => null` route registration) and the
-  // "update later" flow from the main app (has a real back target).
+  // Reached two ways: the forced first-time flow (nothing to go back to) and
+  // the "update later" flow from the main app (has a real back target).
   const forcedOnboarding = !user?.isOnboarded;
-  const screenTitle = forcedOnboarding ? 'Your Fitness Profile' : 'Update Fitness Profile';
+  const userId = user?.id ?? null;
 
-  const [age, setAge] = useState('');
-  const [weight, setWeight] = useState('');
-  const [height, setHeight] = useState('');
-  const [gender, setGender] = useState<Gender | null>(null);
-  const [goal, setGoal] = useState<FitnessGoal | null>(null);
-  const [diet, setDiet] = useState<DietPreference | null>(null);
-  const [activity, setActivity] = useState<ActivityLevel | null>(null);
-  const [allergies, setAllergies] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
+  const [hydrated, setHydrated] = useState(false);
+  const [loadNote, setLoadNote] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+  const [showAllergies, setShowAllergies] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [slowSave, setSlowSave] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const mounted = useRef(true);
+  useEffect(() => () => {
+    mounted.current = false;
+  }, []);
+
+  const heightRef = useRef<TextInput>(null);
+  const weightRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const step = draft.step;
+  const stepKey = ONBOARDING_STEPS[step];
+  const errors: FieldErrors = showErrors ? validateStep(stepKey, draft) : {};
+  const isLastStep = step === ONBOARDING_STEPS.length - 1;
+
+  /* ── Hydrate: local draft and/or the saved profile ── */
 
   useEffect(() => {
+    if (!userId) return;
     let cancelled = false;
 
-    const loadProfile = async () => {
+    (async () => {
+      const local = await loadDraft(userId);
+      // First-time members: their own unfinished draft is the freshest thing
+      // there is — show it at once rather than waiting on the network.
+      if (forcedOnboarding && local) {
+        if (!cancelled) {
+          setDraft(local);
+          setShowAllergies(!!local.allergies);
+          setHydrated(true);
+        }
+        return;
+      }
+
       try {
         const existing = await getProfile();
-        if (cancelled || !existing) return;
-        if (existing.age) setAge(String(existing.age));
-        if (existing.weight) setWeight(String(existing.weight));
-        if (existing.height) setHeight(String(existing.height));
-        if (existing.gender) setGender(existing.gender);
-        if (existing.fitnessGoal) setGoal(existing.fitnessGoal);
-        if (existing.dietPreference) setDiet(existing.dietPreference);
-        if (existing.activityLevel) setActivity(existing.activityLevel);
-        if (existing.allergies) setAllergies(existing.allergies);
+        if (cancelled) return;
+        const next = existing ? draftFromProfile(existing) : local ?? EMPTY_DRAFT;
+        setDraft(next);
+        setShowAllergies(!!next.allergies);
+      } catch {
+        if (cancelled) return;
+        // Couldn't reach the server: fall back to whatever was typed last.
+        if (local) setDraft(local);
+        if (!forcedOnboarding) {
+          setLoadNote('Couldn’t load your saved profile, so some fields may be empty. You can still update them.');
+        }
       } finally {
-        if (!cancelled) setProfileLoading(false);
+        if (!cancelled) setHydrated(true);
       }
-    };
+    })();
 
-    loadProfile();
     return () => {
       cancelled = true;
     };
+    // Only on mount / account change — re-hydrating mid-edit would wipe input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Persist every change (debounced) so nothing typed is ever lost.
+  useEffect(() => {
+    if (!hydrated || !userId) return;
+    const t = setTimeout(() => saveDraft(userId, draft), 400);
+    return () => clearTimeout(t);
+  }, [draft, hydrated, userId]);
+
+  const update = useCallback(<K extends keyof OnboardingDraft>(key: K, value: OnboardingDraft[K]) => {
+    setSubmitError(null);
+    setDraft((d) => ({ ...d, [key]: value }));
   }, []);
 
-  const completion = useMemo(() => {
-    let filled = 0;
-    const total = REQUIRED_FIELDS;
-    if (age) filled++;
-    if (weight) filled++;
-    if (height) filled++;
-    if (gender) filled++;
-    if (goal) filled++;
-    if (diet) filled++;
-    if (activity) filled++;
-    return filled / total;
-  }, [age, weight, height, gender, goal, diet, activity]);
+  /* ── Navigation between steps ── */
 
-  const handleSubmit = async () => {
-    const ageNum = parseInt(age, 10);
-    const weightNum = parseFloat(weight);
-    const heightNum = parseFloat(height);
+  const goToStep = useCallback((next: number) => {
+    setShowErrors(false);
+    setDraft((d) => ({ ...d, step: next }));
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
 
-    if (!ageNum || ageNum < 10 || ageNum > 120) {
-      Alert.alert('Invalid Age', 'Please enter a valid age (10–120).');
+  const goBack = useCallback(() => {
+    if (saving) return true;
+    if (step > 0) {
+      goToStep(step - 1);
+      return true;
+    }
+    if (!forcedOnboarding && navigation.canGoBack()) {
+      navigation.goBack();
+      return true;
+    }
+    return false;
+  }, [saving, step, goToStep, forcedOnboarding, navigation]);
+
+  // Android back steps back through the form before leaving it.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
+    return () => sub.remove();
+  }, [goBack]);
+
+  const selectGoal = (goal: FitnessGoal) => {
+    Haptics.selectionAsync().catch(() => {});
+    update('goal', goal);
+    // One question on this step, so answering it is the "continue".
+    setTimeout(() => {
+      if (mounted.current) goToStep(1);
+    }, 220);
+  };
+
+  /* ── Submit ── */
+
+  const submit = async () => {
+    const invalid = firstInvalidStep(draft);
+    if (invalid !== -1) {
+      goToStep(invalid);
+      setShowErrors(true);
       return;
     }
-    if (!weightNum || weightNum <= 0 || weightNum > 500) {
-      Alert.alert('Invalid Weight', 'Please enter a valid weight in kg.');
-      return;
-    }
-    if (!heightNum || heightNum <= 0 || heightNum > 300) {
-      Alert.alert('Invalid Height', 'Please enter a valid height in cm.');
-      return;
-    }
-    if (!goal || !diet || !activity) {
-      Alert.alert('Missing Fields', 'Please select your goal, diet preference, and activity level.');
+    if (!userId) return;
+
+    setSubmitError(null);
+    if (!(await confirmOnline())) {
+      setSubmitError('You’re offline. Your answers are saved on this device — tap Save again once you’re connected.');
       return;
     }
 
-    setLoading(true);
+    const input = toProfileInput(draft);
+    setSaving(true);
+    setSlowSave(false);
+    const slowTimer = setTimeout(() => mounted.current && setSlowSave(true), SLOW_SAVE_MS);
+
+    const { saved, request } = saveProfile(input);
+
     try {
-      const { aiPlan } = await submitProfile({
-        age: ageNum,
-        weight: weightNum,
-        height: heightNum,
-        gender: gender ?? undefined,
-        fitnessGoal: goal,
-        dietPreference: diet,
-        activityLevel: activity,
-        allergies: allergies.trim() || undefined,
-      });
+      await saved;
+    } catch (err) {
+      clearTimeout(slowTimer);
+      if (!mounted.current) return;
+      setSaving(false);
+      setSubmitError(
+        `${err instanceof Error ? err.message : 'We couldn’t save your profile.'} Your answers are kept — try again when you’re ready.`,
+      );
+      return;
+    }
+    clearTimeout(slowTimer);
 
-      // Refresh auth so isOnboarded is set before navigation.
-      await refreshUser();
+    // Profile is stored. The diet plan may still be generating inside the
+    // same request (or on the server afterwards) — hand it to the plan store,
+    // which keeps watching after this screen is gone.
+    trackGeneration('DIET', request.then((r) => r.aiPlan));
+    await clearDraft(userId);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-      if (aiPlan) {
-        // Plan was already generated (e.g. cache hit) — pass it directly.
-        navigation.replace('DietPlan', { plan: aiPlan, fromOnboarding: true });
-      } else {
-        // Plan is generating in the background. Navigate to the DietPlan screen
-        // without a pre-loaded plan — it will fetch from the API once ready.
-        navigation.replace('DietPlan', { fromOnboarding: true });
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save your profile.';
-      Alert.alert('Error', message);
-    } finally {
-      setLoading(false);
+    if (forcedOnboarding) {
+      // Flips the navigator straight to the main app; refreshUser then syncs
+      // the rest of /me in the background.
+      markOnboarded();
+      refreshUser();
+      return;
+    }
+
+    refreshUser();
+    if (mounted.current) {
+      setSaving(false);
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.replace('DietPlan');
     }
   };
+
+  const handleContinue = () => {
+    if (isLastStep) {
+      submit();
+      return;
+    }
+    if (Object.keys(validateStep(stepKey, draft)).length > 0) {
+      setShowErrors(true);
+      return;
+    }
+    goToStep(step + 1);
+  };
+
+  /* ── Render ── */
+
+  const renderStep = () => {
+    if (stepKey === 'goal') {
+      return (
+        <View style={styles.cards} accessibilityRole="radiogroup">
+          {GOAL_OPTIONS.map((opt) => (
+            <ChoiceCard
+              key={opt.value}
+              option={opt}
+              selected={draft.goal === opt.value}
+              onPress={() => selectGoal(opt.value)}
+              colors={colors}
+            />
+          ))}
+          {errors.goal ? <Text style={styles.errorText}>{errors.goal}</Text> : null}
+        </View>
+      );
+    }
+
+    if (stepKey === 'body') {
+      return (
+        <GlassCard innerStyle={styles.section}>
+          <GlassInput
+            label="Age"
+            placeholder="e.g. 28"
+            value={draft.age}
+            onChangeText={(v) => update('age', v.replace(/[^\d]/g, ''))}
+            keyboardType="number-pad"
+            maxLength={3}
+            returnKeyType="next"
+            onSubmitEditing={() => heightRef.current?.focus()}
+            submitBehavior="submit"
+            rightIcon={<UnitSuffix unit="years" colors={colors} />}
+            error={errors.age}
+            editable={!saving}
+            accessibilityLabel="Age in years"
+          />
+          <View style={styles.row}>
+            <View style={styles.flex1}>
+              <GlassInput
+                ref={heightRef}
+                label="Height"
+                placeholder="170"
+                value={draft.height}
+                onChangeText={(v) => update('height', v.replace(/[^\d.,]/g, ''))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                returnKeyType="next"
+                onSubmitEditing={() => weightRef.current?.focus()}
+                submitBehavior="submit"
+                rightIcon={<UnitSuffix unit="cm" colors={colors} />}
+                // Half-width field: let the text shrink so the unit stays inside.
+                style={styles.shrinkInput}
+                error={errors.height}
+                editable={!saving}
+                accessibilityLabel="Height in centimetres"
+              />
+            </View>
+            <View style={styles.flex1}>
+              <GlassInput
+                ref={weightRef}
+                label="Weight"
+                placeholder="70"
+                value={draft.weight}
+                onChangeText={(v) => update('weight', v.replace(/[^\d.,]/g, ''))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                returnKeyType="done"
+                rightIcon={<UnitSuffix unit="kg" colors={colors} />}
+                style={styles.shrinkInput}
+                error={errors.weight}
+                editable={!saving}
+                accessibilityLabel="Weight in kilograms"
+              />
+            </View>
+          </View>
+          <View style={styles.group}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              Gender <Text style={{ color: colors.textMuted }}>(optional)</Text>
+            </Text>
+            <ChipRow
+              options={GENDER_OPTIONS}
+              selected={draft.gender}
+              // Tapping the selected chip again clears it — "prefer not to say".
+              onSelect={(g) => update('gender', draft.gender === g ? null : g)}
+              disabled={saving}
+            />
+          </View>
+        </GlassCard>
+      );
+    }
+
+    return (
+      <>
+        <GlassCard innerStyle={styles.section}>
+          <View style={styles.group}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>How do you eat?</Text>
+            <ChipRow options={DIET_OPTIONS} selected={draft.diet} onSelect={(v) => update('diet', v)} disabled={saving} />
+            {errors.diet ? <Text style={styles.errorText}>{errors.diet}</Text> : null}
+          </View>
+
+          {showAllergies ? (
+            <GlassInput
+              label="Food allergies (optional)"
+              placeholder="e.g. peanuts, lactose"
+              value={draft.allergies}
+              onChangeText={(v) => update('allergies', v)}
+              maxLength={200}
+              editable={!saving}
+              autoFocus={!draft.allergies}
+            />
+          ) : (
+            <Pressable
+              onPress={() => setShowAllergies(true)}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={styles.linkRow}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+              <Text style={[styles.link, { color: colors.primary }]}>Add food allergies</Text>
+            </Pressable>
+          )}
+        </GlassCard>
+
+        <View style={styles.group}>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>How active are you?</Text>
+          <View style={styles.cards} accessibilityRole="radiogroup">
+            {ACTIVITY_OPTIONS.map((opt) => (
+              <ChoiceCard
+                key={opt.value}
+                option={opt}
+                selected={draft.activity === opt.value}
+                onPress={() => update('activity', opt.value)}
+                disabled={saving}
+                colors={colors}
+              />
+            ))}
+          </View>
+          {errors.activity ? <Text style={styles.errorText}>{errors.activity}</Text> : null}
+        </View>
+      </>
+    );
+  };
+
+  const canGoBackInHeader = step > 0 || (!forcedOnboarding && navigation.canGoBack());
 
   return (
     <AnimatedScreen>
       <ScreenHeader
-        title={screenTitle}
-        onBack={
-          forcedOnboarding
-            ? undefined
-            : navigation.canGoBack()
-            ? () => navigation.goBack()
-            : undefined
-        }
+        title={forcedOnboarding ? 'Your Fitness Profile' : 'Update Fitness Profile'}
+        onBack={canGoBackInHeader && !saving ? () => goBack() : undefined}
       />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {profileLoading ? (
-          <View style={styles.profileLoader}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {!hydrated ? (
+          <View style={styles.loader}>
             <AiLoadingPulse icon="fitness-outline" size={40} />
-            <Text style={[styles.profileLoaderText, { color: colors.textSecondary }]}>
-              Loading your profile…
-            </Text>
+            <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Loading your profile…</Text>
           </View>
         ) : (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View entering={FadeInUp.duration(400)} style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Tell us about yourself</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              We'll use this to build your personalised diet and training plans.
-            </Text>
+          <>
+            <ScrollView
+              ref={scrollRef}
+              contentContainerStyle={styles.scroll}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+            >
+              <StepProgress step={step} colors={colors} />
 
-            <View style={styles.progressBlock}>
-              <FormProgress progress={completion} />
-              <View style={styles.progressMeta}>
-                <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-                  {Math.round(completion * 100)}% complete
+              <Animated.View key={stepKey} entering={FadeIn.duration(200)} style={styles.stepBody}>
+                <View style={styles.header}>
+                  <Text style={[styles.title, { color: colors.text }]} accessibilityRole="header">
+                    {STEP_TITLES[step]}
+                  </Text>
+                  <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{STEP_SUBTITLES[step]}</Text>
+                </View>
+
+                {loadNote && step === 0 ? (
+                  <View style={[styles.notice, { borderColor: `${colors.warning}55`, backgroundColor: `${colors.warning}14` }]}>
+                    <Ionicons name="cloud-offline-outline" size={16} color={colors.warning} />
+                    <Text style={[styles.noticeText, { color: colors.textSecondary }]}>{loadNote}</Text>
+                  </View>
+                ) : null}
+
+                {renderStep()}
+              </Animated.View>
+            </ScrollView>
+
+            {/* Pinned outside the scroll view so the keyboard pushes it up
+                rather than covering it. */}
+            <View
+              style={[
+                styles.footer,
+                { paddingBottom: Math.max(insets.bottom, SPACING.md), borderTopColor: colors.surfaceBorder, backgroundColor: colors.background },
+              ]}
+            >
+              {submitError ? (
+                <View
+                  style={[styles.notice, { borderColor: `${colors.danger}55`, backgroundColor: `${colors.danger}12` }]}
+                  accessibilityLiveRegion="polite"
+                >
+                  <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+                  <Text style={[styles.noticeText, { color: colors.text }]}>{submitError}</Text>
+                </View>
+              ) : saving && slowSave ? (
+                <Text style={[styles.footerNote, { color: colors.textSecondary }]}>
+                  Still saving — the connection is slow. Your answers are safe on this device.
                 </Text>
-                <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-                  {REQUIRED_FIELDS - Math.round(completion * REQUIRED_FIELDS)} left
+              ) : isLastStep && isOffline ? (
+                <Text style={[styles.footerNote, { color: colors.textSecondary }]}>
+                  You’re offline. Your answers are saved on this device until you reconnect.
                 </Text>
+              ) : isLastStep ? (
+                <Text style={[styles.footerNote, { color: colors.textMuted }]}>
+                  Your diet plan is built in the background — you can start using the app right away.
+                </Text>
+              ) : null}
+
+              <View style={styles.footerButtons}>
+                {step > 0 ? (
+                  <AnimatedButton
+                    label="Back"
+                    variant="secondary"
+                    onPress={() => goBack()}
+                    disabled={saving}
+                    style={styles.backButton}
+                  />
+                ) : null}
+                {/* Step 1 advances on tap; the button is there for a member who
+                    already picked a goal and came back to it. */}
+                {stepKey !== 'goal' || draft.goal ? (
+                  <AnimatedButton
+                    label={isLastStep ? (forcedOnboarding ? 'Save & Start' : 'Save Changes') : 'Continue'}
+                    onPress={handleContinue}
+                    loading={saving}
+                    disabled={saving}
+                    style={styles.flex1}
+                  />
+                ) : null}
               </View>
             </View>
-          </Animated.View>
-
-          <GlassCard glowColor={colors.accent} innerStyle={styles.section}>
-            <SectionHeader icon="person-outline" title="Personal info" color={colors.text} tint={colors.accent} />
-            <View style={styles.row}>
-              <View style={styles.flex1}>
-                <GlassInput label="Age" placeholder="25" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} editable={!loading} />
-              </View>
-              <View style={styles.flex1}>
-                <GlassInput label="Weight" placeholder="70 kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
-              </View>
-              <View style={styles.flex1}>
-                <GlassInput label="Height" placeholder="175 cm" value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={6} editable={!loading} />
-              </View>
-            </View>
-            <View style={styles.group}>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Gender</Text>
-              <OptionSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} disabled={loading} />
-            </View>
-          </GlassCard>
-
-          <GlassCard glowColor={colors.primary} innerStyle={styles.section}>
-            <SectionHeader icon="trophy-outline" title="Goals" color={colors.text} tint={colors.primary} />
-            <View style={styles.group}>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>What are you training for?</Text>
-              <OptionSelector options={GOAL_OPTIONS} selected={goal} onSelect={setGoal} disabled={loading} />
-            </View>
-          </GlassCard>
-
-          <GlassCard glowColor={colors.primaryGlow} innerStyle={styles.section}>
-            <SectionHeader icon="restaurant-outline" title="Preferences" color={colors.text} tint={colors.primaryGlow} />
-            <View style={styles.group}>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Diet preference</Text>
-              <OptionSelector options={DIET_OPTIONS} selected={diet} onSelect={setDiet} disabled={loading} />
-            </View>
-            <View style={styles.group}>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Activity level</Text>
-              <OptionSelector options={ACTIVITY_OPTIONS} selected={activity} onSelect={setActivity} disabled={loading} />
-            </View>
-            <GlassInput
-              label="Allergies (optional)"
-              placeholder="e.g. peanuts, lactose"
-              value={allergies}
-              onChangeText={setAllergies}
-              multiline
-              numberOfLines={2}
-              editable={!loading}
-            />
-          </GlassCard>
-
-          <View style={styles.footer}>
-            <AnimatedButton
-              label="Create My Plan"
-              onPress={handleSubmit}
-              loading={loading}
-              disabled={loading}
-            />
-            <Text style={[styles.footerNote, { color: colors.textMuted }]}>
-              You can update these details anytime from your profile.
-            </Text>
-          </View>
-        </ScrollView>
+          </>
         )}
       </KeyboardAvoidingView>
     </AnimatedScreen>
   );
 };
 
-// One spacing scale: 8 inside a label/control pair, 16 between groups in a
-// card, 24 between cards, 32 before and after the page's edges.
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  flex: { flex: 1 },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xxl,
-    gap: SPACING.lg,
-  },
-  profileLoader: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-  },
-  profileLoaderText: { ...TYPOGRAPHY.body, textAlign: 'center' as const },
-
-  header: { gap: SPACING.sm },
-  title: { ...TYPOGRAPHY.title },
-  subtitle: { ...TYPOGRAPHY.body },
-  progressBlock: { gap: SPACING.sm, marginTop: SPACING.xs },
-  progressTrack: {
-    width: '100%',
-    height: 8,
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.full,
-    overflow: 'hidden' as const,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  progressFillWrap: { height: '100%', borderRadius: RADIUS.full, overflow: 'hidden' as const },
-  progressFill: { flex: 1, borderRadius: RADIUS.full },
-  progressMeta: { flexDirection: 'row', justifyContent: 'space-between' },
+// Theme-independent layout, shared by the small components above.
+const baseStyles = StyleSheet.create({
+  progressWrap: { gap: SPACING.sm },
+  progressBars: { flexDirection: 'row', gap: 6 },
+  progressBar: { flex: 1, height: 6, borderRadius: RADIUS.full },
   progressLabel: { ...TYPOGRAPHY.caption, fontFamily: FONTS.bodyMedium },
 
-  section: { padding: SPACING.lg, gap: SPACING.md },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  sectionIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: RADIUS.sm,
+  choiceCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: SPACING.md,
+    minHeight: 64,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
   },
-  sectionTitle: { ...TYPOGRAPHY.heading, fontFamily: FONTS.displaySemi },
+  choiceIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  choiceText: { flex: 1, gap: 2 },
+  choiceLabel: { fontSize: 15, fontFamily: FONTS.bodySemi },
+  choiceHint: { fontSize: 13, lineHeight: 18 },
 
-  // A label and the control it names belong together — 8 apart, while the
-  // card's own 16 gap keeps one group clear of the next.
-  group: { gap: SPACING.sm },
-  fieldLabel: { ...INPUT_LABEL },
-  row: { flexDirection: 'row', gap: SPACING.sm },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  unit: { fontSize: 14, fontFamily: FONTS.bodyMedium },
+});
+
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+  flex: { flex: 1 },
   flex1: { flex: 1 },
-  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING.md, padding: SPACING.lg },
+  loaderText: { ...TYPOGRAPHY.body, textAlign: 'center' },
 
-  footer: { gap: SPACING.md, marginTop: SPACING.xs },
-  footerNote: { ...TYPOGRAPHY.caption, textAlign: 'center' as const, lineHeight: 18 },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: SPACING.gutter,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    gap: SPACING.lg,
+  },
+  stepBody: { gap: SPACING.lg },
+  header: { gap: SPACING.xs },
+  title: { ...TYPOGRAPHY.title },
+  subtitle: { ...TYPOGRAPHY.body },
+
+  cards: { gap: SPACING.sm },
+  section: { padding: SPACING.md + 4, gap: SPACING.md },
+  group: { gap: SPACING.sm },
+  row: { flexDirection: 'row', gap: SPACING.sm },
+  shrinkInput: { minWidth: 0 },
+  fieldLabel: { ...INPUT_LABEL },
+  errorText: { fontFamily: FONTS.bodyMedium, fontSize: 12, lineHeight: 16, color: colors.danger },
+
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 },
+  link: { fontSize: 14, fontFamily: FONTS.bodySemi },
+
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    padding: 12,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+  },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
+
+  footer: {
+    paddingHorizontal: SPACING.gutter,
+    paddingTop: 12,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  footerButtons: { flexDirection: 'row', gap: SPACING.sm },
+  backButton: { minWidth: 104 },
+  footerNote: { ...TYPOGRAPHY.caption, textAlign: 'center', lineHeight: 18 },
 });

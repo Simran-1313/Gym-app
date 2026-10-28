@@ -1,5 +1,10 @@
-import React from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import React, { useState } from 'react';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,6 +13,10 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { FloatingTabBar } from '../components/ui/FloatingTabBar';
+import { ConnectivityBanner } from '../components/ui/ConnectivityBanner';
+import { PlanReadyToast } from '../components/ui/PlanReadyToast';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { FONT_SIZE, FONTS, ThemeColors } from '../config/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { ActiveSubscription, AiPlan, WorkoutDay } from '../types';
@@ -208,8 +217,40 @@ const MainTabs: React.FC = () => {
   );
 };
 
+const navigationRef = createNavigationContainerRef<RootStackParams>();
+
+/** Focused-route names that show the floating tab bar. */
+const TAB_ROUTES = new Set(['Home', 'ClassSchedules', 'MyBookings', 'ChatList', 'CheckIns', 'Profile']);
+
+/**
+ * A saved session exists but couldn't be verified (offline or server down).
+ * Offering a retry here — instead of the login form — means a member who
+ * opens the app on a train isn't signed out by a tunnel. AuthContext also
+ * retries on its own when the connection comes back.
+ */
+const SessionRestoreError: React.FC<{ message: string }> = ({ message }) => {
+  const { retryRestore, abandonRestore } = useAuth();
+  return (
+    <ScreenBackground>
+      <View style={styles.restoreWrap}>
+        <EmptyState
+          icon="cloud-offline-outline"
+          tone="error"
+          title="Can’t connect right now"
+          subtitle={`${message} You’re still signed in — we’ll reconnect automatically.`}
+          actionLabel="Try Again"
+          onAction={retryRestore}
+          secondaryLabel="Sign in with another account"
+          onSecondary={abandonRestore}
+        />
+      </View>
+    </ScreenBackground>
+  );
+};
+
 export const AppNavigator: React.FC = () => {
-  const { user, isLoading, isFirstLogin, theme } = useAuth();
+  const { user, isLoading, isFirstLogin, theme, restoreError } = useAuth();
+  const [currentRoute, setCurrentRoute] = useState<string | undefined>(undefined);
 
   // Register push notifications when user is logged in
   usePushNotifications(!!user);
@@ -221,6 +262,21 @@ export const AppNavigator: React.FC = () => {
   if (isLoading) return <LoadingSpinner fullScreen />;
 
   let content: React.ReactNode;
+  // Keys the NavigationContainer below. The container owns navigation state
+  // and carries it across a navigator swap; since both the onboarding and the
+  // main stack contain an `Onboarding` route, finishing onboarding used to
+  // leave the member on that route inside the main app. A fresh container per
+  // phase starts each phase at its own first screen.
+  const phase = !user ? 'auth' : isFirstLogin ? 'first-login' : user.isOnboarded === false ? 'onboarding' : 'app';
+
+  if (!user && restoreError) {
+    return (
+      <>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <SessionRestoreError message={restoreError} />
+      </>
+    );
+  }
 
   if (!user) {
     content = (
@@ -274,11 +330,33 @@ export const AppNavigator: React.FC = () => {
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
-      <NavigationContainer theme={navigationTheme}>{content}</NavigationContainer>
+      <NavigationContainer
+        key={phase}
+        ref={navigationRef}
+        theme={navigationTheme}
+        onReady={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
+        onStateChange={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
+      >
+        {content}
+      </NavigationContainer>
+      {user ? (
+        <PlanReadyToast
+          currentRoute={currentRoute}
+          onOpen={
+            user.isOnboarded
+              ? (type) => {
+                  if (navigationRef.isReady()) navigationRef.navigate(type === 'WORKOUT' ? 'WorkoutPlan' : 'DietPlan');
+                }
+              : null
+          }
+        />
+      ) : null}
+      <ConnectivityBanner aboveTabBar={!!currentRoute && TAB_ROUTES.has(currentRoute)} />
     </>
   );
 };
 
 const styles = StyleSheet.create({
   tabScene: { backgroundColor: 'transparent' },
+  restoreWrap: { flex: 1, justifyContent: 'center', padding: 20 },
 });

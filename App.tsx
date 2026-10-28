@@ -21,6 +21,11 @@ import { AuthProvider } from './src/context/AuthContext';
 import { PlansProvider } from './src/context/PlansContext';
 import { ActivityProvider } from './src/context/ActivityContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { startConnectivityMonitor } from './src/services/network';
+
+// Before the first render, so the API client knows about connectivity from
+// the very first request.
+startConnectivityMonitor();
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({

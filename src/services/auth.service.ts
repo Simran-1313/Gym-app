@@ -14,24 +14,8 @@ export interface LoginResponse {
 }
 
 export const login = async (payload: LoginPayload): Promise<LoginResponse> => {
-  const url = '/member/auth/login';
-  console.log('====================================');
-  console.log('[login] API request');
-  console.log('  → method  : POST');
-  console.log('  → url     :', url);
-  console.log('  → payload :', JSON.stringify(payload, null, 2));
-  console.log('====================================');
-
-  const res = await api.post<ApiResponse<LoginResponse>>(url, payload);
-
-  console.log('====================================');
-  console.log('[login] API response');
-  console.log('  → status  :', res.status);
-  console.log('  → success :', res.data.success);
-  console.log('  → message :', res.data.message ?? '(none)');
-  console.log('  → data    :', JSON.stringify(res.data.data, null, 2));
-  console.log('====================================');
-
+  // Never log this payload — it holds the password and device token.
+  const res = await api.post<ApiResponse<LoginResponse>>('/member/auth/login', payload);
   if (!res.data.success || !res.data.data) throw new Error(res.data.message ?? 'Login failed');
   return res.data.data;
 };

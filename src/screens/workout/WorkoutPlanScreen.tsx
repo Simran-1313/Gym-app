@@ -78,7 +78,7 @@ export const WorkoutPlanScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const route = useRoute<RouteProp<RootStackParams, 'WorkoutPlan'>>();
   const insets = useSafeAreaInsets();
-  const { workout, loadPlan, generatePlan, setPlan } = usePlans();
+  const { workout, loadPlan, generatePlan, setPlan, retry } = usePlans();
   const colors = useThemeColors();
 
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -164,7 +164,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             {workout.error ?? 'Generate a personalised training split from your fitness profile.'}
           </Text>
           {workout.error ? (
-            <AnimatedButton label="Try Again" onPress={() => loadPlan('WORKOUT')} />
+            <AnimatedButton label="Try Again" onPress={() => retry('WORKOUT')} />
           ) : (
             <>
               <AnimatedButton

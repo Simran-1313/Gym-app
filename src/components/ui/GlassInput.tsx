@@ -24,6 +24,8 @@ interface Props extends TextInputProps {
   containerStyle?: StyleProp<ViewStyle>;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /** Inline validation message; also turns the border to the danger color. */
+  error?: string | null;
 }
 
 export const GlassInput: React.FC<Props> = ({
@@ -35,6 +37,7 @@ export const GlassInput: React.FC<Props> = ({
   onBlur,
   style,
   multiline,
+  error,
   ...rest
 }) => {
   const colors = useThemeColors();
@@ -46,7 +49,7 @@ export const GlassInput: React.FC<Props> = ({
     borderColor: interpolateColor(
       focused.value,
       [0, 1],
-      [colors.surfaceBorder, colors.primary],
+      [error ? colors.danger : colors.surfaceBorder, error ? colors.danger : colors.primary],
     ),
   }));
 
@@ -81,6 +84,11 @@ export const GlassInput: React.FC<Props> = ({
         {rightIcon}
       </Animated.View>
       {isFocused ? <View style={[styles.focusGlow, { backgroundColor: colors.primaryGlow }]} pointerEvents="none" /> : null}
+      {error ? (
+        <Text style={[styles.error, { color: colors.danger }]} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 };
@@ -105,6 +113,7 @@ const styles = StyleSheet.create({
     paddingVertical: INPUT.multilinePaddingVertical,
   },
   input: INPUT_TEXT,
+  error: { fontFamily: INPUT_LABEL.fontFamily, fontSize: 12, lineHeight: 16 },
   inputMultiline: { height: undefined, minHeight: INPUT.multilineMinHeight - INPUT.multilinePaddingVertical * 2 - INPUT.borderWidth * 2, textAlignVertical: 'top' },
   focusGlow: {
     position: 'absolute',

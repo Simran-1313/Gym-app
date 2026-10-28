@@ -19,7 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile } from '../../services/auth.service';
-import { submitProfile } from '../../services/member.service';
+import { saveProfile } from '../../services/profileSave';
+import { usePlans } from '../../context/PlansContext';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { FONT_SIZE, FONTS, INPUT, INPUT_LABEL, SPACING, TYPOGRAPHY } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -142,6 +143,7 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+  const { trackGeneration } = usePlans();
   const isIOS = Platform.OS === 'ios';
 
   const [name, setName] = useState('');
@@ -272,13 +274,21 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
 
       let savedProfile: MemberProfile | null = null;
       if (fitnessChanged && profile && goal) {
-        const { profile: saved } = await submitProfile({
-          ...profile,
+        // Wait for the profile to be stored, not for the diet plan the
+        // backend regenerates from it — that lands in the background.
+        const { saved, request } = saveProfile({
+          age: profile.age,
           weight,
           height,
+          gender: profile.gender,
           fitnessGoal: goal,
+          dietPreference: profile.dietPreference,
+          activityLevel: profile.activityLevel,
+          allergies: profile.allergies,
+          daysPerWeek: profile.daysPerWeek,
         });
-        savedProfile = saved;
+        savedProfile = await saved;
+        trackGeneration('DIET', request.then((r) => r.aiPlan));
       }
 
       await refreshUser();

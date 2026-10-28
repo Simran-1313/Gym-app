@@ -26,6 +26,9 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
 import { AiLoadingPulse } from '../../components/ui/AiLoadingPulse';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { confirmOnline, useConnectivity } from '../../services/network';
+import { PlanSlice, STALL_AFTER_MS } from '../../context/PlansContext';
 
 /**
  * Ported from `#screen-diet-plan` in docs/UI_PROTOTYPE.html: a "Daily Target"
@@ -66,6 +69,27 @@ const macroPercents = (macros: { proteinG: number; carbsG: number; fatG: number 
   };
 };
 
+/** Headline + icon per failure, so "offline" never reads as "server broken". */
+const errorCopy = (slice: PlanSlice): { title: string; icon: 'cloud-offline-outline' | 'server-outline' | 'warning-outline' | 'time-outline' } => {
+  switch (slice.errorKind) {
+    case 'offline':
+      return { title: 'You’re offline', icon: 'cloud-offline-outline' };
+    case 'unreachable':
+    case 'server':
+      return { title: 'Service unavailable', icon: 'server-outline' };
+    case 'timeout':
+      return {
+        title: slice.errorSource === 'generate' ? 'Generation took too long' : 'Server is slow to respond',
+        icon: 'time-outline',
+      };
+    default:
+      return {
+        title: slice.errorSource === 'generate' ? 'Couldn’t generate your plan' : 'Couldn’t load your diet plan',
+        icon: 'warning-outline',
+      };
+  }
+};
+
 const MealCard: React.FC<{ meal: DietPlanDay['meals'][0] }> = ({ meal }) => {
   const colors = useThemeColors();
   const items = Array.isArray(meal.items) ? meal.items : [];
@@ -91,17 +115,17 @@ export const DietPlanScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
   const colors = useThemeColors();
-  const { diet, loadPlan, generatePlan, setPlan } = usePlans();
+  const { diet, loadPlan, generatePlan, setPlan, retry } = usePlans();
+  const { isOffline } = useConnectivity();
 
   const [selectedDay, setSelectedDay] = useState(0);
-  // True while we're waiting for a background-generated plan (after onboarding).
-  const [awaitingBackground, setAwaitingBackground] = useState(false);
 
   // Hydrate once on mount — never re-run on context updates (prevents flicker).
+  // A generation started during onboarding is tracked by PlansContext, which
+  // keeps watching for the plan whether or not this screen is open.
   useEffect(() => {
     const paramPlan = route.params?.plan ?? null;
     const shouldGenerate = !!route.params?.generate;
-    const fromOnboarding = !!route.params?.fromOnboarding;
 
     if (paramPlan) {
       setPlan('DIET', paramPlan);
@@ -111,41 +135,42 @@ export const DietPlanScreen: React.FC = () => {
       generatePlan('DIET');
       return;
     }
-    // If coming straight from onboarding without a pre-loaded plan, the AI is
-    // still generating in the background. Start polling until it appears.
-    if (fromOnboarding) setAwaitingBackground(true);
     loadPlan('DIET');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll every 5 s while awaiting the background-generated plan (up to 90 s).
-  useEffect(() => {
-    if (!awaitingBackground || diet.plan || diet.generating) return;
-
-    const poll = setInterval(() => loadPlan('DIET', true), 5000);
-    const giveUp = setTimeout(() => {
-      setAwaitingBackground(false);
-      clearInterval(poll);
-    }, 90000);
-
-    if (diet.loaded && diet.plan) {
-      setAwaitingBackground(false);
-      clearInterval(poll);
-      clearTimeout(giveUp);
-    }
-
-    return () => {
-      clearInterval(poll);
-      clearTimeout(giveUp);
-    };
-  }, [awaitingBackground, diet.plan, diet.generating, diet.loaded, loadPlan]);
-
   const plan = diet.plan;
   const content = plan ? normalizeDietPlanContent(plan.content) : null;
   const cameFromOnboarding = !user?.isOnboarded || !!route.params?.fromOnboarding;
-  const showBlockingLoader = (diet.generating || diet.loading || awaitingBackground) && !content;
+
+  // Re-render once the watched generation counts as stalled, to offer a retry.
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (!diet.awaitingSince) {
+      setStalled(false);
+      return;
+    }
+    const remaining = diet.awaitingSince + STALL_AFTER_MS - Date.now();
+    if (remaining <= 0) {
+      setStalled(true);
+      return;
+    }
+    setStalled(false);
+    const t = setTimeout(() => setStalled(true), remaining);
+    return () => clearTimeout(t);
+  }, [diet.awaitingSince]);
+
+  const handleRetry = useCallback(async () => {
+    // Re-check before spending a request; the connectivity event may be stale.
+    await confirmOnline();
+    await retry('DIET');
+  }, [retry]);
 
   const handleGenerateNew = useCallback(() => {
+    if (isOffline) {
+      Alert.alert('You’re offline', 'Connect to the internet to generate a new plan. Your current plan stays available.');
+      return;
+    }
     Alert.alert(
       'Generate a fresh plan?',
       'This builds a new 7-day diet plan from your current fitness profile. It can take up to a minute.',
@@ -160,7 +185,7 @@ export const DietPlanScreen: React.FC = () => {
         },
       ],
     );
-  }, [generatePlan]);
+  }, [generatePlan, isOffline]);
 
   const handleDone = async () => {
     await refreshUser();
@@ -176,68 +201,79 @@ export const DietPlanScreen: React.FC = () => {
   };
 
   const renderBody = () => {
-    if (showBlockingLoader) {
+    if (!content && diet.generating) {
       return (
         <View style={s.center}>
           <AiLoadingPulse icon="nutrition-outline" size={48} />
-          <Text style={[s.loadingTitle, { color: colors.text }]}>
-            {diet.generating
-              ? 'Crafting your diet plan'
-              : awaitingBackground
-              ? 'Preparing your plan…'
-              : 'Loading your diet plan'}
-          </Text>
+          <Text style={[s.loadingTitle, { color: colors.text }]}>Building your diet plan</Text>
           <Text style={[s.loadingText, { color: colors.textSecondary }]}>
-            {diet.generating || awaitingBackground
-              ? 'Our AI nutritionist is balancing your meals and macros. This usually takes under a minute.'
-              : 'Fetching your saved plan…'}
+            {isOffline
+              ? 'You’re offline. We’ll check on your plan as soon as you reconnect.'
+              : 'Our AI nutritionist is balancing your meals and macros. This usually takes under a minute.'}
           </Text>
+          <Text style={[s.loadingHint, { color: colors.textMuted }]}>
+            You can keep using the app — your plan will be here when it’s ready.
+          </Text>
+          {stalled && !isOffline ? (
+            <AnimatedButton label="Taking too long? Try Again" onPress={handleRetry} />
+          ) : null}
+          {navigation.canGoBack() ? (
+            <AnimatedButton label="Keep Exploring" variant="secondary" onPress={() => navigation.goBack()} />
+          ) : null}
         </View>
       );
     }
 
-    if (!content) {
+    if (!content && (diet.loading || !diet.loaded)) {
       return (
         <View style={s.center}>
-          <View
-            style={[
-              s.emptyIconWrap,
-              { backgroundColor: colors.surface, borderColor: colors.cardBorder },
-              diet.error && { borderColor: `${colors.danger}40`, backgroundColor: `${colors.danger}10` },
-            ]}
-          >
-            <Ionicons
-              name={diet.error ? 'warning-outline' : 'nutrition-outline'}
-              size={42}
-              color={diet.error ? colors.danger : colors.primary}
-            />
-          </View>
-          <Text style={[s.emptyTitle, { color: colors.text }]}>
-            {diet.error ? 'Couldn’t load your diet plan' : 'No diet plan yet'}
-          </Text>
-          <Text style={[s.loadingText, { color: colors.textSecondary }]}>
-            {diet.error ?? 'Generate a personalised 7-day diet plan from your fitness profile.'}
-          </Text>
-          {diet.error ? (
-            <AnimatedButton label="Try Again" onPress={() => loadPlan('DIET')} />
-          ) : (
-            <>
-              <AnimatedButton
-                label={diet.generating ? 'Generating…' : 'Generate My Diet Plan'}
-                onPress={() => generatePlan('DIET')}
-                loading={diet.generating}
-                disabled={diet.generating}
-                icon={<Ionicons name="sparkles" size={18} color={colors.white} />}
-              />
-              <AnimatedButton
-                label="Update Fitness Profile"
-                variant="secondary"
-                onPress={() => navigation.navigate('Onboarding')}
-                icon={<Ionicons name="create-outline" size={16} color={colors.primary} />}
-              />
-            </>
-          )}
+          <AiLoadingPulse icon="nutrition-outline" size={48} />
+          <Text style={[s.loadingTitle, { color: colors.text }]}>Loading your diet plan</Text>
+          <Text style={[s.loadingText, { color: colors.textSecondary }]}>Fetching your saved plan…</Text>
         </View>
+      );
+    }
+
+    if (!content && diet.error) {
+      const copy = errorCopy(diet);
+      return (
+        <EmptyState
+          icon={copy.icon}
+          tone="error"
+          title={copy.title}
+          subtitle={diet.error}
+          actionLabel={diet.errorSource === 'generate' ? 'Try Generating Again' : 'Try Again'}
+          onAction={handleRetry}
+          secondaryLabel={diet.errorKind === 'validation' ? 'Update Fitness Profile' : undefined}
+          onSecondary={diet.errorKind === 'validation' ? () => navigation.navigate('Onboarding') : undefined}
+        />
+      );
+    }
+
+    if (!content) {
+      // A plan exists but its content isn't in a shape we can render — say
+      // so honestly rather than presenting it as a working plan.
+      if (plan) {
+        return (
+          <EmptyState
+            icon="warning-outline"
+            title="This plan couldn’t be displayed"
+            subtitle="The saved plan is incomplete. Generate a fresh one from your fitness profile."
+            actionLabel="Generate New Plan"
+            onAction={() => generatePlan('DIET')}
+          />
+        );
+      }
+      return (
+        <EmptyState
+          icon="nutrition-outline"
+          title="No diet plan yet"
+          subtitle="Generate a personalised 7-day diet plan from your fitness profile."
+          actionLabel={isOffline ? 'Connect to Generate' : 'Generate My Diet Plan'}
+          onAction={() => (isOffline ? handleRetry() : generatePlan('DIET'))}
+          secondaryLabel="Update Fitness Profile"
+          onSecondary={() => navigation.navigate('Onboarding')}
+        />
       );
     }
 
@@ -252,7 +288,9 @@ export const DietPlanScreen: React.FC = () => {
         refreshControl={
           <RefreshControl
             refreshing={diet.loading}
-            onRefresh={() => loadPlan('DIET', true)}
+            onRefresh={() => {
+              if (!isOffline) loadPlan('DIET', true);
+            }}
             tintColor={colors.primary}
           />
         }
@@ -260,8 +298,35 @@ export const DietPlanScreen: React.FC = () => {
         {diet.generating && (
           <View style={[s.banner, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <AiLoadingPulse icon="sparkles" size={18} />
-            <Text style={[s.bannerText, { color: colors.textSecondary }]}>Generating a fresh plan…</Text>
+            <Text style={[s.bannerText, { color: colors.textSecondary }]}>
+              Generating a fresh plan… you can leave this screen.
+            </Text>
           </View>
+        )}
+
+        {diet.fromCache && (
+          <View style={[s.banner, { backgroundColor: `${colors.warning}12`, borderColor: `${colors.warning}40` }]}>
+            <Ionicons name="cloud-offline-outline" size={16} color={colors.warning} />
+            <Text style={[s.bannerText, s.bannerFlex, { color: colors.textSecondary }]}>
+              {diet.errorKind === 'offline'
+                ? 'You’re offline — showing the copy saved on this device. It’ll refresh when you reconnect.'
+                : 'Couldn’t reach the server — showing the copy saved on this device. Pull down to refresh.'}
+            </Text>
+          </View>
+        )}
+
+        {!diet.generating && diet.errorSource === 'generate' && diet.error && (
+          <Pressable
+            onPress={handleRetry}
+            accessibilityRole="button"
+            style={[s.banner, { backgroundColor: `${colors.danger}10`, borderColor: `${colors.danger}40` }]}
+          >
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={[s.bannerText, s.bannerFlex, { color: colors.textSecondary }]}>
+              New plan failed: {diet.error} Your previous plan is shown.
+            </Text>
+            <Text style={[s.bannerAction, { color: colors.primary }]}>Retry</Text>
+          </Pressable>
         )}
 
         {/* ── Daily Target ──
@@ -357,11 +422,12 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg, gap: SPACING.md },
   loadingTitle: { fontSize: 18, fontFamily: FONTS.bodyExtra, textAlign: 'center' },
   loadingText: { fontSize: 13.5, textAlign: 'center', lineHeight: 20 },
-  emptyIconWrap: { width: 84, height: 84, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emptyTitle: { fontSize: 18, fontFamily: FONTS.bodyExtra, textAlign: 'center' },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1 },
   bannerText: { fontSize: 12.5, fontFamily: FONTS.bodySemi },
+  bannerFlex: { flex: 1, lineHeight: 17 },
+  bannerAction: { fontSize: 13, fontFamily: FONTS.bodyBold },
+  loadingHint: { fontSize: 12.5, textAlign: 'center', lineHeight: 18 },
 
   // `.card.card-elevated { padding:18px; margin-bottom:16px }`
   targetCard: { marginBottom: 2 },

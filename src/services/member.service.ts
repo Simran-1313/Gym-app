@@ -1,4 +1,5 @@
 import api from './api';
+import { kindOf } from '../utils/requestPolicy';
 import {
   AiPlan,
   AiPlanMeta,
@@ -68,16 +69,22 @@ export interface SubmitProfileResult {
   aiPlan: AiPlan | null;
 }
 
+/**
+ * The backend may generate the diet plan inside this request (it returns
+ * `aiPlan` when it did), so the call can take as long as the LLM does. Callers
+ * must not block the member on it — use `saveProfile` (services/profileSave),
+ * which confirms the save by reading the profile back.
+ */
+export const PROFILE_SUBMIT_TIMEOUT = 120000;
+
 export const submitProfile = async (data: MemberProfileInput): Promise<SubmitProfileResult> => {
   const res = await api.post<ApiResponse<SubmitProfileResult>>('/member/profile', data, {
-    // Diet plan generation calls an LLM (with multi-model fallback on the
-    // backend); give it generous headroom beyond the default 15s.
-    timeout: 120000,
+    timeout: PROFILE_SUBMIT_TIMEOUT,
   });
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message ?? 'Failed to save profile');
   }
-  return res.data.data;
+  return { profile: res.data.data.profile, aiPlan: res.data.data.aiPlan ?? null };
 };
 
 export interface AiPlansResult {
@@ -99,7 +106,8 @@ export const getAiPlan = async (id: string): Promise<AiPlan> => {
   return res.data.data.plan;
 };
 
-const AI_TIMEOUT = 120000;
+/** LLM generation on the backend; reads stay on the 15s client default. */
+export const AI_TIMEOUT = 120000;
 
 export const generateDietPlan = async (): Promise<AiPlan> => {
   const res = await api.post<ApiResponse<{ plan: AiPlan }>>('/member/ai-plans/diet', {}, {
@@ -121,15 +129,22 @@ export const generateWorkoutPlan = async (): Promise<AiPlan> => {
   return res.data.data.plan;
 };
 
+/**
+ * `null` only when the member genuinely has no profile yet (404). Offline,
+ * server and session errors throw, so callers can tell "new member" apart
+ * from "couldn't load" — conflating them made an offline edit look like an
+ * empty profile.
+ */
 export const getProfile = async (): Promise<MemberProfile | null> => {
   try {
     const res = await api.get<ApiResponse<{ profile: MemberProfile }>>('/member/profile');
     if (res.data.success && res.data.data) {
-      return res.data.data.profile;
+      return res.data.data.profile ?? null;
     }
     return null;
-  } catch {
-    return null;
+  } catch (err) {
+    if (kindOf(err) === 'not_found') return null;
+    throw err;
   }
 };
 
@@ -186,13 +201,7 @@ export interface DeviceTokenPayload {
 }
 
 export const registerDeviceToken = async (payload: DeviceTokenPayload): Promise<void> => {
-  console.log('====================================');
-  console.log('[registerDeviceToken] Sending payload to backend:');
-  console.log('  → token   :', payload.token);
-  console.log('  → platform:', payload.platform);
-  console.log('====================================');
   const res = await api.put<ApiResponse<any>>('/member/notifications/device-token', payload);
-  console.log('[registerDeviceToken] Backend response:', JSON.stringify(res.data));
   if (!res.data.success) throw new Error(res.data.message ?? 'Failed to register device token');
 };
 
