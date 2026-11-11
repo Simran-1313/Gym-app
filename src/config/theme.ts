@@ -1,10 +1,11 @@
 /**
- * Midnight / Teal design system.
+ * Clasendra design system, matched to clasendra.com: near-black and warm
+ * off-white grounds with a single lime accent.
  *
  * One accent, not five. The previous palette gave every surface its own neon
  * hue, which made nothing feel important because everything shouted. Here a
- * single teal carries interaction and progress, the greys carry structure, and
- * the muted tints below are reserved for biometric categories only — so a teal
+ * single lime carries interaction and progress, the greys carry structure, and
+ * the muted tints below are reserved for biometric categories only — so a lime
  * element on screen always means "this is live or actionable".
  */
 
@@ -14,59 +15,59 @@ const TINTS_DARK = {
   heart: '#F0768B',
   sleep: '#9BA9F0',
   oxygen: '#7FD1E8',
-  recovery: '#4FD1B5',
+  recovery: '#9FE870',
   energy: '#F0B36B',
   hydration: '#6BB8F0',
-  exercise: '#2DD4BF',
+  exercise: '#C7FF4A',
 } as const;
 
 const TINTS_LIGHT = {
   heart: '#D93B57',
   sleep: '#5566D6',
   oxygen: '#1E88A8',
-  recovery: '#0D9488',
+  recovery: '#3F6B00',
   energy: '#C77A1E',
   hydration: '#1D7CC4',
-  exercise: '#0D9488',
+  exercise: '#3F6B00',
 } as const;
 
 export const DARK_COLORS = {
-  // Near-black with a blue cast. Pure #000 makes the teal look radioactive and
-  // crushes the card elevation; the slight navy keeps surfaces separable.
-  background: '#080B11',
-  backgroundGradient: ['#080B11', '#0A1017', '#080B11'] as const,
+  // The website's near-black. Pure #000 makes the lime look radioactive and
+  // crushes the card elevation; the slight lift keeps surfaces separable.
+  background: '#080A0A',
+  backgroundGradient: ['#080A0A', '#0C0F0F', '#080A0A'] as const,
 
-  surface: '#121821',
-  surfaceElevated: '#171F2A',
+  surface: '#111414',
+  surfaceElevated: '#171B1B',
   surfaceBorder: 'rgba(255,255,255,0.07)',
   // Bottom sheets sit above every other surface, so they step up once more and
   // take a stronger hairline than a card would.
-  overlay: '#22282F',
+  overlay: '#1F2424',
   overlayBorder: 'rgba(255,255,255,0.13)',
-  card: '#121821',
+  card: '#111414',
   cardBorder: 'rgba(255,255,255,0.07)',
-  cardPressed: '#1A222D',
+  cardPressed: '#171B1B',
   // Recessed area *inside* a card (progress tracks, nested tiles, steppers).
   // Must stay opaque: a translucent fill over the animated ground reads muddy.
-  inset: '#1B232E',
+  inset: '#1A1F1F',
   insetBorder: 'rgba(255,255,255,0.06)',
 
-  // Teal-400. Bright enough to read as "active" on the dark ground without
-  // the neon-cyan buzz of the old palette.
-  primary: '#2DD4BF',
-  primaryGlow: '#5EEAD4',
-  primaryDark: '#14B8A6',
-  primaryLight: '#99F6E4',
-  primarySoft: 'rgba(45,212,191,0.12)',
-  primaryBorder: 'rgba(45,212,191,0.24)',
+  // The website's lime (--lime). Reads as "active" on the near-black ground.
+  primary: '#C7FF4A',
+  primaryGlow: '#DCFF85',
+  primaryDark: '#8ED952',
+  primaryLight: '#E6FA68',
+  primarySoft: 'rgba(199,255,74,0.12)',
+  primaryBorder: 'rgba(199,255,74,0.24)',
   // A deepened primary for surfaces that always carry white text (CTAs,
-  // filled chips, banners) — `primary` itself is a bright accent teal that
-  // white fails badly against (~1.9:1). See utils/color.ts's `solidFillFor`,
-  // which is how useThemeColors derives this for a tenant's own brand color.
-  primarySolid: '#1B7F73',
+  // filled chips, banners) — `primary` itself is a bright lime that white
+  // fails badly against. This is the website's --lime-ink (white on it is
+  // 6.3:1). See utils/color.ts's `solidFillFor`, which is how
+  // useThemeColors derives this for a tenant's own brand color.
+  primarySolid: '#3F6B00',
 
   secondary: '#7FD1E8',
-  accent: '#4FD1B5',
+  accent: '#9FE870',
   // `--lavender` in the prototype: the AI/assistant accent (chat banner icon,
   // shield-milestone outline) and the default (non-booked, non-full) class
   // capacity bar fill. Distinct from `secondary`/`info`, which are a cyan.
@@ -78,7 +79,7 @@ export const DARK_COLORS = {
   error: '#F0768B',
   info: '#7FD1E8',
 
-  text: '#FFFFFF',
+  text: '#F5F3ED',
   textSecondary: 'rgba(255,255,255,0.56)',
   textMuted: 'rgba(255,255,255,0.38)',
   textFaint: 'rgba(255,255,255,0.22)',
@@ -94,10 +95,10 @@ export const DARK_COLORS = {
   // hero's big metric) and bottom (the footer stats), but near-open through the
   // middle band where the ridge line actually lives. A monotonic ramp buried it.
   scrim: [
-    'rgba(8,11,17,0.78)',
-    'rgba(8,11,17,0.22)',
-    'rgba(8,11,17,0.30)',
-    'rgba(8,11,17,0.88)',
+    'rgba(8,10,10,0.78)',
+    'rgba(8,10,10,0.22)',
+    'rgba(8,10,10,0.30)',
+    'rgba(8,10,10,0.88)',
   ] as const,
 
   white: '#FFFFFF',
@@ -106,32 +107,32 @@ export const DARK_COLORS = {
 } as const;
 
 export const LIGHT_COLORS = {
-  background: '#F5F7FA',
-  backgroundGradient: ['#F5F7FA', '#EDF1F6', '#F5F7FA'] as const,
+  background: '#F5F3ED',
+  backgroundGradient: ['#F5F3ED', '#EFEDE6', '#F5F3ED'] as const,
 
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  surfaceBorder: 'rgba(15,29,45,0.09)',
+  surfaceBorder: 'rgba(8,10,10,0.09)',
   overlay: '#FFFFFF',
-  overlayBorder: 'rgba(15,23,42,0.15)',
+  overlayBorder: 'rgba(8,10,10,0.15)',
   card: '#FFFFFF',
-  cardBorder: 'rgba(15,29,45,0.09)',
-  cardPressed: '#EEF2F6',
-  inset: '#F1F4F8',
-  insetBorder: 'rgba(15,29,45,0.07)',
+  cardBorder: 'rgba(8,10,10,0.09)',
+  cardPressed: '#EFEDE6',
+  inset: '#EFEDE6',
+  insetBorder: 'rgba(8,10,10,0.07)',
 
-  // Teal-600. The dark-mode teal fails contrast on white, so light mode drops
-  // two steps rather than reusing the same token.
-  primary: '#0D9488',
-  primaryGlow: '#14B8A6',
-  primaryDark: '#0F766E',
-  primaryLight: '#5EEAD4',
-  primarySoft: 'rgba(13,148,136,0.10)',
-  primaryBorder: 'rgba(13,148,136,0.22)',
-  primarySolid: '#0C857A',
+  // The website's --lime-ink. The dark-mode lime is invisible on a light
+  // ground, so light mode uses the deep olive the site uses for lime text.
+  primary: '#3F6B00',
+  primaryGlow: '#4D8200',
+  primaryDark: '#2F5200',
+  primaryLight: '#9FE870',
+  primarySoft: 'rgba(63,107,0,0.10)',
+  primaryBorder: 'rgba(63,107,0,0.22)',
+  primarySolid: '#3F6B00',
 
   secondary: '#1E88A8',
-  accent: '#0D9488',
+  accent: '#3F6B00',
   lavender: '#5A6EEA',
 
   success: '#16A34A',
@@ -140,15 +141,15 @@ export const LIGHT_COLORS = {
   error: '#DC2626',
   info: '#1E88A8',
 
-  text: '#0F1D2D',
-  textSecondary: 'rgba(15,29,45,0.62)',
-  textMuted: 'rgba(15,29,45,0.42)',
-  textFaint: 'rgba(15,29,45,0.24)',
+  text: '#080A0A',
+  textSecondary: 'rgba(8,10,10,0.62)',
+  textMuted: 'rgba(8,10,10,0.42)',
+  textFaint: 'rgba(8,10,10,0.24)',
 
   statusActive: '#16A34A',
   statusExpired: '#DC2626',
   statusFrozen: '#D97706',
-  statusCancelled: 'rgba(15,29,45,0.34)',
+  statusCancelled: 'rgba(8,10,10,0.34)',
 
   tint: TINTS_LIGHT,
 
@@ -258,12 +259,12 @@ export const TYPOGRAPHY = {
 } as const;
 
 export const GRADIENTS = {
-  primary: ['#2DD4BF', '#14B8A6'] as const,
-  accent: ['#5EEAD4', '#2DD4BF'] as const,
-  surfaceGlow: ['rgba(45,212,191,0.16)', 'transparent'] as const,
-  profileHero: ['#2DD4BF', '#14B8A6', '#0F766E'] as const,
-  // Deep teal-navy behind vector scenery in hero cards.
-  scenery: ['#0C1A22', '#102A33', '#0A1219'] as const,
+  primary: ['#C7FF4A', '#8ED952'] as const,
+  accent: ['#E6FA68', '#C7FF4A'] as const,
+  surfaceGlow: ['rgba(199,255,74,0.16)', 'transparent'] as const,
+  profileHero: ['#C7FF4A', '#8ED952', '#3A9E47'] as const,
+  // Deep forest green behind vector scenery in hero cards.
+  scenery: ['#0E1A10', '#13261A', '#0A120C'] as const,
 } as const;
 
 /**
@@ -297,7 +298,7 @@ export const MOTION = {
 
 /**
  * Elevation. Dark mode leans on a black shadow for depth; light mode uses a
- * cool blue-grey, because a neutral shadow on a blue-tinted ground reads muddy.
+ * warm near-black at low opacity to sit on the off-white ground.
  */
 export const shadow = (isDark: boolean, level: 'sm' | 'md' | 'lg' = 'md') => {
   const config = {
@@ -307,7 +308,7 @@ export const shadow = (isDark: boolean, level: 'sm' | 'md' | 'lg' = 'md') => {
   }[level];
 
   return {
-    shadowColor: isDark ? '#000000' : '#1E3A5F',
+    shadowColor: isDark ? '#000000' : '#2A2E2C',
     shadowOpacity: isDark ? config.darkOpacity : config.lightOpacity,
     shadowRadius: config.radius,
     shadowOffset: { width: 0, height: config.offset },

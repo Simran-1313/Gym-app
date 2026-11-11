@@ -33,24 +33,24 @@ import { AnimatedButton } from '../../components/ui/AnimatedButton';
  * preference to honour yet — and the scene is artwork, which cannot recolour.
  */
 const SCENE = {
-  glow: 'rgba(45,212,200,0.22)',
-  skyTop: '#0D1A22',
-  skyMid: '#0A141C',
-  skyBottom: '#08090C',
-  ridgeNear: '#101F28',
-  ridgeMid: '#172933',
-  ridgeFar: '#0D1C24',
+  glow: 'rgba(199,255,74,0.16)',
+  skyTop: '#16210D',
+  skyMid: '#0E140C',
+  skyBottom: '#080A0A',
+  ridgeNear: '#131C10',
+  ridgeMid: '#1A2716',
+  ridgeFar: '#0F170D',
 };
 
-/** Dark-mode tokens, lifted verbatim from the prototype's `:root`. */
+/** Dark-mode tokens, matched to clasendra.com's dark palette. */
 const INK = {
-  bg: '#08090C',
-  surface: '#0F1319',
+  bg: '#080A0A',
+  surface: '#111414',
   hairline: 'rgba(255,255,255,0.13)',
-  teal: '#2DD4C8',
-  text: '#F5F7F9',
-  muted: 'rgba(245,247,249,0.64)',
-  dim: 'rgba(245,247,249,0.4)',
+  lime: '#C7FF4A',
+  text: '#F5F3ED',
+  muted: 'rgba(245,243,237,0.64)',
+  dim: 'rgba(245,243,237,0.4)',
   danger: '#FF5A5F',
 };
 
@@ -115,7 +115,7 @@ export const LoginScreen: React.FC = () => {
 
   // Tenant branding still applies pre-login — the gym is resolved before the
   // member signs in, so its accent should already be on the login screen.
-  const accent = isValidHex(gym?.primaryColor) ? (gym!.primaryColor as string) : INK.teal;
+  const accent = isValidHex(gym?.primaryColor) ? (gym!.primaryColor as string) : INK.lime;
   // The mark and the wordmark must agree, so both read from one resolved name.
   const gymName = gym?.name?.trim() || 'Clasendra';
 
@@ -298,13 +298,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(45,212,191,0.14)',
+    backgroundColor: 'rgba(199,255,74,0.14)',
     borderWidth: 1,
-    borderColor: 'rgba(45,212,191,0.3)',
+    borderColor: 'rgba(199,255,74,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tenantMarkText: { fontFamily: FONTS.bodyExtra, fontSize: 16, color: INK.teal },
+  tenantMarkText: { fontFamily: FONTS.bodyExtra, fontSize: 16, color: INK.lime },
   wordmark: {
     fontFamily: FONTS.bodyExtra,
     fontSize: 17,
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   },
 
   links: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 20, paddingVertical: 4 },
-  linkText: { fontFamily: FONTS.bodySemi, fontSize: 13, color: INK.teal },
+  linkText: { fontFamily: FONTS.bodySemi, fontSize: 13, color: INK.lime },
 
   errorBox: {
     flexDirection: 'row',
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, fontFamily: FONTS.body, fontSize: 13, lineHeight: 18, color: INK.danger },
 
   foot: { textAlign: 'center', fontFamily: FONTS.body, fontSize: 13, color: INK.muted, marginTop: 20 },
-  footLink: { fontFamily: FONTS.bodySemi, color: INK.teal },
+  footLink: { fontFamily: FONTS.bodySemi, color: INK.lime },
   poweredBy: {
     textAlign: 'center',
     fontFamily: FONTS.body,

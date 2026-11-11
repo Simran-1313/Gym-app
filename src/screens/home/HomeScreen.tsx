@@ -60,9 +60,9 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const GUTTER = SPACING.gutter;
 const CARD_W = SCREEN_W - GUTTER * 2;
 
-/** Accent used on the photographic hero. Fixed to the bright teal in both
- *  themes — light mode's deeper teal disappears against the dark photo. */
-const HERO_ACCENT = '#5EEAD4';
+/** Accent used on the photographic hero. Fixed to the bright lime in both
+ *  themes — light mode's deep olive disappears against the dark photo. */
+const HERO_ACCENT = '#C7FF4A';
 
 const daysRemaining = (endDate: string) => {
   const diff = new Date(endDate).getTime() - Date.now();
@@ -628,7 +628,7 @@ export const HomeScreen: React.FC = () => {
                   <Text style={[styles.heroStatValue, { color: onPhoto }]}>{stat.value}</Text>
                 </View>
               ))}
-              <View style={[styles.heroArrow, { backgroundColor: 'rgba(45,212,191,0.18)' }]}>
+              <View style={[styles.heroArrow, { backgroundColor: 'rgba(199,255,74,0.18)' }]}>
                 <Ionicons name="arrow-forward" size={15} color={HERO_ACCENT} />
               </View>
             </View>

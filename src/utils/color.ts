@@ -66,8 +66,8 @@ export const bestTextOn = (bgHex: string): string => {
  * for surfaces that must always carry white — a brand's primary CTA fill,
  * say, where the product wants one consistent "white on brand color" look
  * rather than the text flipping between light/dark per tenant (see
- * `bestTextOn` for that alternative). This app's own default teal
- * (#2DD4BF) is a bright accent — white on it is ~1.9:1, unreadable — so
+ * `bestTextOn` for that alternative). This app's own default lime
+ * (#C7FF4A) is a bright accent — white on it is ~1.2:1, unreadable — so
  * committing to white text means the *fill* has to earn it instead. Works
  * for any tenant's brand color the same way: keeps its hue, deepens it only
  * as far as necessary. Already-dark colors pass on the first check and come

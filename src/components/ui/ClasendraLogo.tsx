@@ -8,7 +8,8 @@ import Svg, {
   Stop,
   ClipPath,
   Rect,
-  Mask,
+  Filter,
+  FeGaussianBlur,
 } from 'react-native-svg';
 
 interface Props {
@@ -17,88 +18,76 @@ interface Props {
   style?: StyleProp<ViewStyle>;
 }
 
+/**
+ * The Clasendra symbol, ported from clasendra.com's /logo-symbol.svg: a "C"
+ * folded from layered green sheets, lime at the top to forest at the bottom.
+ * Each fold has a blurred shadow stroke beneath it and a thin highlight on its
+ * edge, which is what gives the sheets their depth.
+ */
 export const ClasendraLogo: React.FC<Props> = ({
   size = 32,
   idPrefix = 'clasendra-rn-logo',
   style,
 }) => {
-  const swooshGradient = `${idPrefix}-swoosh`;
-  const markGradient = `${idPrefix}-mark`;
-  const depthMask = `${idPrefix}-depth`;
-  const bounds = `${idPrefix}-bounds`;
+  const id = (name: string) => `${idPrefix}-${name}`;
+  const url = (name: string) => `url(#${id(name)})`;
 
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      style={style}
-    >
-      <G clipPath={`url(#${bounds})`}>
-        {/* Trailing swoosh */}
-        <Path
-          d="M5.69852 13.1378C2.72025 14.5888 1.01803 13.4242 0.666992 13.1378C1.09655 14.5697 3.10127 14.9362 4.76242 14.4743C6.14655 14.0894 12.4852 11.1902 13.3628 10.7036C12.3682 12.4219 7.58765 14.2515 5.86942 14.9038L7.20582 15.3333C8.12221 15.3333 10.028 13.9985 11.3105 13.4242C10.73 14.3495 9.62408 15.031 9.1627 15.3333C13.2483 15.0279 15.2935 10.7036 15.2935 7.68756L11.1673 8.98541L11.8355 9.65361C8.16994 11.7537 5.68518 12.0863 4.76242 12.134L5.69852 13.1378Z"
-          fill={`url(#${swooshGradient})`}
-        />
-        {/* Ring and ascending bars */}
-        <Path
-          d="M8.32019 0.667355C9.58573 0.6464 10.8343 0.968078 11.9374 1.599C13.0404 2.23012 13.9595 3.14855 14.5985 4.25915C15.1031 5.13647 15.3162 6.47476 15.3837 6.99841C15.4 7.1256 15.3176 7.24172 15.1932 7.27282C15.0716 7.30317 14.9483 7.24314 14.8934 7.13513L14.8739 7.0863C14.75 6.64452 14.4675 5.71576 14.1229 5.11267C13.187 3.47495 12.3546 3.06659 11.4315 2.53845C10.5084 2.01038 9.39792 1.83337 8.33874 1.85095C7.27962 1.8686 6.24338 2.17237 5.33776 2.73083C4.43228 3.28931 3.68896 4.08312 3.18444 5.02966C2.67997 5.97637 2.43217 7.04344 2.46667 8.1195C2.50128 9.19552 2.81762 10.2434 3.38171 11.1547C3.69778 11.6651 4.08806 12.1199 4.53308 12.5111L4.98034 12.9916C4.51617 13.1778 4.09236 13.2909 3.70983 13.3558C3.20279 12.9003 2.75894 12.3726 2.39538 11.7855C1.72119 10.6965 1.34394 9.4436 1.30261 8.15759C1.26144 6.87179 1.55726 5.59743 2.16003 4.46618C2.763 3.3348 3.65194 2.38659 4.73425 1.71911C5.81658 1.05171 7.05441 0.688399 8.32019 0.667355ZM7.21862 11.2318C6.43962 11.4657 5.81115 11.5852 5.34655 11.6478V7.68786H7.21862V11.2318ZM9.79284 10.2347C9.1089 10.5553 8.48385 10.8072 7.92077 11.0043V6.28357H9.79284V10.2347ZM10.8671 9.2865L11.1356 9.55505C10.9175 9.67411 10.7036 9.78563 10.495 9.89196V8.91345L10.8671 9.2865ZM12.3671 8.16247L11.0399 8.58044L10.495 8.75134V4.2865H12.3671V8.16247Z"
-          fill={`url(#${markGradient})`}
-        />
-
-        {/* Depth shadow */}
-        <Mask
-          id={depthMask}
-          maskUnits="userSpaceOnUse"
-          x="0"
-          y="0"
-          width="16"
-          height="16"
-        >
-          <Path
-            d="M5.69852 13.1378C2.72025 14.5888 1.01803 13.4242 0.666992 13.1378C1.09655 14.5697 3.10127 14.9362 4.76242 14.4743C6.14655 14.0894 12.4852 11.1902 13.3628 10.7036C12.3682 12.4219 7.58765 14.2515 5.86942 14.9038L7.20582 15.3333C8.12221 15.3333 10.028 13.9985 11.3105 13.4242C10.73 14.3495 9.62408 15.031 9.1627 15.3333C13.2483 15.0279 15.2935 10.7036 15.2935 7.68756L11.1673 8.98541L11.8355 9.65361C8.16994 11.7537 5.68518 12.0863 4.76242 12.134L5.69852 13.1378Z"
-            fill="#00BFC9"
-          />
-          <Path
-            d="M8.32116 0.667374C9.58665 0.64651 10.8354 0.968066 11.9384 1.59902C13.0414 2.23017 13.9605 3.14856 14.5995 4.25917C15.1041 5.13654 15.3172 6.47486 15.3846 6.99843C15.401 7.12542 15.3183 7.24153 15.1942 7.27284C15.0726 7.30323 14.9493 7.24311 14.8944 7.13515L14.8749 7.08632C14.751 6.64462 14.4685 5.71584 14.1239 5.11269C13.188 3.47496 12.3555 3.06656 11.4325 2.53847C10.5094 2.01035 9.39886 1.83345 8.33972 1.85097C7.28069 1.86858 6.24432 2.17252 5.33874 2.73085C4.43329 3.28928 3.68995 4.08321 3.18542 5.02968C2.68092 5.97642 2.43314 7.04342 2.46765 8.11952C2.50226 9.19562 2.81852 10.2434 3.38269 11.1547C3.69869 11.665 4.08826 12.12 4.53308 12.5111L4.98034 12.9916C4.51617 13.1778 4.09236 13.2909 3.70984 13.3559C3.20298 12.9004 2.75985 12.3725 2.39636 11.7855C1.7221 10.6964 1.34492 9.4437 1.30359 8.15761C1.2624 6.87177 1.55821 5.59748 2.16101 4.4662C2.76399 3.33489 3.65295 2.38656 4.73523 1.71913C5.81752 1.05185 7.05548 0.688378 8.32116 0.667374ZM7.2196 11.2318C6.4407 11.4658 5.81218 11.5852 5.34753 11.6478V7.68788H7.2196V11.2318ZM9.79382 10.2338C9.10977 10.5545 8.48493 10.8071 7.92175 11.0043V6.28359H9.79382V10.2338ZM10.8671 9.28652L11.1356 9.55507C10.9178 9.67397 10.7043 9.78576 10.496 9.89198V8.91444L10.8671 9.28652ZM12.368 8.16249L11.0399 8.58046L10.496 8.75136V4.28652H12.368V8.16249Z"
-            fill="#00BFC9"
-          />
-        </Mask>
-        <G mask={`url(#${depthMask})`}>
-          <Path
-            d="M9.62821 4.1772C9.34738 8.0152 5.30838 10.3008 3.47519 10.7299C3.74821 10.8469 4.52829 11.9 5.11344 12.7191C5.80709 13.6901 2.07104 13.6552 0.54988 12.7191C-2.25841 12.8361 0.549799 14.8253 0.549799 14.8253C6.03013 15.9705 9.75071 12.1229 11.7831 9.67678C11.7831 9.67678 10.7622 9.36718 11.081 8.85769C11.4105 8.33103 12.3268 8.60908 12.5535 8.15562V4.1772H11.6174H9.62821Z"
-            fill="#077479"
-          />
-        </G>
-      </G>
-
+    <Svg width={size} height={size * (1080 / 1055)} viewBox="10 20 1055 1080" style={style}>
       <Defs>
-        <LinearGradient
-          id={swooshGradient}
-          x1="7.98026"
-          y1="7.68756"
-          x2="7.98026"
-          y2="15.3333"
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0.408654" stopColor="#00BFC9" />
-          <Stop offset="0.894231" stopColor="#005E63" />
-        </LinearGradient>
-        <LinearGradient
-          id={markGradient}
-          x1="8.34228"
-          y1="0.666393"
-          x2="8.34228"
-          y2="13.3558"
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0.408654" stopColor="#00BFC9" />
-          <Stop offset="0.894231" stopColor="#005E63" />
-        </LinearGradient>
-        <ClipPath id={bounds}>
-          <Rect width="16" height="16" fill="white" />
+        <ClipPath id={id('shape')}>
+          <Path d="M590 25C760 25 920 120 1010 260C1035 300 1050 330 1052 352C1052 368 1040 376 1028 380C960 420 880 445 800 428C740 415 700 385 660 368C560 360 470 410 425 470C390 520 392 620 430 685C480 760 580 775 670 752C760 728 820 690 900 684C960 680 1020 700 1045 735C1060 755 1058 768 1048 790C1000 900 900 1010 760 1060C640 1100 480 1095 360 1040C200 960 40 820 25 600C15 380 150 170 330 80C410 40 500 25 590 25Z" />
         </ClipPath>
+        <LinearGradient id={id('top')} gradientUnits="userSpaceOnUse" x1="180" y1="320" x2="980" y2="160">
+          <Stop offset="0" stopColor="#8ED952" />
+          <Stop offset="0.5" stopColor="#BDEB58" />
+          <Stop offset="1" stopColor="#E6FA68" />
+        </LinearGradient>
+        <LinearGradient id={id('left')} gradientUnits="userSpaceOnUse" x1="40" y1="420" x2="420" y2="660">
+          <Stop offset="0" stopColor="#86DB6C" />
+          <Stop offset="0.55" stopColor="#5EC757" />
+          <Stop offset="1" stopColor="#3A9E47" />
+        </LinearGradient>
+        <LinearGradient id={id('core')} gradientUnits="userSpaceOnUse" x1="260" y1="640" x2="560" y2="560">
+          <Stop offset="0" stopColor="#174A25" />
+          <Stop offset="1" stopColor="#2D7D3F" />
+        </LinearGradient>
+        <LinearGradient id={id('lower')} gradientUnits="userSpaceOnUse" x1="520" y1="900" x2="1050" y2="740">
+          <Stop offset="0" stopColor="#2A7A3E" />
+          <Stop offset="0.6" stopColor="#3F9B53" />
+          <Stop offset="1" stopColor="#52B064" />
+        </LinearGradient>
+        <LinearGradient id={id('base')} gradientUnits="userSpaceOnUse" x1="250" y1="1000" x2="850" y2="1040">
+          <Stop offset="0" stopColor="#5DC664" />
+          <Stop offset="1" stopColor="#46AC56" />
+        </LinearGradient>
+        <Filter id={id('blur')} x="-20%" y="-20%" width="140%" height="140%">
+          <FeGaussianBlur stdDeviation="14" />
+        </Filter>
       </Defs>
+
+      <G clipPath={url('shape')}>
+        <Rect x="0" y="0" width="1083" height="1120" fill={url('core')} />
+
+        {/* Base fold */}
+        <Path d="M120 760C170 860 260 940 380 985C500 1025 650 1030 820 1005" fill="none" stroke="#0B2E14" strokeOpacity={0.7} strokeWidth={34} filter={url('blur')} />
+        <Path d="M120 760C170 860 260 940 380 985C500 1025 650 1030 820 1005L1100 1000L1100 1200L0 1200L0 760Z" fill={url('base')} />
+
+        {/* Lower fold */}
+        <Path d="M420 640C460 760 560 880 700 960C760 995 820 1010 880 1012" fill="none" stroke="#0B2E14" strokeOpacity={0.85} strokeWidth={40} filter={url('blur')} />
+        <Path d="M420 640C460 760 560 880 700 960C760 995 820 1010 880 1012L1150 1012L1150 600L420 600Z" fill={url('lower')} />
+        <Path d="M420 640C460 760 560 880 700 960C760 995 820 1010 880 1012" fill="none" stroke="#9CEBA0" strokeOpacity={0.55} strokeWidth={3} />
+
+        {/* Left fold */}
+        <Path d="M600 330C500 395 390 480 310 580C240 670 195 760 200 850C205 910 230 950 265 975" fill="none" stroke="#071F0D" strokeOpacity={0.9} strokeWidth={46} filter={url('blur')} />
+        <Path d="M600 330C500 395 390 480 310 580C240 670 195 760 200 850C205 910 230 950 265 975L0 1000L0 0L600 0Z" fill={url('left')} />
+        <Path d="M600 330C500 395 390 480 310 580C240 670 195 760 200 850C205 910 230 950 265 975" fill="none" stroke="#C9F7A0" strokeOpacity={0.7} strokeWidth={3.5} />
+
+        {/* Top fold */}
+        <Path d="M1028 380C960 420 880 445 800 428C740 415 700 385 660 368C580 330 480 260 400 220C330 190 240 188 150 232" fill="none" stroke="#123F1C" strokeOpacity={0.75} strokeWidth={40} filter={url('blur')} />
+        <Path d="M1028 380C960 420 880 445 800 428C740 415 700 385 660 368C580 330 480 260 400 220C330 190 240 188 150 232L100 180L0 0L1100 0L1100 380Z" fill={url('top')} />
+        <Path d="M1028 380C960 420 880 445 800 428C740 415 700 385 660 368C580 330 480 260 400 220C330 190 240 188 150 232" fill="none" stroke="#F6FFC0" strokeOpacity={0.65} strokeWidth={3} />
+      </G>
     </Svg>
   );
 };

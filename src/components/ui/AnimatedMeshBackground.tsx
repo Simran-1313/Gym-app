@@ -93,15 +93,15 @@ const Bloom = ({
 };
 
 /**
- * App-wide ambient ground. Two slow teal blooms over near-black navy, then a
+ * App-wide ambient ground. Two slow blooms (lime and green) over near-black, then a
  * vignette to pull focus to the centre. Deliberately quiet — cards and the
- * teal accent must be the only things that draw the eye.
+ * lime accent must be the only things that draw the eye.
  */
 export const AnimatedMeshBackground: React.FC<Props> = ({ isDark }) => {
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
-  const primaryBloom = isDark ? 'rgba(45,212,191,0.10)' : 'rgba(13,148,136,0.09)';
-  const secondaryBloom = isDark ? 'rgba(56,116,168,0.10)' : 'rgba(96,150,205,0.10)';
+  const primaryBloom = isDark ? 'rgba(199,255,74,0.08)' : 'rgba(63,107,0,0.07)';
+  const secondaryBloom = isDark ? 'rgba(58,158,71,0.10)' : 'rgba(142,217,82,0.12)';
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
