@@ -1,5 +1,5 @@
 import api, { clearCookie } from './api';
-import { ApiResponse, User } from '../types';
+import { ApiResponse, PlanFeatures, User } from '../types';
 
 export interface LoginPayload {
   email: string;
@@ -28,10 +28,25 @@ export const logout = async (): Promise<void> => {
   }
 };
 
-export const getMe = async (): Promise<User> => {
-  const res = await api.get<ApiResponse<{ user: User }>>('/member/auth/me');
+export interface MeResult {
+  user: User;
+  /** What the gym's Clasendra plan includes; null from an older API. */
+  features: PlanFeatures | null;
+}
+
+export const getMe = async (): Promise<MeResult> => {
+  const res = await api.get<ApiResponse<{ user: User; features?: PlanFeatures }>>('/member/auth/me');
   if (!res.data.success || !res.data.data) throw new Error('Failed to fetch profile');
-  return res.data.data.user;
+  return { user: res.data.data.user, features: res.data.data.features ?? null };
+};
+
+/**
+ * Emails a reset link if the address belongs to a member. The answer is the same
+ * either way, so it can't be used to find out who is a member.
+ */
+export const forgotPassword = async (email: string): Promise<string> => {
+  const res = await api.post<ApiResponse<null>>('/member/auth/forgot-password', { email });
+  return res.data.message ?? "If an account exists with that email, we've sent a password reset link.";
 };
 
 export const changePassword = async (payload: {

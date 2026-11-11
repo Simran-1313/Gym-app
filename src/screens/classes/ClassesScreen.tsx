@@ -298,7 +298,11 @@ const ScheduleCard: React.FC<{
               <View style={[s.capFill, { width: `${fillPct}%`, backgroundColor: fillColor }]} />
             </View>
             <Text style={[s.capLabel, { color: colors.textMuted }]}>
-              {isFull ? 'Full' : `${bookedCount}/${capacity}`}
+              {schedule.isWaitlisted && schedule.waitlistPosition
+                ? `Full · you're #${schedule.waitlistPosition}`
+                : isFull
+                  ? schedule.waitlistCount > 0 ? `Full · ${schedule.waitlistCount} waiting` : 'Full'
+                  : `${bookedCount}/${capacity}`}
             </Text>
           </View>
         </View>
@@ -336,33 +340,7 @@ export const ClassesScreen: React.FC = () => {
   const load = useCallback(async () => {
     try {
       setError(null);
-      let data = await getClassSchedules();
-
-      // Inject dummy data if backend is empty so user can experience the UI
-      if (!data || data.length === 0) {
-        const now = new Date();
-        const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
-        const dayAfter = new Date(now); dayAfter.setDate(dayAfter.getDate() + 2);
-
-        data = [
-          {
-            id: 'd1', classId: 'c1', startTime: new Date(now.setHours(9, 0, 0, 0)).toISOString(), endTime: new Date(now.setHours(9, 45, 0, 0)).toISOString(), capacity: 20, bookedCount: 20, isBooked: false,
-            class: { id: 'c1', name: 'Morning HIIT Blast', description: 'Intense cardio.', durationMinutes: 45, trainer: { id: 't1', name: 'Sarah Chen' } }
-          },
-          {
-            id: 'd2', classId: 'c2', startTime: new Date(now.setHours(17, 30, 0, 0)).toISOString(), endTime: new Date(now.setHours(18, 30, 0, 0)).toISOString(), capacity: 15, bookedCount: 12, isBooked: true,
-            class: { id: 'c2', name: 'Powerlifting Base', description: 'Heavy lifting.', durationMinutes: 60, trainer: { id: 't2', name: 'Mike Ross' } }
-          },
-          {
-            id: 'd3', classId: 'c3', startTime: new Date(tomorrow.setHours(8, 0, 0, 0)).toISOString(), endTime: new Date(tomorrow.setHours(9, 0, 0, 0)).toISOString(), capacity: 30, bookedCount: 10, isBooked: false,
-            class: { id: 'c3', name: 'Vinyasa Flow Yoga', description: 'Flexibility.', durationMinutes: 60, trainer: { id: 't3', name: 'Elena Gilbert' } }
-          },
-          {
-            id: 'd4', classId: 'c4', startTime: new Date(dayAfter.setHours(18, 0, 0, 0)).toISOString(), endTime: new Date(dayAfter.setHours(18, 45, 0, 0)).toISOString(), capacity: 25, bookedCount: 25, isBooked: false,
-            class: { id: 'c4', name: 'Spin Class Extreme', description: 'Cycling.', durationMinutes: 45, trainer: { id: 't4', name: 'Jason Todd' } }
-          }
-        ];
-      }
+      const data = await getClassSchedules();
 
       setSchedules(data);
       if (data.length > 0 && !selectedDate) {
@@ -389,11 +367,7 @@ export const ClassesScreen: React.FC = () => {
     setPendingId(schedule.id);
     try {
       await bookClass(schedule.id);
-      if (schedule.id.startsWith('d')) {
-        setSchedules(prev => prev.map(sc => sc.id === schedule.id ? { ...sc, isBooked: true, bookedCount: sc.bookedCount + 1 } : sc));
-      } else {
-        await load();
-      }
+      await load();
       setShowSuccess(true);
     }
     catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Booking failed'); }
@@ -406,11 +380,7 @@ export const ClassesScreen: React.FC = () => {
     setPendingId(schedule.id);
     try {
       await joinWaitlist(schedule.id);
-      if (schedule.id.startsWith('d')) {
-        setSchedules(prev => prev.map(sc => sc.id === schedule.id ? { ...sc, isWaitlisted: true } : sc));
-      } else {
-        await load();
-      }
+      await load();
       setShowSuccess(true);
     }
     catch (err: unknown) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not join the waitlist'); }
@@ -479,8 +449,15 @@ export const ClassesScreen: React.FC = () => {
           />
         ) : (
           <>
-            <SectionLabel colors={colors} zeroTop>{formatSectionDate(selectedDate)}</SectionLabel>
-            {filteredSchedules.length === 0 ? (
+            {schedules.length === 0 ? (
+              <EmptyState
+                icon="calendar-outline"
+                title="No classes scheduled yet"
+                subtitle="Your gym hasn’t put any classes on the timetable. Ask at the front desk what’s coming up."
+              />
+            ) : null}
+            {schedules.length > 0 ? <SectionLabel colors={colors} zeroTop>{formatSectionDate(selectedDate)}</SectionLabel> : null}
+            {schedules.length === 0 ? null : filteredSchedules.length === 0 ? (
               <EmptyState
                 icon="calendar-outline"
                 title="A rest day on the schedule"
@@ -511,7 +488,7 @@ export const ClassesScreen: React.FC = () => {
         title={confirmSchedule?.class?.name ?? 'Confirm Booking'}
         message={
           confirmSchedule && confirmTime
-            ? `${relativeDayLabel(confirmSchedule.startTime)} at ${confirmTime.main} ${confirmTime.meridiem} — you'll get a reminder 30 minutes before class starts`
+            ? `${relativeDayLabel(confirmSchedule.startTime)} at ${confirmTime.main} ${confirmTime.meridiem}. Can't make it? Cancel at least an hour before so someone else gets your place.`
             : "You're about to reserve your spot in this class"
         }
         confirmLabel="Confirm Booking"

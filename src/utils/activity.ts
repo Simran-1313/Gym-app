@@ -1,25 +1,12 @@
 import { CheckIn, WaterLogEntry } from '../types';
 
 /**
- * Pure derivations over check-in history. Every screen that shows minutes,
- * calories, visits or streaks goes through these, so Home, Activity and
- * Challenges can never disagree about the same member's numbers.
+ * Pure derivations over check-in history: calendar days, streaks and water.
+ * Minutes and calories are not estimated here; they come from the API's
+ * activity summary and analytics, which count visits and workouts in India time.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** A session with no checkout is credited a nominal 45 minutes rather than
- *  zero, so an in-progress visit still moves the ring. */
-export const OPEN_SESSION_MINUTES = 45;
-
-export const calcTotalMinutes = (checkIns: CheckIn[]): number =>
-  checkIns.reduce((total, ci) => {
-    if (!ci.checkedOutAt) return total + OPEN_SESSION_MINUTES;
-    const diff = new Date(ci.checkedOutAt).getTime() - new Date(ci.checkedInAt).getTime();
-    return total + Math.max(0, Math.round(diff / 60000));
-  }, 0);
-
-export const estimateCalories = (totalMinutes: number): number => Math.round(totalMinutes * 8);
 
 export const startOfDay = (d: Date | number | string) => {
   const copy = new Date(d);
@@ -28,19 +15,6 @@ export const startOfDay = (d: Date | number | string) => {
 };
 
 export const dayKey = (d: Date | string) => startOfDay(d).toDateString();
-
-/** Check-ins from the trailing seven days (rolling, not calendar week). */
-export const lastSevenDays = (checkIns: CheckIn[]) =>
-  checkIns.filter((ci) => Date.now() - new Date(ci.checkedInAt).getTime() < 7 * DAY_MS);
-
-export const checkInsOn = (checkIns: CheckIn[], day: Date) => {
-  const from = startOfDay(day).getTime();
-  const to = from + DAY_MS;
-  return checkIns.filter((ci) => {
-    const t = new Date(ci.checkedInAt).getTime();
-    return t >= from && t < to;
-  });
-};
 
 export const visitCountByDay = (checkIns: CheckIn[]): Record<string, number> => {
   const map: Record<string, number> = {};

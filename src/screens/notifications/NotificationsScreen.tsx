@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -8,11 +9,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 
-import { getNotifications, AppNotification } from '../../services/member.service';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../../services/member.service';
+import { AppNotification } from '../../types';
 import { FONTS, RADIUS } from '../../config/theme';
+import type { ThemeColors } from '../../config/theme';
 import { RootStackParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -26,18 +34,26 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 const GUTTER = 18;
 /** `rgba(45,212,200,0.14)` / `rgba(245,168,60,0.14)` — alpha suffix for a themed icon-tile tint (matches CheckInsScreen's TEAL_WASH). */
 const TINT_WASH = '24';
+const PAGE_SIZE = 20;
 
-const notificationIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  SYSTEM: 'settings-outline',
-  CLASS: 'barbell-outline',
-  DIET: 'nutrition-outline',
+/** Icon and tint by `data.type`, the field every notification the API writes carries. */
+const kindOf = (type: string | undefined, colors: ThemeColors): { icon: keyof typeof Ionicons.glyphMap; color: string } => {
+  switch (type) {
+    case 'ADMIN_BROADCAST':
+      return { icon: 'megaphone-outline', color: colors.primary };
+    case 'BIRTHDAY_GREETING':
+    case 'ANNIVERSARY_GREETING':
+      return { icon: 'gift-outline', color: colors.accent };
+    case 'CLASS_WAITLIST_PROMOTED':
+      return { icon: 'barbell-outline', color: colors.success };
+    case 'FREEZE_APPROVED':
+      return { icon: 'pause-circle-outline', color: colors.success };
+    case 'FREEZE_DECLINED':
+      return { icon: 'close-circle-outline', color: colors.danger };
+    default:
+      return { icon: 'notifications-outline', color: colors.primary };
+  }
 };
-
-const getNotificationColors = (colors: { primary: string; accent: string; success: string }) => ({
-  SYSTEM: colors.primary,
-  CLASS: colors.accent,
-  DIET: colors.success,
-});
 
 /** `.notif-time` — the prototype shows "2m" / "1h" / "Yesterday", never "…ago". */
 const formatTimeAgo = (iso: string) => {
@@ -54,23 +70,25 @@ const formatTimeAgo = (iso: string) => {
   return created.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
-const NotificationCard: React.FC<{ item: AppNotification; index: number }> = ({ item, index }) => {
+const NotificationCard: React.FC<{ item: AppNotification; index: number; onPress: (n: AppNotification) => void }> = ({
+  item,
+  index,
+  onPress,
+}) => {
   const colors = useThemeColors();
 
-  const icon = notificationIcons[item.type] ?? 'notifications-outline';
-  const nColors = getNotificationColors(colors);
-  const typeColor = nColors[item.type as keyof typeof nColors] ?? colors.primary;
+  const { icon, color: typeColor } = kindOf(item.data?.type, colors);
   const isUnread = !item.readAt;
 
   return (
     <StaggerItem index={index}>
+      <Pressable onPress={() => onPress(item)} accessibilityRole="button" accessibilityLabel={item.title}>
       {/* `.notif-row-full.unread { border-color: rgba(teal,0.25) }` — a fixed
           teal-tinted border regardless of notification type. */}
       <GlassCard
         style={[styles.card, isUnread && { borderColor: `${colors.primary}40` }]}
         innerStyle={styles.cardInner}
-      >
-        {/* `.notif-icon` — tinted background only while unread; read rows fall
+      >        {/* `.notif-icon` — tinted background only while unread; read rows fall
             back to the neutral recessed tile background. */}
         <View
           style={[
@@ -95,6 +113,7 @@ const NotificationCard: React.FC<{ item: AppNotification; index: number }> = ({ 
         {/* `.notif-unread-dot { top:16; right:14; width:7; height:7 }` */}
         {isUnread ? <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} /> : null}
       </GlassCard>
+      </Pressable>
     </StaggerItem>
   );
 };
@@ -106,23 +125,30 @@ export const NotificationsScreen: React.FC = () => {
   const onBack = navigation.canGoBack() ? () => navigation.goBack() : undefined;
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await getNotifications();
-      setNotifications(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load notifications');
+      const data = await getNotifications(1, PAGE_SIZE);
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+      setPage(1);
+      setHasMore(data.meta.hasNext);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
     }
-  };
+  }, []);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
-  }, []);
+  }, [load]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -130,10 +156,59 @@ export const NotificationsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await getNotifications(page + 1, PAGE_SIZE);
+      setNotifications((prev) => [...prev, ...data.notifications.filter((n) => !prev.some((p) => p.id === n.id))]);
+      setPage(page + 1);
+      setHasMore(data.meta.hasNext);
+    } catch {
+      // The next pull or scroll tries again.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  /** Reading one marks it read (optimistically) and opens what it's about. */
+  const open = (n: AppNotification) => {
+    Haptics.selectionAsync().catch(() => {});
+    if (!n.readAt) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x)));
+      setUnreadCount((c) => Math.max(0, c - 1));
+      markNotificationRead(n.id).catch(() => {});
+    }
+    const type = n.data?.type ?? '';
+    if (type.startsWith('FREEZE_')) navigation.navigate('Membership');
+    else if (type.startsWith('CLASS_')) navigation.dispatch(CommonActions.navigate({ name: 'MainTabs', params: { screen: 'Classes' } }));
+  };
+
+  const markAll = () => {
+    const now = new Date().toISOString();
+    setNotifications((prev) => prev.map((x) => (x.readAt ? x : { ...x, readAt: now })));
+    setUnreadCount(0);
+    markAllNotificationsRead().catch(() => {});
+  };
+
+  const header = (
+    <ScreenHeader
+      title="Notifications"
+      onBack={onBack}
+      right={
+        unreadCount > 0 ? (
+          <Pressable onPress={markAll} hitSlop={8} accessibilityRole="button" accessibilityLabel="Mark all as read">
+            <Text style={[styles.markAll, { color: colors.primary }]}>Mark all read</Text>
+          </Pressable>
+        ) : undefined
+      }
+    />
+  );
+
   if (loading) {
     return (
       <AnimatedScreen>
-        <ScreenHeader title="Notifications" onBack={onBack} />
+        {header}
         <LoadingSpinner fullScreen />
       </AnimatedScreen>
     );
@@ -142,7 +217,7 @@ export const NotificationsScreen: React.FC = () => {
   if (error) {
     return (
       <AnimatedScreen>
-        <ScreenHeader title="Notifications" onBack={onBack} />
+        {header}
         <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: GUTTER }}>
           <EmptyState
             icon="warning-outline"
@@ -161,7 +236,7 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
-      <ScreenHeader title="Notifications" onBack={onBack} />
+      {header}
       <FlatList
         style={styles.root}
         contentContainerStyle={[
@@ -170,7 +245,10 @@ export const NotificationsScreen: React.FC = () => {
         ]}
         data={notifications}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => <NotificationCard item={item} index={index} />}
+        renderItem={({ item, index }) => <NotificationCard item={item} index={index} onPress={open} />}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <LoadingSpinner /> : null}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
@@ -178,7 +256,7 @@ export const NotificationsScreen: React.FC = () => {
           <EmptyState
             icon="notifications-off-outline"
             title="All caught up!"
-            subtitle="Class updates, reminders and gym announcements will show up here."
+            subtitle="Gym announcements, class updates and replies about your membership will show up here."
           />
         }
         refreshControl={
@@ -190,6 +268,7 @@ export const NotificationsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  markAll: { fontSize: 13, fontFamily: FONTS.bodySemi },
   root: { flex: 1 },
   content: { paddingHorizontal: GUTTER },
 

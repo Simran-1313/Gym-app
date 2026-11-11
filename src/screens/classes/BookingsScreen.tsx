@@ -70,21 +70,20 @@ const relativeDayLabel = (iso: string): string => {
 type StatusKey = ClassBooking['status'];
 
 /**
- * Colors/icons per the prototype's four sample rows: Confirmed → teal,
- * Attended → neutral (surface-2 / text-muted, NOT a tint — the prototype's
- * "Attended" row has no background override), Cancelled → red. NO_SHOW and
- * WAITLISTED aren't in the mockup; they're extended sensibly (danger /
- * accent) since the real API can return them.
+ * Colors/icons per the prototype's sample rows: Booked → teal, Attended →
+ * neutral (surface-2 / text-muted, NOT a tint — the prototype's "Attended" row
+ * has no background override), Cancelled → red. NO_SHOW and WAITLISTED aren't
+ * in the mockup; they're extended sensibly (danger / accent).
  */
 const getStatusConfig = (colors: ThemeColors): Record<StatusKey, { color: string; icon: keyof typeof Ionicons.glyphMap; label: string; neutral?: boolean }> => ({
-  CONFIRMED: { color: colors.primary, icon: 'checkmark-circle-outline', label: 'Confirmed' },
+  BOOKED: { color: colors.primary, icon: 'checkmark-circle-outline', label: 'Booked' },
   ATTENDED: { color: colors.textSecondary, icon: 'checkmark-done-circle', label: 'Attended', neutral: true },
   NO_SHOW: { color: colors.danger, icon: 'close-circle-outline', label: 'No Show' },
   CANCELLED: { color: colors.danger, icon: 'close-circle-outline', label: 'Cancelled' },
   WAITLISTED: { color: colors.accent, icon: 'hourglass-outline', label: 'Waitlisted' },
 });
 
-const isUpcoming = (status: StatusKey) => status === 'CONFIRMED' || status === 'WAITLISTED';
+const isUpcoming = (status: StatusKey) => status === 'BOOKED' || status === 'WAITLISTED';
 
 /* ─── Section label (`.section-label`) ─── */
 
@@ -107,8 +106,12 @@ const BookingRow: React.FC<{
   colors: ThemeColors;
   onCancelPress: (b: ClassBooking) => void;
 }> = ({ booking, index, isPast, colors, onCancelPress }) => {
-  const cfg = getStatusConfig(colors)[booking.status] ?? getStatusConfig(colors).CONFIRMED;
-  const canCancel = booking.status === 'CONFIRMED';
+  const cfg = getStatusConfig(colors)[booking.status] ?? getStatusConfig(colors).BOOKED;
+  // A booking can be cancelled, and a place in the queue given up, until class.
+  const canCancel = booking.status === 'BOOKED' || booking.status === 'WAITLISTED';
+  // Upcoming rows show the next session; past ones, when they were booked
+  // (the slot repeats weekly, so its "next session" says nothing about the past).
+  const when = isPast ? booking.bookedAt : booking.schedule.startTime;
 
   const card = (
     <GlassCard style={[s.row, isPast && s.rowPast]} innerStyle={s.rowInner}>
@@ -126,7 +129,7 @@ const BookingRow: React.FC<{
           {booking.schedule.class.name}
         </Text>
         <Text style={[s.checkinMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-          {relativeDayLabel(booking.schedule.startTime)} · {formatTime(booking.schedule.startTime)}
+          {isPast ? `Booked ${relativeDayLabel(when)}` : `${relativeDayLabel(when)} · ${formatTime(when)}`}
         </Text>
       </View>
 
@@ -152,7 +155,11 @@ const BookingRow: React.FC<{
         <Pressable
           onPress={() => onCancelPress(booking)}
           accessibilityRole="button"
-          accessibilityLabel={`Cancel booking for ${booking.schedule.class.name}`}
+          accessibilityLabel={
+            booking.status === 'WAITLISTED'
+              ? `Leave the waitlist for ${booking.schedule.class.name}`
+              : `Cancel booking for ${booking.schedule.class.name}`
+          }
         >
           {card}
         </Pressable>
@@ -234,10 +241,14 @@ export const BookingsScreen: React.FC = () => {
       />
       <GlassOverlay
         visible={!!cancelTarget}
-        title="Cancel Booking"
-        message={`Cancel your booking for ${cancelTarget?.schedule.class.name ?? 'this class'}?`}
-        confirmLabel="Yes, Cancel"
-        cancelLabel="Keep Booking"
+        title={cancelTarget?.status === 'WAITLISTED' ? 'Leave Waitlist' : 'Cancel Booking'}
+        message={
+          cancelTarget?.status === 'WAITLISTED'
+            ? `Give up your place in the queue for ${cancelTarget.schedule.class.name}?`
+            : `Cancel your booking for ${cancelTarget?.schedule.class.name ?? 'this class'}? Your place goes to the next person waiting.`
+        }
+        confirmLabel={cancelTarget?.status === 'WAITLISTED' ? 'Leave Waitlist' : 'Yes, Cancel'}
+        cancelLabel={cancelTarget?.status === 'WAITLISTED' ? 'Stay in Line' : 'Keep Booking'}
         destructive
         loading={!!cancellingId}
         onConfirm={confirmCancel}
@@ -262,7 +273,7 @@ export const BookingsScreen: React.FC = () => {
           <EmptyState
             icon="bookmark-outline"
             title="No classes booked yet"
-            subtitle="Reserve a spot in a class and it’ll wait for you here, with a reminder before it starts."
+            subtitle="Book a place in a class and it’ll show up here."
             actionLabel="Browse Classes"
             onAction={() => navigation.dispatch(CommonActions.navigate({ name: 'MainTabs', params: { screen: 'Classes' } }))}
           />

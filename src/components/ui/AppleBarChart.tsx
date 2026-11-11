@@ -17,65 +17,6 @@ interface Props {
   customData?: DataPoint[];
 }
 
-const mockData: Record<Props['metricType'], Record<Props['viewMode'], DataPoint[]>> = {
-  CALORIES: {
-    DAILY: [
-      { label: 'M', value: 320, displayValue: '320 kcal' },
-      { label: 'T', value: 640, displayValue: '640 kcal' },
-      { label: 'W', value: 450, displayValue: '450 kcal' },
-      { label: 'T', value: 800, displayValue: '800 kcal' },
-      { label: 'F', value: 540, displayValue: '540 kcal' },
-      { label: 'S', value: 480, displayValue: '480 kcal' },
-      { label: 'S', value: 300, displayValue: '300 kcal' },
-    ],
-    MONTHLY: [
-      { label: 'Jan', value: 12500, displayValue: '12.5k kcal' },
-      { label: 'Feb', value: 14000, displayValue: '14.0k kcal' },
-      { label: 'Mar', value: 18200, displayValue: '18.2k kcal' },
-      { label: 'Apr', value: 11000, displayValue: '11.0k kcal' },
-      { label: 'May', value: 21000, displayValue: '21.0k kcal' },
-      { label: 'Jun', value: 9800, displayValue: '9.8k kcal' },
-    ],
-  },
-  DURATION: {
-    DAILY: [
-      { label: 'M', value: 30, displayValue: '30m' },
-      { label: 'T', value: 45, displayValue: '45m' },
-      { label: 'W', value: 60, displayValue: '60m' },
-      { label: 'T', value: 0, displayValue: '0m' },
-      { label: 'F', value: 45, displayValue: '45m' },
-      { label: 'S', value: 90, displayValue: '90m' },
-      { label: 'S', value: 15, displayValue: '15m' },
-    ],
-    MONTHLY: [
-      { label: 'Jan', value: 12.5, displayValue: '12.5 hrs' },
-      { label: 'Feb', value: 16.0, displayValue: '16.0 hrs' },
-      { label: 'Mar', value: 22.4, displayValue: '22.4 hrs' },
-      { label: 'Apr', value: 14.2, displayValue: '14.2 hrs' },
-      { label: 'May', value: 25.0, displayValue: '25.0 hrs' },
-      { label: 'Jun', value: 11.8, displayValue: '11.8 hrs' },
-    ],
-  },
-  WATER: {
-    DAILY: [
-      { label: 'M', value: 2000, displayValue: '2.0L' },
-      { label: 'T', value: 2500, displayValue: '2.5L' },
-      { label: 'W', value: 3000, displayValue: '3.0L' },
-      { label: 'T', value: 1500, displayValue: '1.5L' },
-      { label: 'F', value: 2250, displayValue: '2.25L' },
-      { label: 'S', value: 3000, displayValue: '3.0L' },
-      { label: 'S', value: 1800, displayValue: '1.8L' },
-    ],
-    MONTHLY: [
-      { label: 'Jan', value: 62000, displayValue: '62L' },
-      { label: 'Feb', value: 74000, displayValue: '74L' },
-      { label: 'Mar', value: 89000, displayValue: '89L' },
-      { label: 'Apr', value: 58000, displayValue: '58L' },
-      { label: 'May', value: 92000, displayValue: '92L' },
-      { label: 'Jun', value: 45000, displayValue: '45L' },
-    ],
-  },
-};
 
 /** The same hues the activity rings use, so a metric reads as one colour everywhere. */
 
@@ -110,7 +51,8 @@ const formatY = (val: number) => {
 
 export const AppleBarChart: React.FC<Props> = ({ metricType, viewMode, customData }) => {
   const colors = useThemeColors();
-  const raw = customData && customData.length > 0 ? customData : (mockData[metricType]?.[viewMode] ?? []);
+  // No data is an empty chart, never sample bars that look like the member's.
+  const raw = customData ?? [];
   // The API has sent numeric strings before; a string value made every bar
   // fall through to the empty marker.
   const data = raw.map((p) => ({ ...p, value: Math.max(0, finiteNum(p.value)) }));

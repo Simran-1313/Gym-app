@@ -23,6 +23,7 @@ import Animated, {
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAuth } from '../../context/AuthContext';
+import { forgotPassword } from '../../services/auth.service';
 import { FONTS, INPUT, INPUT_LABEL, INPUT_TEXT, SPACING } from '../../config/theme';
 import { isValidHex } from '../../utils/color';
 import { AnimatedButton } from '../../components/ui/AnimatedButton';
@@ -152,12 +153,26 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  // No self-serve reset exists on the backend; the gym resets member passwords.
-  const handleForgot = () =>
-    Alert.alert(
-      'Forgot password?',
-      'Ask your gym’s front desk to reset it — they’ll send you a new temporary password.',
-    );
+  // Emails a reset link to the address in the email field. The answer is the
+  // same whether or not an account exists, so it can't be used to probe emails.
+  const handleForgot = () => {
+    const address = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      Alert.alert('Forgot password?', 'Enter your email above, then tap “Forgot password?” again and we’ll email you a reset link.');
+      return;
+    }
+    Alert.alert('Reset your password?', `We’ll email a reset link to ${address}.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send Link',
+        onPress: () => {
+          forgotPassword(address)
+            .then((message) => Alert.alert('Check your email', message))
+            .catch(() => Alert.alert('Couldn’t send the link', 'Check your connection and try again, or ask your gym’s front desk.'));
+        },
+      },
+    ]);
+  };
 
   const handleFirstTime = () =>
     Alert.alert(

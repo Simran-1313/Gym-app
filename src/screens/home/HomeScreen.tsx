@@ -31,17 +31,13 @@ import {
   type ThemeColors,
 } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { ActiveSubscription, User, MemberProfile } from '../../types';
-import { getProfile } from '../../services/member.service';
+import { AnalyticsDataPoint, MemberProfile, MemberSubscription } from '../../types';
+import { getNotifications, getProfile } from '../../services/member.service';
+import { getActivityAnalytics } from '../../services/activity.service';
+import { getMembership } from '../../services/subscription.service';
 import { useActivity } from '../../context/ActivityContext';
 import { HydrationCard } from '../../components/activity/HydrationCard';
-import {
-  calcTotalMinutes,
-  checkInsOn,
-  estimateCalories,
-  nextMilestone,
-  startOfDay,
-} from '../../utils/activity';
+import { nextMilestone, startOfDay } from '../../utils/activity';
 import { RootStackParams, TabParams } from '../../navigation/AppNavigator';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -63,6 +59,15 @@ const CARD_W = SCREEN_W - GUTTER * 2;
 /** Accent used on the photographic hero. Fixed to the bright lime in both
  *  themes — light mode's deep olive disappears against the dark photo. */
 const HERO_ACCENT = '#C7FF4A';
+
+/** The IST calendar date of an instant, YYYY-MM-DD — the API buckets days in India time. */
+const istKey = (iso: string) => new Date(new Date(iso).getTime() + 330 * 60000).toISOString().slice(0, 10);
+
+const addDaysKey = (key: string, days: number) => {
+  const d = new Date(`${key}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
 
 const daysRemaining = (endDate: string) => {
   const diff = new Date(endDate).getTime() - Date.now();
@@ -238,7 +243,7 @@ const EnergyDial: React.FC<{ progress: number }> = ({ progress }) => {
 /* ─────────────────────── Screen ─────────────────────── */
 
 export const HomeScreen: React.FC = () => {
-  const { user, refreshUser, gym, theme } = useAuth();
+  const { user, refreshUser, gym, theme, hasFeature } = useAuth();
   const nav = useNavigation<HomeNavProp>();
   const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
@@ -250,6 +255,11 @@ export const HomeScreen: React.FC = () => {
   // Check-ins, goals, water and streak come from the shared activity store,
   // so this screen, Activity and Challenges always show the same numbers.
   const { checkIns, summary, water, stats, refresh: refreshActivity } = useActivity();
+  const [sub, setSub] = useState<MemberSubscription | null>(null);
+  const [unread, setUnread] = useState(0);
+  // Last 7 days (IST) from the API: calories feed the sparkline, minutes the week strip.
+  const [dailyCalories, setDailyCalories] = useState<AnalyticsDataPoint[]>([]);
+  const [dailyMinutes, setDailyMinutes] = useState<AnalyticsDataPoint[]>([]);
 
   // The BMI card's weight/height steppers used to open on fake defaults
   // (75kg/175cm) regardless of the signed-in member's real stats — showing a
@@ -261,7 +271,15 @@ export const HomeScreen: React.FC = () => {
 
   const loadActivityData = useCallback(async (force = false) => {
     try {
-      const [profileRes] = await Promise.all([getProfile(), refreshActivity(force)]);
+      const [profileRes] = await Promise.all([
+        getProfile(),
+        refreshActivity(force),
+        // Each of these is optional on Home: a failure leaves its card as it was.
+        getMembership().then((m) => setSub(m.subscription)).catch(() => {}),
+        getNotifications(1, 1).then((n) => setUnread(n.unreadCount)).catch(() => {}),
+        getActivityAnalytics('CALORIES', 'DAILY').then((r) => setDailyCalories(r.points)).catch(() => {}),
+        getActivityAnalytics('DURATION', 'DAILY').then((r) => setDailyMinutes(r.points)).catch(() => {}),
+      ]);
       if (profileRes) {
         setProfile(profileRes);
         setWeight((w) => w ?? profileRes.weight);
@@ -278,13 +296,12 @@ export const HomeScreen: React.FC = () => {
     }, [loadActivityData]),
   );
 
-  const sub = (user as User & { activeSubscription?: ActiveSubscription | null })
-    ?.activeSubscription;
   const activeDays = sub?.status === 'ACTIVE' ? daysRemaining(sub.endDate) : 0;
 
   /* ── Derived activity figures ── */
 
   const {
+    ready,
     weeklyVisits,
     weeklyMinutes: totalMinutes,
     weeklyCalories: totalCalories,
@@ -310,35 +327,32 @@ export const HomeScreen: React.FC = () => {
         : 'Just getting started today.';
 
   /** Per-day calories for the last 7 days, oldest first — feeds the sparkline. */
-  const dailySeries = useMemo(() => {
-    const today = startOfDay(new Date());
-    return Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(today);
-      day.setDate(day.getDate() - (6 - i));
-      return estimateCalories(calcTotalMinutes(checkInsOn(checkIns, day)));
-    });
-  }, [checkIns]);
+  const dailySeries = useMemo(
+    () => (dailyCalories.length ? dailyCalories.map((p) => p.value) : Array(7).fill(0)),
+    [dailyCalories],
+  );
 
-  /** Mon–Sun strip for the weekly progress card. */
+  /** Mon–Sun strip for the weekly progress card, in India time like the API's week. */
   const weekDays = useMemo(() => {
-    const today = startOfDay(new Date());
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    // JS weeks start Sunday; shift so Monday is index 0.
-    const mondayOffset = (today.getDay() + 6) % 7;
-    const monday = new Date(today);
-    monday.setDate(monday.getDate() - mondayOffset);
-
+    const minutesByDay = new Map(
+      dailyMinutes.filter((p) => p.timestamp).map((p) => [istKey(p.timestamp as string), p.value]),
+    );
+    const todayKey = istKey(new Date().toISOString());
+    let monday = summary?.week.start;
+    if (!monday) {
+      const today = startOfDay(new Date());
+      monday = addDaysKey(todayKey, -((today.getDay() + 6) % 7));
+    }
     return labels.map((label, i) => {
-      const day = new Date(monday);
-      day.setDate(day.getDate() + i);
-      const minutes = calcTotalMinutes(checkInsOn(checkIns, day));
+      const key = addDaysKey(monday as string, i);
       return {
         label,
-        progress: Math.min(1, minutes / 45),
-        isToday: day.getTime() === today.getTime(),
+        progress: Math.min(1, (minutesByDay.get(key) ?? 0) / 45),
+        isToday: key === todayKey,
       };
     });
-  }, [checkIns]);
+  }, [dailyMinutes, summary]);
 
   // null until the real profile has loaded — see the weight/height state above.
   const hasBmiInputs = weight != null && height != null;
@@ -446,6 +460,7 @@ export const HomeScreen: React.FC = () => {
             <Pressable
               onPress={() => {
                 tap();
+                setUnread(0);
                 nav.navigate('Notifications');
               }}
               style={({ pressed }) => [
@@ -457,6 +472,11 @@ export const HomeScreen: React.FC = () => {
               ]}
             >
               <Ionicons name="notifications-outline" size={18} color={colors.text} />
+              {unread > 0 ? (
+                <View style={[styles.bellBadge, { backgroundColor: colors.danger, borderColor: colors.surface }]}>
+                  <Text style={styles.bellBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+                </View>
+              ) : null}
             </Pressable>
             <Pressable
               onPress={() => {
@@ -560,15 +580,19 @@ export const HomeScreen: React.FC = () => {
               />
               <View style={styles.subStatusCopy}>
                 <Text style={[styles.subStatusTitle, { color: colors.text }]} numberOfLines={1}>
-                  {sub.plan.name} · {sub.status === 'ACTIVE' ? 'Active' : sub.status.charAt(0) + sub.status.slice(1).toLowerCase()}
+                  {sub.planName} · {sub.status === 'ACTIVE' ? 'Active' : sub.status.charAt(0) + sub.status.slice(1).toLowerCase()}
                 </Text>
                 <Text style={[styles.subStatusSub, { color: colors.textMuted }]} numberOfLines={1}>
-                  {sub.status === 'ACTIVE'
-                    ? `Renews in ${activeDays} day${activeDays === 1 ? '' : 's'} · ₹${sub.plan.price.toLocaleString('en-IN')}/mo`
-                    : 'Tap to renew your plan'}
+                  {sub.balanceDue > 0
+                    ? `₹${sub.balanceDue.toLocaleString('en-IN')} due · pay at the front desk`
+                    : sub.status === 'ACTIVE'
+                      ? `Ends in ${activeDays} day${activeDays === 1 ? '' : 's'}`
+                      : sub.status === 'FROZEN'
+                        ? 'Paused for now'
+                        : 'See your membership'}
                 </Text>
               </View>
-              <Text style={[styles.subStatusCta, { color: colors.primary }]}>Manage</Text>
+              <Text style={[styles.subStatusCta, { color: colors.primary }]}>View</Text>
             </Pressable>
           </View>
         ) : null}
@@ -611,9 +635,9 @@ export const HomeScreen: React.FC = () => {
 
             <View style={[styles.heroFooter, { borderTopColor: onPhotoRule }]}>
               {[
-                { label: 'Calories', value: `${totalCalories}` },
-                { label: 'Active Time', value: `${totalMinutes} min` },
-                { label: 'Workouts', value: `${weeklyVisits}` },
+                { label: 'Calories', value: ready ? `${totalCalories}` : '—' },
+                { label: 'Active Time', value: ready ? `${totalMinutes} min` : '—' },
+                { label: 'Gym Visits', value: ready ? `${weeklyVisits}` : '—' },
               ].map((stat, i) => (
                 <View
                   key={stat.label}
@@ -641,9 +665,9 @@ export const HomeScreen: React.FC = () => {
             icon="flame"
             label="Calories"
             value={
-              totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : `${totalCalories}`
+              !ready ? '—' : totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : `${totalCalories}`
             }
-            status={`${Math.round(moveProgress * 100)}% of goal`}
+            status={ready ? `${Math.round(moveProgress * 100)}% of weekly goal` : 'This week'}
             tint={colors.tint.energy}
             colors={colors}
             isDark={isDark}
@@ -653,8 +677,8 @@ export const HomeScreen: React.FC = () => {
           <MetricTile
             icon="fitness"
             label="Active"
-            value={`${totalMinutes}m`}
-            status={`${Math.round(exerciseProgress * 100)}% of goal`}
+            value={ready ? `${totalMinutes}m` : '—'}
+            status={ready ? `${Math.round(exerciseProgress * 100)}% of weekly goal` : 'This week'}
             tint={colors.tint.recovery}
             colors={colors}
             isDark={isDark}
@@ -674,8 +698,8 @@ export const HomeScreen: React.FC = () => {
           />
           <MetricTile
             icon="trophy"
-            label="Sessions"
-            value={`${weeklyVisits}`}
+            label="Gym Visits"
+            value={ready ? `${weeklyVisits}` : '—'}
             status="This week"
             tint={colors.tint.oxygen}
             colors={colors}
@@ -685,7 +709,8 @@ export const HomeScreen: React.FC = () => {
           />
         </View>
 
-        {/* ── Today's workout ── */}
+        {/* ── Today's workout — AI plans are a gym plan feature ── */}
+        {hasFeature('aiFeatures') ? (
         <View style={styles.block}>
           <View
             style={[
@@ -703,7 +728,7 @@ export const HomeScreen: React.FC = () => {
                 {user?.isOnboarded ? 'Your Training Split' : 'Build Your Plan'}
               </Text>
               <Text style={[styles.workoutMeta, { color: onArtMuted }]}>
-                {sub?.status === 'ACTIVE' ? `${activeDays} active days left` : 'Personalised by AI'}
+                {user?.isOnboarded ? 'Your plan for today' : 'Personalised by AI'}
               </Text>
 
               <Pressable
@@ -732,6 +757,7 @@ export const HomeScreen: React.FC = () => {
             </Pressable>
           </View>
         </View>
+        ) : null}
 
         {/* ── Weekly progress ── */}
         <View style={styles.block}>
@@ -769,12 +795,15 @@ export const HomeScreen: React.FC = () => {
           </GlassCard>
         </View>
 
-        {/* ── Coach insight ── */}
+        {/* ── Coach insight — the API's read on the week; tap through to the
+            coach when the gym has it, otherwise to the activity detail ── */}
+        {summary?.aiInsight ? (
         <View style={styles.block}>
           <Pressable
             onPress={() => {
               tap();
-              nav.navigate('Chat');
+              if (hasFeature('aiFeatures')) nav.navigate('Chat');
+              else nav.navigate('Activity');
             }}
             style={({ pressed }) => [
               styles.coachCard,
@@ -789,15 +818,17 @@ export const HomeScreen: React.FC = () => {
               <Ionicons name="sparkles" size={15} color={onPrimary} />
             </View>
             <View style={styles.coachCopy}>
-              <Text style={[styles.coachTitle, { color: colors.primary }]}>Your Coach</Text>
+              <Text style={[styles.coachTitle, { color: colors.primary }]}>
+                {hasFeature('aiFeatures') ? 'Your Coach' : 'This Week'}
+              </Text>
               <Text style={[styles.coachText, { color: colors.text }]} numberOfLines={3}>
-                {summary?.aiInsight ||
-                  `You've logged ${weeklyVisits} session${weeklyVisits === 1 ? '' : 's'} and ${totalCalories} kcal this week. Keep the streak alive.`}
+                {summary.aiInsight}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={15} color={colors.primary} />
           </Pressable>
         </View>
+        ) : null}
 
         {/* ── Hydration ── */}
         <View style={styles.block}>
@@ -810,12 +841,17 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.actionGrid}>
             {(
               [
-                { title: 'Diet Plan', icon: 'nutrition', tint: colors.tint.recovery, onPress: handleCreateDiet },
-                { title: 'Classes', icon: 'calendar', tint: colors.tint.hydration, onPress: () => nav.navigate('Classes') },
-                { title: 'Body Profile', icon: 'body', tint: colors.tint.energy, onPress: () => nav.navigate('Onboarding') },
-                { title: 'Store', icon: 'bag-handle', tint: colors.tint.sleep, onPress: () => nav.navigate('Products') },
+                { title: 'Diet Plan', icon: 'nutrition', tint: colors.tint.recovery, onPress: handleCreateDiet, feature: 'aiFeatures' },
+                { title: 'Classes', icon: 'calendar', tint: colors.tint.hydration, onPress: () => nav.navigate('Classes'), feature: 'classes' },
+                { title: 'Body Profile', icon: 'body', tint: colors.tint.energy, onPress: () => nav.navigate('Onboarding'), feature: null },
+                { title: 'Membership', icon: 'card', tint: colors.tint.oxygen, onPress: () => nav.navigate('Membership'), feature: null },
+                { title: 'Store', icon: 'bag-handle', tint: colors.tint.sleep, onPress: () => nav.navigate('Products'), feature: 'pos' },
               ] as const
-            ).map((a, i) => (
+            )
+              // Only what this gym's plan includes; four at most, to keep the grid even.
+              .filter((a) => a.feature === null || hasFeature(a.feature))
+              .slice(0, 4)
+              .map((a, i) => (
               <View key={a.title} style={styles.actionWrap}>
                 <Pressable
                   onPress={() => {
@@ -1023,6 +1059,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bellBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellBadgeText: { color: '#FFFFFF', fontSize: 9.5, fontFamily: FONTS.bodyBold },
   iconBtn: {
     width: 38,
     height: 38,

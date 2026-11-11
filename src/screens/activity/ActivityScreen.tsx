@@ -21,14 +21,12 @@ import { BlurView } from 'expo-blur';
 import {
   getActivityAnalytics,
   logWorkout,
-  getSyncDeviceStatus,
 } from '../../services/activity.service';
 import { useActivity } from '../../context/ActivityContext';
 import { HydrationCard } from '../../components/activity/HydrationCard';
+import { GoalsSheet } from '../../components/activity/GoalsSheet';
 import {
   AnalyticsDataPoint,
-  CheckIn,
-  SyncDeviceStatus,
   WorkoutType,
 } from '../../types';
 import { FONT_SIZE, FONTS, RADIUS, SPACING, metricTint } from '../../config/theme';
@@ -47,14 +45,11 @@ import { RootStackParams } from '../../navigation/AppNavigator';
 
 const DAYS_OF_WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-const hasCheckedInOnDay = (checkIns: CheckIn[], dayIndex: number): boolean => {
-  const targetDay = dayIndex === 6 ? 0 : dayIndex + 1;
-  const now = new Date();
-  return checkIns.some((ci) => {
-    const ciDate = new Date(ci.checkedInAt);
-    const isSameWeek = now.getTime() - ciDate.getTime() < 7 * 24 * 60 * 60 * 1000;
-    return isSameWeek && ciDate.getDay() === targetDay;
-  });
+/** The IST date key of day `index` (0 = Monday) of the week starting `weekStart` (YYYY-MM-DD). */
+const weekDayKey = (weekStart: string, index: number): string => {
+  const d = new Date(`${weekStart}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + index);
+  return d.toISOString().slice(0, 10);
 };
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string; icon: keyof typeof Ionicons.glyphMap; calPerMin: number }[] = [
@@ -80,9 +75,11 @@ export const ActivityScreen: React.FC = () => {
 
   // Check-ins, goals and water are the shared activity store's — the same
   // numbers Home and Challenges show.
-  const { loaded, checkIns, summary, water, stats, refresh } = useActivity();
+  const { loaded, summary, water, stats, refresh } = useActivity();
   const [chartPoints, setChartPoints] = useState<AnalyticsDataPoint[]>([]);
-  const [deviceStatus, setDeviceStatus] = useState<SyncDeviceStatus | null>(null);
+  const [chartError, setChartError] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,35 +93,39 @@ export const ActivityScreen: React.FC = () => {
   const [workoutElapsedSec, setWorkoutElapsedSec] = useState(0);
   const timerRef = useRef<any>(null);
 
+  const loadChart = useCallback(() => {
+    setChartError(false);
+    return getActivityAnalytics(activeMetric, viewMode)
+      .then((res) => setChartPoints(res.points))
+      .catch(() => {
+        setChartPoints([]);
+        setChartError(true);
+      });
+  }, [activeMetric, viewMode]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [analyticsRes, deviceRes] = await Promise.all([
-        getActivityAnalytics(activeMetric, viewMode),
-        getSyncDeviceStatus(),
-        refresh(),
-      ]);
-      setChartPoints(analyticsRes.points);
-      setDeviceStatus(deviceRes);
+      await Promise.all([refresh(true), loadChart()]);
     } catch (err: any) {
       setError(err.message || 'Failed to load activity data');
     } finally {
       setLoading(false);
     }
-  }, [activeMetric, viewMode, refresh]);
+  }, [refresh, loadChart]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [loadData])
+      // Switching metric or period reloads only the chart (below).
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
   useEffect(() => {
-    getActivityAnalytics(activeMetric, viewMode)
-      .then((res) => setChartPoints(res.points))
-      .catch((err) => console.log('Analytics error:', err));
-  }, [activeMetric, viewMode]);
+    loadChart();
+  }, [loadChart]);
 
   useEffect(() => {
     if (isWorkoutActive) {
@@ -147,16 +148,11 @@ export const ActivityScreen: React.FC = () => {
     setViewMode(mode);
   };
 
-  const handleWearableNotice = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-    Alert.alert('Coming Soon 🚀', 'Smartwatch & Health App integration is currently under active development. Stay tuned!');
-  };
-
   const handleStartWorkoutSession = () => { setWorkoutElapsedSec(0); setIsWorkoutActive(true); };
 
   const handleFinishWorkoutSession = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     setIsWorkoutActive(false);
+    setSaving(true);
     const minutes = Math.max(1, Math.round(workoutElapsedSec / 60));
     const calories = Math.round(minutes * selectedWorkout.calPerMin);
     try {
@@ -168,11 +164,16 @@ export const ActivityScreen: React.FC = () => {
         caloriesBurned: calories,
         source: 'APP_TIMER',
       });
-      Alert.alert('Workout Saved! 🔥', `Great job! You completed ${minutes}m of ${selectedWorkout.label} and burned ~${calories} kcal.`);
-      refresh(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      setIsWorkoutModalOpen(false);
+      Alert.alert('Workout saved', `${minutes} min of ${selectedWorkout.label}, about ${calories} kcal.`);
       loadData();
-    } catch (e) { console.log('Save workout error:', e); }
-    finally { setIsWorkoutModalOpen(false); }
+    } catch (err) {
+      // Keep the sheet open with the time on it, so trying again doesn't lose the session.
+      Alert.alert('Workout not saved', err instanceof Error ? err.message : 'Check your connection and tap Save again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const formatTimer = (sec: number) => {
@@ -202,9 +203,10 @@ export const ActivityScreen: React.FC = () => {
   }
 
   const {
+    ready,
     weeklyVisits,
-    weeklyMinutes: totalMinutes,
-    weeklyCalories: totalCalories,
+    weeklyMinutes,
+    weeklyCalories,
     exerciseGoal,
     calorieGoal,
     moveProgress,
@@ -213,6 +215,11 @@ export const ActivityScreen: React.FC = () => {
   } = stats;
 
   const activeColor = metricTint(colors, activeMetric);
+  // Until the summary loads, readings show a dash rather than a zero that looks real.
+  const totalMinutes = ready ? `${weeklyMinutes}` : '—';
+  const totalCalories = ready ? `${weeklyCalories}` : '—';
+  const visitDays = summary?.week.visitDays ?? [];
+  const weekStart = summary?.week.start;
 
   return (
     <AnimatedScreen>
@@ -232,8 +239,8 @@ export const ActivityScreen: React.FC = () => {
           />
           <View style={styles.ringsLegend}>
             {[
-              { icon: 'flame' as const, color: metricTint(colors, 'CALORIES'), label: 'Move', value: `${totalCalories}`, goal: `/ ${calorieGoal} kcal` },
-              { icon: 'fitness' as const, color: metricTint(colors, 'DURATION'), label: 'Exercise', value: `${totalMinutes}`, goal: `/ ${exerciseGoal} min` },
+              { icon: 'flame' as const, color: metricTint(colors, 'CALORIES'), label: 'Move', value: totalCalories, goal: `/ ${calorieGoal} kcal` },
+              { icon: 'fitness' as const, color: metricTint(colors, 'DURATION'), label: 'Exercise', value: totalMinutes, goal: `/ ${exerciseGoal} min` },
               { icon: 'water' as const, color: metricTint(colors, 'WATER'), label: 'Hydrate', value: (water.totalMl / 1000).toFixed(1), goal: `/ ${(water.goalMl / 1000).toFixed(1)} L` },
             ].map((r) => (
               <View key={r.label} style={styles.ringsRow}>
@@ -245,6 +252,10 @@ export const ActivityScreen: React.FC = () => {
                 </Text>
               </View>
             ))}
+            <Pressable onPress={() => setGoalsOpen(true)} hitSlop={8} style={styles.goalsLink} accessibilityRole="button">
+              <Ionicons name="options-outline" size={13} color={colors.primary} />
+              <Text style={[styles.detailsLinkText, { color: colors.primary }]}>Edit goals</Text>
+            </Pressable>
           </View>
         </GlassCard>
 
@@ -260,19 +271,19 @@ export const ActivityScreen: React.FC = () => {
             </View>
             <View style={styles.snapshotStatsRow}>
               <View style={styles.snapshotStat}>
-                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{weeklyVisits}</Text>
-                <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>WORKOUTS</Text>
+                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{ready ? weeklyVisits : '—'}</Text>
+                <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>GYM VISITS</Text>
               </View>
               <View style={[styles.snapshotDivider, { backgroundColor: colors.inset }]} />
               <View style={styles.snapshotStat}>
                 <Text style={[styles.snapshotStatValue, { color: colors.text }]}>
-                  {totalCalories >= 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : totalCalories}
+                  {ready && weeklyCalories >= 1000 ? `${(weeklyCalories / 1000).toFixed(1)}k` : totalCalories}
                 </Text>
                 <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>KCAL BURNED</Text>
               </View>
               <View style={[styles.snapshotDivider, { backgroundColor: colors.inset }]} />
               <View style={styles.snapshotStat}>
-                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{totalMinutes}m</Text>
+                <Text style={[styles.snapshotStatValue, { color: colors.text }]}>{ready ? `${weeklyMinutes}m` : '—'}</Text>
                 <Text style={[styles.snapshotStatLabel, { color: colors.textSecondary }]}>ACTIVE TIME</Text>
               </View>
             </View>
@@ -308,34 +319,8 @@ export const ActivityScreen: React.FC = () => {
           </Pressable>
         </View>
 
-        {/* ═══ WEARABLE TRACKER — Coming Soon ═══ */}
-        <View>
-          <GlassCard glowColor={undefined}>
-            <View style={styles.wearableRow}>
-              <View style={[styles.wearableIcon, { backgroundColor: colors.inset }]}>
-                <Ionicons name="watch-outline" size={22} color={colors.textMuted} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.wearableTitle, { color: colors.text }]}>Wearable Tracker</Text>
-                <Text style={[styles.wearableSub, { color: colors.textMuted }]}>
-                  Apple Health, Health Connect & Smartwatches
-                </Text>
-              </View>
-              <Pressable
-                onPress={handleWearableNotice}
-                style={({ pressed }) => [
-                  styles.comingSoonPill,
-                  { backgroundColor: `${colors.warning}1F`, borderColor: `${colors.warning}59` },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Text style={[styles.comingSoonPillText, { color: colors.warning }]}>Coming Soon</Text>
-              </Pressable>
-            </View>
-          </GlassCard>
-        </View>
-
-        {/* ═══ AI INSIGHT ═══ */}
+        {/* ═══ THIS WEEK — the API's read on the week, from real numbers ═══ */}
+        {summary?.aiInsight ? (
         <View>
           <GlassCard glowColor={colors.accent}>
             <View style={styles.insightRow}>
@@ -343,14 +328,15 @@ export const ActivityScreen: React.FC = () => {
                 <Ionicons name="sparkles" size={22} color={colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.insightLabel, { color: colors.accent }]}>FitCoach AI Insight</Text>
+                <Text style={[styles.insightLabel, { color: colors.accent }]}>This week</Text>
                 <Text style={[styles.insightBody, { color: colors.text }]}>
-                  {summary?.aiInsight || `You've burned ${totalCalories} kcal this week across ${weeklyVisits} workouts. Keep pushing to hit your goal!`}
+                  {summary.aiInsight}
                 </Text>
               </View>
             </View>
           </GlassCard>
         </View>
+        ) : null}
 
         {/* ═══ ANALYTICS & INTERACTIVE CHART ═══ */}
         <View>
@@ -387,8 +373,8 @@ export const ActivityScreen: React.FC = () => {
             {/* Metric Selector — 3 tappable metric cards */}
             <View style={styles.metricCardsRow}>
               {([
-                { key: 'CALORIES' as const, label: 'Move', value: `${totalCalories}`, unit: 'kcal', icon: 'flame' as const, color: metricTint(colors, 'CALORIES') },
-                { key: 'DURATION' as const, label: 'Exercise', value: `${totalMinutes}`, unit: 'min', icon: 'fitness' as const, color: metricTint(colors, 'DURATION') },
+                { key: 'CALORIES' as const, label: 'Move', value: totalCalories, unit: 'kcal', icon: 'flame' as const, color: metricTint(colors, 'CALORIES') },
+                { key: 'DURATION' as const, label: 'Exercise', value: totalMinutes, unit: 'min', icon: 'fitness' as const, color: metricTint(colors, 'DURATION') },
                 { key: 'WATER' as const, label: 'Hydration', value: `${(water.totalMl / 1000).toFixed(1)}`, unit: 'L', icon: 'water' as const, color: metricTint(colors, 'WATER') },
               ]).map((m) => {
                 const isActive = activeMetric === m.key;
@@ -413,7 +399,13 @@ export const ActivityScreen: React.FC = () => {
             </View>
 
             {/* Chart */}
-            <AppleBarChart metricType={activeMetric} viewMode={viewMode} customData={chartPoints} />
+            {chartError ? (
+              <Pressable onPress={loadChart} style={styles.chartError} accessibilityRole="button">
+                <Text style={[styles.detailsLinkText, { color: colors.textMuted }]}>Couldn’t load the chart. Tap to retry.</Text>
+              </Pressable>
+            ) : (
+              <AppleBarChart metricType={activeMetric} viewMode={viewMode} customData={chartPoints} />
+            )}
           </GlassCard>
         </View>
 
@@ -426,12 +418,12 @@ export const ActivityScreen: React.FC = () => {
             </View>
 
             <Text style={[styles.streakText, { color: colors.text }]}>
-              You attended gym <Text style={{ fontFamily: FONTS.bodyExtra, color: colors.primary }}>{weeklyVisits} days</Text> this week!
+              You attended gym <Text style={{ fontFamily: FONTS.bodyExtra, color: colors.primary }}>{visitDays.length} {visitDays.length === 1 ? 'day' : 'days'}</Text> this week
             </Text>
 
             <View style={styles.daysRow}>
               {DAYS_OF_WEEK.map((day, index) => {
-                const active = hasCheckedInOnDay(checkIns, index);
+                const active = weekStart ? visitDays.includes(weekDayKey(weekStart, index)) : false;
                 return (
                   <View key={index} style={styles.dayCol}>
                     <View
@@ -474,7 +466,7 @@ export const ActivityScreen: React.FC = () => {
 
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Live Workout ⏱️</Text>
-              <TouchableOpacity onPress={() => { setIsWorkoutActive(false); setIsWorkoutModalOpen(false); }}>
+              <TouchableOpacity onPress={() => { setIsWorkoutActive(false); setWorkoutElapsedSec(0); setIsWorkoutModalOpen(false); }}>
                 <Ionicons name="close-circle" size={28} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -511,7 +503,7 @@ export const ActivityScreen: React.FC = () => {
             </View>
 
             <View style={styles.modalActions}>
-              {!isWorkoutActive ? (
+              {!isWorkoutActive && workoutElapsedSec === 0 ? (
                 <AnimatedButton
                   label="Start Session"
                   onPress={handleStartWorkoutSession}
@@ -519,8 +511,9 @@ export const ActivityScreen: React.FC = () => {
                 />
               ) : (
                 <AnimatedButton
-                  label="Finish & Save"
+                  label={saving ? 'Saving…' : 'Finish & Save'}
                   onPress={handleFinishWorkoutSession}
+                  disabled={saving}
                   icon={<Ionicons name="checkmark-done" size={18} color={colors.white} />}
                 />
               )}
@@ -528,6 +521,8 @@ export const ActivityScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      <GoalsSheet visible={goalsOpen} onClose={() => setGoalsOpen(false)} />
     </AnimatedScreen>
   );
 };
@@ -544,6 +539,8 @@ const styles = StyleSheet.create({
   },
 
   detailsLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 'auto', marginRight: SPACING.sm },
+  goalsLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  chartError: { height: 160, alignItems: 'center', justifyContent: 'center' },
   detailsLinkText: { fontFamily: FONTS.bodySemi, fontSize: 12.5 },
 
   /* ── RINGS ── */
@@ -637,37 +634,6 @@ const styles = StyleSheet.create({
   },
 
   /* ── WEARABLE ── */
-  wearableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  wearableIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wearableTitle: {
-    fontSize: 15,
-    fontFamily: FONTS.bodyBold,
-  },
-  wearableSub: {
-    fontSize: 12,
-    fontFamily: FONTS.bodyMedium,
-    marginTop: 2,
-  },
-  comingSoonPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-  },
-  comingSoonPillText: {
-    fontSize: 10,
-    fontFamily: FONTS.bodyBold,
-  },
 
   /* ── AI INSIGHT ── */
   insightRow: {

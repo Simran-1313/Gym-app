@@ -19,7 +19,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { FONT_SIZE, FONTS, ThemeColors } from '../config/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { ActiveSubscription, AiPlan, WorkoutDay } from '../types';
+import { AiPlan, WorkoutDay } from '../types';
 
 // A flat, solid header — one elevation tier above the screen body, separated
 // by a single hairline. Replaces a blurred/gradient strip: cheaper to render,
@@ -60,7 +60,6 @@ import { ChatListScreen } from '../screens/chat/ChatListScreen';
 import { ChatRoomScreen } from '../screens/chat/ChatRoomScreen';
 import { AiCoachScreen } from '../screens/chat/AiCoachScreen';
 import { MembershipScreen } from '../screens/membership/MembershipScreen';
-import { CheckoutScreen } from '../screens/membership/CheckoutScreen';
 import { ChallengesScreen } from '../screens/challenges/ChallengesScreen';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
@@ -109,7 +108,6 @@ export type RootStackParams = {
   MetricDetail: { metric: 'CALORIES' | 'DURATION' | 'WATER' };
   Products: undefined;
   Membership: undefined;
-  Checkout: { subscription: ActiveSubscription };
   Challenges: undefined;
   // Also reachable from Profile, not just through the first-login gate — the
   // prototype has an in-app "Change Password" row (#screen-change-password-inapp).
@@ -181,6 +179,8 @@ const ClassesNavigator: React.FC = () => {
 
 const MainTabs: React.FC = () => {
   const colors = useThemeColors();
+  // Tabs for parts of Clasendra the gym's plan doesn't include are left out.
+  const { hasFeature } = useAuth();
 
   return (
     <Tab.Navigator
@@ -201,16 +201,20 @@ const MainTabs: React.FC = () => {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home', headerShown: false }} />
-      <Tab.Screen
-        name="Classes"
-        component={ClassesNavigator}
-        options={{ title: 'Classes', headerShown: false }}
-      />
-      <Tab.Screen
-        name="Chat"
-        component={ChatNavigator}
-        options={{ title: 'Chat', headerShown: false }}
-      />
+      {hasFeature('classes') ? (
+        <Tab.Screen
+          name="Classes"
+          component={ClassesNavigator}
+          options={{ title: 'Classes', headerShown: false }}
+        />
+      ) : null}
+      {hasFeature('chat') || hasFeature('aiFeatures') ? (
+        <Tab.Screen
+          name="Chat"
+          component={ChatNavigator}
+          options={{ title: 'Chat', headerShown: false }}
+        />
+      ) : null}
       <Tab.Screen name="CheckIns" component={CheckInsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
@@ -315,7 +319,6 @@ export const AppNavigator: React.FC = () => {
         <RootStack.Screen name="MetricDetail" component={MetricDetailScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="Products" component={ProductsNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Membership" component={MembershipScreen} options={{ headerShown: false }} />
-        <RootStack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="Challenges" component={ChallengesScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
       </RootStack.Navigator>

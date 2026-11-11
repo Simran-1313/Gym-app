@@ -8,7 +8,7 @@ import { getMe, login as apiLogin, logout as apiLogout, LoginPayload } from '../
 import { getDeviceTokenInfo } from '../services/deviceToken';
 import { disconnectSocket } from '../services/socket';
 import { cacheGym, getCachedGym, toGymBrand, GymBrand } from '../services/gymBrand';
-import { User } from '../types';
+import { PlanFeatureKey, PlanFeatures, User } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -38,6 +38,12 @@ interface AuthContextValue extends AuthState {
    * null only on a device that has never signed in.
    */
   gym: GymBrand | null;
+  /**
+   * Whether the gym's Clasendra plan includes a feature. Screens for one it
+   * doesn't stay hidden instead of failing with an upgrade error the member
+   * can do nothing about. True while unknown, so an older API hides nothing.
+   */
+  hasFeature: (key: PlanFeatureKey) => boolean;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
 }
@@ -56,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [cachedGym, setCachedGym] = useState<GymBrand | null>(null);
+  const [features, setFeatures] = useState<PlanFeatures | null>(null);
 
   // Follow the device until the member picks a side, then remember the pick.
   // Hardcoding 'light' meant a phone in dark mode opened to a bright screen,
@@ -89,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const endSession = useCallback(async () => {
     disconnectSocket();
     await clearCookie();
+    setFeatures(null);
     setState({ user: null, isLoading: false, isFirstLogin: false, restoreError: null });
   }, []);
 
@@ -104,8 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = useCallback(async () => {
     try {
-      const user = await getMe();
+      const { user, features: planFeatures } = await getMe();
       rememberGym(user);
+      setFeatures(planFeatures);
       setState((s) => ({ ...s, user, isFirstLogin: user.isFirstLogin }));
     } catch (err) {
       // Used to clear the cookie on *any* failure, so a dropped connection
@@ -126,13 +135,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     try {
-      const user = await getMe();
+      const { user, features: planFeatures } = await getMe();
       // Only auto-restore fully onboarded members. Everyone else must log in
       // first so the flow is always: Login → (change password) → onboarding.
       // Their onboarding answers are kept as a local draft, so this costs a
       // sign-in, not the form.
       if (user.isOnboarded) {
         rememberGym(user);
+        setFeatures(planFeatures);
         setState((s) => ({ ...s, user, isFirstLogin: user.isFirstLogin, isLoading: false, restoreError: null }));
       } else {
         await clearCookie();
@@ -193,6 +203,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const data = await apiLogin(fullPayload);
     rememberGym(data.user);
     setState((s) => ({ ...s, user: data.user, isFirstLogin: data.isFirstLogin }));
+    // Login doesn't carry the plan's features; /me does.
+    getMe()
+      .then(({ features: planFeatures }) => setFeatures(planFeatures))
+      .catch(() => {});
   }, [rememberGym]);
 
   const logout = useCallback(async () => {
@@ -201,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await apiLogout();
     } finally {
       // Offline logout still signs out locally; apiLogout already cleared the cookie.
+      setFeatures(null);
       setState({ user: null, isLoading: false, isFirstLogin: false, restoreError: null });
     }
   }, []);
@@ -212,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Live tenant wins over the cache — a member moved to another gym should see
   // the new branding the moment their session says so.
   const gym = toGymBrand(state.user?.tenant) ?? cachedGym;
+  const hasFeature = useCallback((key: PlanFeatureKey) => (features ? features[key] === true : true), [features]);
 
   return (
     <AuthContext.Provider
@@ -225,6 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         abandonRestore,
         setFirstLoginDone,
         gym,
+        hasFeature,
         theme,
         toggleTheme,
       }}

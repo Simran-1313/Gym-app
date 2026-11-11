@@ -139,11 +139,25 @@ export const WorkoutSessionScreen: React.FC = () => {
           : `Completed ${day.focus} — ${setsCompleted} sets across ${totalExercises} exercises.`,
       };
 
-      try {
-        await logWorkout(payload);
-      } catch {
-        // logWorkout already falls back to a local record on failure.
-      }
+      // A failed save is said out loud and can be retried; the session isn't
+      // quietly reported as logged when it wasn't.
+      const save = async (): Promise<void> => {
+        try {
+          await logWorkout(payload);
+        } catch (err) {
+          await new Promise<void>((resolve) => {
+            Alert.alert(
+              'Workout not saved',
+              err instanceof Error ? err.message : 'Check your connection and try again.',
+              [
+                { text: 'Discard', style: 'destructive', onPress: () => resolve() },
+                { text: 'Try Again', onPress: () => void save().then(resolve) },
+              ],
+            );
+          });
+        }
+      };
+      await save();
 
       if (!endedEarly) {
         setSummary({ durationMinutes, caloriesBurned, setsCompleted });

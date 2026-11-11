@@ -10,16 +10,9 @@ import React, {
 import * as SecureStore from 'expo-secure-store';
 
 import { getCheckIns } from '../services/member.service';
-import { getActivitySummary, getWaterSummary, logWater } from '../services/activity.service';
-import { ActivitySummary, CheckIn, WaterLogEntry } from '../types';
-import {
-  calcTotalMinutes,
-  computeStreaks,
-  estimateCalories,
-  finiteNum,
-  lastSevenDays,
-  normalizeWater,
-} from '../utils/activity';
+import { getActivitySummary, getWaterSummary, logWater, updateGoals } from '../services/activity.service';
+import { ActivityGoals, ActivitySummary, CheckIn, WaterLogEntry } from '../types';
+import { computeStreaks, finiteNum, normalizeWater } from '../utils/activity';
 import { useAuth } from './AuthContext';
 
 /**
@@ -27,6 +20,11 @@ import { useAuth } from './AuthContext';
  * summary and today's water. Home, Activity and Challenges all read from
  * here, so a glass logged on one screen is already on the others, and the
  * streak shown on Home is the same number Challenges awards badges on.
+ *
+ * Weekly minutes, calories and visits come from the API's summary, which
+ * counts gym visits and logged workouts in India time. Nothing here estimates
+ * them: if the summary can't load, `stats.ready` is false and screens show a
+ * dash rather than a zero that looks like the member's own.
  */
 
 /** Enough history for the 13-week contribution grid and the best-streak stat. */
@@ -49,14 +47,22 @@ interface ActivityContextValue {
   refresh: (force?: boolean) => Promise<void>;
   /** Optimistic: the total moves on the tap, the server catches up behind it. */
   addWater: (deltaMl: number) => void;
+  /** The member's targets, from the summary (API defaults until they set their own). */
+  goals: ActivityGoals;
+  /** Saves new targets and reloads the summary against them. */
+  saveGoals: (next: Partial<ActivityGoals>) => Promise<void>;
   stats: {
+    /** False until the summary has loaded; screens show "—" rather than 0. */
+    ready: boolean;
     weeklyVisits: number;
     weeklyMinutes: number;
     weeklyCalories: number;
     exerciseGoal: number;
     calorieGoal: number;
+    visitGoal: number;
     moveProgress: number;
     exerciseProgress: number;
+    visitProgress: number;
     waterProgress: number;
     streak: { current: number; best: number };
   };
@@ -67,12 +73,18 @@ const ActivityContext = createContext<ActivityContextValue | null>(null);
 const localDate = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const DEFAULT_WATER_GOAL = 3000;
+/** The API's own defaults, used only until the first summary arrives. */
+const DEFAULT_GOALS: ActivityGoals = {
+  weeklyCaloriesGoal: 2400,
+  weeklyActiveMinutesGoal: 300,
+  dailyWaterGoal: 3000,
+  daysPerWeek: 3,
+};
+const DEFAULT_WATER_GOAL = DEFAULT_GOALS.dailyWaterGoal;
 const emptyWater: WaterState = { totalMl: 0, goalMl: DEFAULT_WATER_GOAL, logs: [] };
 
-/* Today's water is mirrored on-device. Until the water endpoint is live the
-   service answers with a placeholder; without this mirror, every refetch
-   would snap the member's count back to it. */
+/* Today's water is mirrored on-device, so a glass logged offline (or while a
+   write is still in flight) survives a refetch instead of snapping back. */
 const waterKey = (userId: string) => `activity.water.${userId}.${localDate()}`;
 
 const readLocalWater = async (userId: string): Promise<WaterState | null> => {
@@ -136,15 +148,12 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ]);
 
         if (checkInRes) setCheckIns(checkInRes.checkIns ?? []);
-        // A placeholder summary would show 1.25 L the member never drank and a
-        // canned insight as theirs; without a real one, goals use defaults and
-        // screens build the insight from real check-ins.
-        if (summaryRes && !summaryRes.isFallback) setSummary(summaryRes);
+        if (summaryRes) setSummary(summaryRes);
 
         // Never let a refetch overwrite taps that haven't reached the server.
         if (pendingWrites.current === 0 && tapVersion.current === startVersion) {
-          const server = waterRes && !waterRes.isFallback ? normalizeWater(waterRes, DEFAULT_WATER_GOAL) : null;
-          const summaryWater = summaryRes && !summaryRes.isFallback ? normalizeWater(summaryRes.metrics?.hydration, DEFAULT_WATER_GOAL) : null;
+          const server = waterRes ? normalizeWater(waterRes, DEFAULT_WATER_GOAL) : null;
+          const summaryWater = summaryRes ? normalizeWater(summaryRes.metrics?.hydration, DEFAULT_WATER_GOAL) : null;
           const goalMl = server?.goalMl ?? summaryWater?.goalMl ?? localWater?.goalMl ?? DEFAULT_WATER_GOAL;
           if (server) {
             setWater(server);
@@ -197,7 +206,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           // on the total, adopt its log ids and goal. If it disagrees (a
           // dropped or misapplied write), keep the member's number rather
           // than jumping the opposite way to the tap.
-          const server = res && !res.isFallback ? normalizeWater(res, waterRef.current.goalMl, { requireTotal: true }) : null;
+          const server = res ? normalizeWater(res, waterRef.current.goalMl, { requireTotal: true }) : null;
           const local = waterRef.current;
           if (pendingWrites.current === 0 && server && server.totalMl === local.totalMl) {
             setWater({ ...local, goalMl: server.goalMl, logs: server.logs.length ? server.logs : local.logs });
@@ -225,28 +234,41 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [userId, refresh]);
 
+  const goals = summary?.goals ?? DEFAULT_GOALS;
+
+  const saveGoals = useCallback(
+    async (next: Partial<ActivityGoals>) => {
+      await updateGoals(next);
+      await refresh(true);
+    },
+    [refresh],
+  );
+
   const stats = useMemo(() => {
-    const weekly = lastSevenDays(checkIns);
-    const weeklyMinutes = calcTotalMinutes(weekly);
-    const weeklyCalories = estimateCalories(weeklyMinutes);
-    const exerciseGoal = summary?.metrics?.exerciseDuration?.goal ?? 300;
-    const calorieGoal = summary?.metrics?.calories?.goal ?? 2400;
+    const week = summary?.week;
+    const weeklyMinutes = finiteNum(week?.activeMinutes);
+    const weeklyCalories = finiteNum(week?.caloriesBurned);
+    // A "visit" goal counts days at the gym, not check-ins: two on one day is one day.
+    const visitDays = week?.visitDays?.length ?? 0;
     return {
-      weeklyVisits: weekly.length,
+      ready: Boolean(week),
+      weeklyVisits: finiteNum(week?.visits),
       weeklyMinutes,
       weeklyCalories,
-      exerciseGoal,
-      calorieGoal,
-      moveProgress: Math.min(1, weeklyCalories / calorieGoal),
-      exerciseProgress: Math.min(1, weeklyMinutes / exerciseGoal),
+      exerciseGoal: goals.weeklyActiveMinutesGoal,
+      calorieGoal: goals.weeklyCaloriesGoal,
+      visitGoal: goals.daysPerWeek,
+      moveProgress: Math.min(1, weeklyCalories / Math.max(1, goals.weeklyCaloriesGoal)),
+      exerciseProgress: Math.min(1, weeklyMinutes / Math.max(1, goals.weeklyActiveMinutesGoal)),
+      visitProgress: Math.min(1, visitDays / Math.max(1, goals.daysPerWeek)),
       waterProgress: Math.min(1, finiteNum(water.totalMl) / Math.max(1, finiteNum(water.goalMl, DEFAULT_WATER_GOAL))),
       streak: computeStreaks(checkIns),
     };
-  }, [checkIns, summary, water.totalMl, water.goalMl]);
+  }, [checkIns, summary, goals, water.totalMl, water.goalMl]);
 
   const value = useMemo<ActivityContextValue>(
-    () => ({ loaded, checkIns, summary, water, refresh, addWater, stats }),
-    [loaded, checkIns, summary, water, refresh, addWater, stats],
+    () => ({ loaded, checkIns, summary, water, refresh, addWater, goals, saveGoals, stats }),
+    [loaded, checkIns, summary, water, refresh, addWater, goals, saveGoals, stats],
   );
 
   return <ActivityContext.Provider value={value}>{children}</ActivityContext.Provider>;

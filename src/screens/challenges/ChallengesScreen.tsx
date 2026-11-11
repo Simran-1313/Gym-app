@@ -31,7 +31,6 @@ import {
 
 type Colors = ReturnType<typeof useThemeColors>;
 
-const MONTHLY_GOAL = 12; // ~3 sessions/week
 
 /* Contribution graph geometry. Thirteen weeks is a quarter — the window the
    shared store loads (90 days) — laid out GitHub-style: one column per week,
@@ -57,7 +56,9 @@ export const ChallengesScreen: React.FC = () => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { loaded, checkIns, refresh, stats } = useActivity();
+  const { loaded, checkIns, refresh, stats, goals } = useActivity();
+  // The member's weekly gym-days goal, over an average month (52 weeks / 12).
+  const monthlyGoal = Math.max(1, Math.round((goals.daysPerWeek * 52) / 12));
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
@@ -97,7 +98,7 @@ export const ChallengesScreen: React.FC = () => {
     );
   }
 
-  const monthlyProgress = Math.min(1, sessionsThisMonth / MONTHLY_GOAL);
+  const monthlyProgress = Math.min(1, sessionsThisMonth / monthlyGoal);
 
   // Badges are earned on the best run ever (a badge, once won, stays won);
   // the next rung is the first one not yet earned, paced by the current run.
@@ -200,7 +201,7 @@ export const ChallengesScreen: React.FC = () => {
           <View style={s.chBody}>
             <Text style={[s.chTitle, { color: colors.text }]}>Monthly Consistency</Text>
             <Text style={[s.chSub, { color: colors.textMuted }]}>
-              {sessionsThisMonth} of {MONTHLY_GOAL} sessions this month
+              {sessionsThisMonth} of {monthlyGoal} gym days this month
             </Text>
             <View style={[s.chTrack, { backgroundColor: colors.inset }]}>
               <View
