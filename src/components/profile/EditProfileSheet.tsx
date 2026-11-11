@@ -30,6 +30,7 @@ import { GlassInput } from '../ui/GlassInput';
 import { AnimatedChip } from '../ui/AnimatedChip';
 import { FitnessGoal, MemberProfile } from '../../types';
 import { GOALS } from './profileGoals';
+import { LIMITS } from '../../utils/onboardingProfile';
 
 /**
  * Photo edits are staged, not applied: picking or removing only changes the
@@ -44,10 +45,21 @@ interface Props {
   onClose: () => void;
   /** Called after a successful save with the re-submitted fitness profile, if it changed. */
   onSaved?: (profile: MemberProfile | null) => void;
+  /**
+   * Opens the full fitness form (Onboarding). Used when the profile is missing
+   * something this sheet can't edit (age, diet, activity), since the backend
+   * only accepts a complete profile.
+   */
+  onCompleteProfile?: () => void;
 }
 
-const WEIGHT_RANGE = { min: 25, max: 300 };
-const HEIGHT_RANGE = { min: 90, max: 250 };
+// Same ranges as onboarding, so a value saved here never fails its checks there.
+const WEIGHT_RANGE = { min: LIMITS.weightKg.min, max: LIMITS.weightKg.max, start: 70 };
+const HEIGHT_RANGE = { min: LIMITS.heightCm.min, max: LIMITS.heightCm.max, start: 170 };
+
+/** The backend stores skipped fields as null; treat null, 0 and NaN as "not set". */
+const known = (n: number | null | undefined): number | null =>
+  typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null;
 
 /* ─────────────── Form primitives ─────────────── */
 
@@ -77,23 +89,29 @@ const Section: React.FC<{ title: string; footer?: string; children: React.ReactN
 const StepperField: React.FC<{
   label: string;
   unit: string;
-  value: number;
+  /** null = not set yet; the first tap starts from `start`. */
+  value: number | null;
   min: number;
   max: number;
+  start: number;
   disabled?: boolean;
   onChange: (next: number) => void;
-}> = ({ label, unit, value, min, max, disabled, onChange }) => {
+}> = ({ label, unit, value, min, max, start, disabled, onChange }) => {
   const colors = useThemeColors();
 
   const step = (delta: number) => {
-    const next = Math.min(max, Math.max(min, value + delta));
+    // Whole numbers on screen; a stored 72.5 steps to 73 / 72.
+    const next =
+      value == null
+        ? start
+        : Math.min(max, Math.max(min, delta > 0 ? Math.floor(value) + 1 : Math.ceil(value) - 1));
     if (next === value) return;
     Haptics.selectionAsync().catch(() => {});
     onChange(next);
   };
 
-  const atMin = value <= min;
-  const atMax = value >= max;
+  const atMin = value != null && value <= min;
+  const atMax = value != null && value >= max;
 
   return (
     <View style={s.field}>
@@ -103,7 +121,7 @@ const StepperField: React.FC<{
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={label}
-        accessibilityValue={{ text: `${value} ${unit}` }}
+        accessibilityValue={{ text: value == null ? 'Not set' : `${value} ${unit}` }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => {
           if (disabled) return;
@@ -119,10 +137,16 @@ const StepperField: React.FC<{
         >
           <Ionicons name="remove" size={20} color={atMin ? colors.textFaint : colors.text} />
         </Pressable>
-        <Text style={[s.stepValue, { color: colors.text }]} numberOfLines={1}>
-          {value}
-          <Text style={[s.stepUnit, { color: colors.textSecondary }]}> {unit}</Text>
-        </Text>
+        {value == null ? (
+          <Text style={[s.stepValue, s.stepUnit, { color: colors.textMuted }]} numberOfLines={1}>
+            Not set
+          </Text>
+        ) : (
+          <Text style={[s.stepValue, { color: colors.text }]} numberOfLines={1}>
+            {value}
+            <Text style={[s.stepUnit, { color: colors.textSecondary }]}> {unit}</Text>
+          </Text>
+        )}
         <Pressable
           onPress={() => step(1)}
           disabled={disabled || atMax}
@@ -139,7 +163,7 @@ const StepperField: React.FC<{
 
 /* ─────────────── Sheet ─────────────── */
 
-export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, onSaved }) => {
+export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, onSaved, onCompleteProfile }) => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
@@ -148,8 +172,8 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [weight, setWeight] = useState(0);
-  const [height, setHeight] = useState(0);
+  const [weight, setWeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
   const [goal, setGoal] = useState<FitnessGoal | undefined>(undefined);
   const [photo, setPhoto] = useState<PhotoDraft>({ kind: 'keep' });
   const [saving, setSaving] = useState(false);
@@ -163,8 +187,8 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
     if (!visible) return;
     setName(user?.name ?? '');
     setPhone(user?.phone ?? '');
-    setWeight(profile?.weight ?? 0);
-    setHeight(profile?.height ?? 0);
+    setWeight(known(profile?.weight));
+    setHeight(known(profile?.height));
     setGoal(profile?.fitnessGoal);
     setPhoto({ kind: 'keep' });
     setSaving(false);
@@ -183,7 +207,18 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
   // is far too heavy to run because someone renamed themselves.
   const fitnessChanged =
     profile != null &&
-    (weight !== profile.weight || height !== profile.height || goal !== profile.fitnessGoal);
+    (weight !== known(profile.weight) ||
+      height !== known(profile.height) ||
+      goal !== profile.fitnessGoal);
+
+  // What the backend needs for a full profile save that this sheet can't set.
+  const missingElsewhere =
+    profile != null && (!known(profile.age) || !profile.dietPreference || !profile.activityLevel);
+
+  const openFullForm = () => {
+    onClose();
+    onCompleteProfile?.();
+  };
 
   const dirty = nameChanged || phoneChanged || photoChanged || fitnessChanged;
 
@@ -254,6 +289,25 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
       Alert.alert('Phone required', 'Enter a phone number, or tap Cancel to keep your current one.');
       return;
     }
+    if (fitnessChanged) {
+      // Checked before anything is saved, so a refused fitness change never
+      // leaves the name/photo half-saved behind it.
+      if (missingElsewhere) {
+        Alert.alert(
+          'Finish your fitness profile',
+          'Your age, diet or activity level is missing. Add them once in the full form, then you can edit weight and height here.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            ...(onCompleteProfile ? [{ text: 'Open form', onPress: openFullForm }] : []),
+          ],
+        );
+        return;
+      }
+      if (weight == null || height == null || !goal) {
+        Alert.alert('Add your details', 'Set your weight, height and goal before saving.');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -273,19 +327,21 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
       }
 
       let savedProfile: MemberProfile | null = null;
-      if (fitnessChanged && profile && goal) {
+      if (fitnessChanged && profile && goal && weight != null && height != null) {
         // Wait for the profile to be stored, not for the diet plan the
         // backend regenerates from it — that lands in the background.
+        // Skipped fields come back from GET as null; send them as absent, since
+        // older backends reject null (400 "Couldn't save").
         const { saved, request } = saveProfile({
           age: profile.age,
           weight,
           height,
-          gender: profile.gender,
+          gender: profile.gender ?? undefined,
           fitnessGoal: goal,
           dietPreference: profile.dietPreference,
           activityLevel: profile.activityLevel,
-          allergies: profile.allergies,
-          daysPerWeek: profile.daysPerWeek,
+          allergies: profile.allergies ?? undefined,
+          daysPerWeek: profile.daysPerWeek ?? undefined,
         });
         savedProfile = await saved;
         trackGeneration('DIET', request.then((r) => r.aiPlan));
@@ -472,6 +528,26 @@ export const EditProfileSheet: React.FC<Props> = ({ visible, profile, onClose, o
                   </View>
                 </Section>
               </>
+            ) : onCompleteProfile ? (
+              // No fitness profile saved yet: weight, height and goal are set
+              // in the full form, which also asks what the plans need.
+              <Section title="Body" footer="Used to calculate your BMI and tailor your plans.">
+                <Pressable
+                  onPress={openFullForm}
+                  disabled={saving}
+                  style={({ pressed }) => [
+                    s.stepper,
+                    { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[s.stepValue, { color: colors.primary, textAlign: 'left' }]}>
+                    Add weight, height and goal
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                </Pressable>
+              </Section>
             ) : null}
           </ScrollView>
         </KeyboardAvoidingView>

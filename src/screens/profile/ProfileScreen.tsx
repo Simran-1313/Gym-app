@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -150,16 +150,27 @@ export const ProfileScreen: React.FC = () => {
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const loadProfile = () => {
+  // A failed re-read keeps the metrics already on screen; only a first load
+  // with nothing to show turns into the error card.
+  const hasProfile = useRef(false);
+  const loadProfile = useCallback(() => {
     setProfileError(null);
     getProfile()
-      .then(setProfile)
-      .catch((err: unknown) =>
-        setProfileError(err instanceof Error ? err.message : 'Failed to load profile'),
-      );
-  };
+      .then((p) => {
+        hasProfile.current = p != null;
+        setProfile(p);
+      })
+      .catch((err: unknown) => {
+        if (!hasProfile.current) {
+          setProfileError(err instanceof Error ? err.message : 'Failed to load profile');
+        }
+      });
+  }, []);
 
-  useEffect(loadProfile, []);
+  // Tabs stay mounted, so a load-once screen kept showing whatever it read
+  // first (e.g. empty metrics from before the fitness form was filled in).
+  // Read again every time the tab comes back into view.
+  useFocusEffect(loadProfile);
 
   // The badge names the member's plan; no plan, or a failed read, says MEMBER.
   useEffect(() => {
@@ -224,8 +235,12 @@ export const ProfileScreen: React.FC = () => {
         profile={profile}
         onClose={() => setEditOpen(false)}
         onSaved={(saved) => {
-          if (saved) setProfile(saved);
+          if (saved) {
+            hasProfile.current = true;
+            setProfile(saved);
+          }
         }}
+        onCompleteProfile={() => navigation.navigate('Onboarding')}
       />
 
       <AvatarPreview
