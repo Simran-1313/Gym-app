@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
@@ -16,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
 import { streamAiCoachMessage, sendAiCoachMessage, ChatMessage } from '../../services/aiCoach.service';
+import { useAuth } from '../../context/AuthContext';
+import { readCache, removeCache, writeCache } from '../../utils/localCache';
 import { COMPOSER, FONTS, RADIUS } from '../../config/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { AnimatedScreen } from '../../components/ui/AnimatedScreen';
@@ -58,8 +61,37 @@ const SUGGESTIONS = [
   'Best exercises for fat loss?',
 ];
 
+// Unique across launches too: restored messages keep their ids, so a plain
+// counter starting at 0 would collide with them.
 let _msgId = 0;
-const nextId = () => String(++_msgId);
+const nextId = () => `${Date.now().toString(36)}-${++_msgId}`;
+
+/*
+ * The backend doesn't store coach chats (each request carries its own
+ * history), so the conversation is kept on this device, one file per member.
+ * Only finished, non-error messages are saved, newest MAX_SAVED kept.
+ */
+const MAX_SAVED = 100;
+const historyKey = (userId: string) => `ai-coach.${userId}`;
+
+const toSaved = (messages: LocalMessage[]): LocalMessage[] =>
+  messages
+    .filter((m) => !m.streaming && !m.error && m.content.trim())
+    .slice(-MAX_SAVED)
+    .map(({ id, role, content }) => ({ id, role, content }));
+
+const parseSaved = (raw: unknown): LocalMessage[] =>
+  Array.isArray(raw)
+    ? raw
+        .filter(
+          (m): m is LocalMessage =>
+            !!m &&
+            typeof m.id === 'string' &&
+            (m.role === 'user' || m.role === 'assistant') &&
+            typeof m.content === 'string',
+        )
+        .map(({ id, role, content }) => ({ id, role, content }))
+    : [];
 
 // ── Blinking cursor (`.ai-cursor`) ───────────────────────────────────────────
 
@@ -87,11 +119,16 @@ export const AiCoachScreen: React.FC = () => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // Don't save until the stored chat has been read, or an empty first render
+  // would overwrite it.
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const listRef = useRef<FlatList<LocalMessage>>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -99,6 +136,50 @@ export const AiCoachScreen: React.FC = () => {
   const scrollToBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
   }, []);
+
+  // Restore this member's earlier conversation.
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryLoaded(false);
+    if (!userId) {
+      setMessages([]);
+      return;
+    }
+    readCache<unknown>(historyKey(userId)).then((raw) => {
+      if (cancelled) return;
+      const saved = parseSaved(raw);
+      // A message sent before the read finished goes after the saved ones.
+      setMessages((current) => [...saved, ...current]);
+      setHistoryLoaded(true);
+      if (saved.length) setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Save after every finished reply (not on each streamed token).
+  useEffect(() => {
+    if (!userId || !historyLoaded || streamingId) return;
+    const saved = toSaved(messages);
+    if (saved.length) writeCache(historyKey(userId), saved);
+    else removeCache(historyKey(userId));
+  }, [messages, streamingId, historyLoaded, userId]);
+
+  const clearChat = useCallback(() => {
+    Alert.alert('Clear chat?', 'This deletes your conversation with FitCoach on this phone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          abortRef.current?.abort();
+          setMessages([]);
+          if (userId) removeCache(historyKey(userId));
+        },
+      },
+    ]);
+  }, [userId]);
 
   const send = useCallback(
     async (text: string) => {
@@ -134,10 +215,15 @@ export const AiCoachScreen: React.FC = () => {
       scrollToBottom();
 
       // Build OpenRouter-compatible history from prior messages
-      const history: ChatMessage[] = priorMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      // Error bubbles aren't coach replies, so they aren't sent as history.
+      // The backend keeps only the last 8 turns anyway; 20 messages covers it.
+      const history: ChatMessage[] = priorMessages
+        .filter((m) => !m.error && m.content.trim())
+        .slice(-20)
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
       const abort = new AbortController();
       abortRef.current = abort;
@@ -265,7 +351,23 @@ export const AiCoachScreen: React.FC = () => {
 
   return (
     <AnimatedScreen>
-      <ScreenHeader title="FitCoach AI" onBack={() => navigation.goBack()} />
+      <ScreenHeader
+        title="FitCoach AI"
+        onBack={() => navigation.goBack()}
+        right={
+          isEmpty ? null : (
+            <TouchableOpacity
+              onPress={clearChat}
+              disabled={busy}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear chat"
+            >
+              <Ionicons name="trash-outline" size={20} color={busy ? colors.textMuted : colors.text} />
+            </TouchableOpacity>
+          )
+        }
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
